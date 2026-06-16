@@ -1,0 +1,227 @@
+[
+  {
+    "id": "dsa-two-sum",
+    "question": "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers that add up to `target`. Each input has exactly one solution, and you may not use the same element twice. Example: Input nums = [2,7,11,15], target = 9 -> Output [0,1] (because nums[0] + nums[1] == 9).",
+    "answer": "Use a hash map to store each value's index as you iterate. For every element `x`, check whether `target - x` already exists in the map. If it does, you have found the pair and return both indices; otherwise store `x` with its index. This avoids the brute-force O(n^2) double loop by trading space for time.\n\n**Time O(n), Space O(n)**",
+    "code": "function twoSum(nums, target) {\n  const seen = new Map();\n  for (let i = 0; i < nums.length; i++) {\n    const need = target - nums[i];\n    if (seen.has(need)) return [seen.get(need), i];\n    seen.set(nums[i], i);\n  }\n  return [];\n}",
+    "codeLang": "js",
+    "tags": ["array", "hashing", "hash-map"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-valid-palindrome",
+    "question": "Given a string `s`, return true if it is a palindrome after converting all uppercase letters to lowercase and removing all non-alphanumeric characters. Example: Input s = \"A man, a plan, a canal: Panama\" -> Output true.",
+    "answer": "Use two pointers, one at each end. Skip any character that is not alphanumeric. Compare the lowercased characters at the two pointers; if they ever differ, it is not a palindrome. Move the pointers inward until they cross. This checks the string in a single pass without building a new string.\n\n**Time O(n), Space O(1)**",
+    "code": "function isPalindrome(s) {\n  const isAlnum = (c) => /[a-z0-9]/i.test(c);\n  let i = 0, j = s.length - 1;\n  while (i < j) {\n    while (i < j && !isAlnum(s[i])) i++;\n    while (i < j && !isAlnum(s[j])) j--;\n    if (s[i].toLowerCase() !== s[j].toLowerCase()) return false;\n    i++; j--;\n  }\n  return true;\n}",
+    "codeLang": "js",
+    "tags": ["string", "two-pointers"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-valid-anagram",
+    "question": "Given two strings `s` and `t`, return true if `t` is an anagram of `s` (uses exactly the same characters with the same frequencies). Example: Input s = \"anagram\", t = \"nagaram\" -> Output true.",
+    "answer": "If the lengths differ they cannot be anagrams. Otherwise count character frequencies in `s` using a hash map, then decrement for each character in `t`. If any count goes negative or a character is missing, return false. Equivalently, all counts must end at zero.\n\n**Time O(n), Space O(1)** (bounded alphabet)",
+    "code": "function isAnagram(s, t) {\n  if (s.length !== t.length) return false;\n  const count = {};\n  for (const c of s) count[c] = (count[c] || 0) + 1;\n  for (const c of t) {\n    if (!count[c]) return false;\n    count[c]--;\n  }\n  return true;\n}",
+    "codeLang": "js",
+    "tags": ["string", "hashing", "counting"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-contains-duplicate",
+    "question": "Given an integer array `nums`, return true if any value appears at least twice, and false if every element is distinct. Example: Input nums = [1,2,3,1] -> Output true.",
+    "answer": "Track seen values in a hash set. As you iterate, if a value is already in the set you have found a duplicate and return true immediately; otherwise add it. If you finish the loop with no repeats, return false.\n\n**Time O(n), Space O(n)**",
+    "code": "function containsDuplicate(nums) {\n  const seen = new Set();\n  for (const n of nums) {\n    if (seen.has(n)) return true;\n    seen.add(n);\n  }\n  return false;\n}",
+    "codeLang": "js",
+    "tags": ["array", "hashing", "hash-set"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-best-time-buy-sell-stock",
+    "question": "Given an array `prices` where `prices[i]` is the stock price on day `i`, return the maximum profit from buying on one day and selling on a later day. Return 0 if no profit is possible. Example: Input prices = [7,1,5,3,6,4] -> Output 5 (buy at 1, sell at 6).",
+    "answer": "Track the minimum price seen so far as a candidate buy day. For each price, the best profit selling today is `price - minSoFar`; keep the maximum of these. Update the running minimum as you go. A single pass suffices.\n\n**Time O(n), Space O(1)**",
+    "code": "function maxProfit(prices) {\n  let minPrice = Infinity, best = 0;\n  for (const p of prices) {\n    if (p < minPrice) minPrice = p;\n    else if (p - minPrice > best) best = p - minPrice;\n  }\n  return best;\n}",
+    "codeLang": "js",
+    "tags": ["array", "greedy", "sliding-window"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-maximum-subarray",
+    "question": "Given an integer array `nums`, find the contiguous subarray with the largest sum and return that sum. Example: Input nums = [-2,1,-3,4,-1,2,1,-5,4] -> Output 6 (subarray [4,-1,2,1]).",
+    "answer": "Use Kadane's algorithm. Maintain the best sum of a subarray ending at the current index: either extend the previous subarray or start fresh at the current element, whichever is larger. Track the global maximum of these running sums.\n\n**Time O(n), Space O(1)**",
+    "code": "function maxSubArray(nums) {\n  let cur = nums[0], best = nums[0];\n  for (let i = 1; i < nums.length; i++) {\n    cur = Math.max(nums[i], cur + nums[i]);\n    best = Math.max(best, cur);\n  }\n  return best;\n}",
+    "codeLang": "js",
+    "tags": ["array", "dynamic-programming", "kadane"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-move-zeroes",
+    "question": "Given an integer array `nums`, move all 0s to the end while keeping the relative order of the non-zero elements. Do it in place. Example: Input nums = [0,1,0,3,12] -> Output [1,3,12,0,0].",
+    "answer": "Use a write pointer `j` that marks where the next non-zero element belongs. Scan with a read pointer; whenever you find a non-zero value, swap it into position `j` and advance `j`. After the pass, all non-zeros are packed at the front in order and zeros fill the rest.\n\n**Time O(n), Space O(1)**",
+    "code": "function moveZeroes(nums) {\n  let j = 0;\n  for (let i = 0; i < nums.length; i++) {\n    if (nums[i] !== 0) {\n      [nums[j], nums[i]] = [nums[i], nums[j]];\n      j++;\n    }\n  }\n  return nums;\n}",
+    "codeLang": "js",
+    "tags": ["array", "two-pointers", "in-place"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-merge-sorted-array",
+    "question": "Given two sorted arrays `a` and `b`, merge them into a single sorted array and return it. Example: Input a = [1,3,5], b = [2,4,6] -> Output [1,2,3,4,5,6].",
+    "answer": "Use two pointers, one per array, comparing the current elements and appending the smaller to the result, then advancing that pointer. When one array is exhausted, append the remaining tail of the other. This merge is the core step of merge sort.\n\n**Time O(n + m), Space O(n + m)**",
+    "code": "function mergeSorted(a, b) {\n  const res = [];\n  let i = 0, j = 0;\n  while (i < a.length && j < b.length) {\n    if (a[i] <= b[j]) res.push(a[i++]);\n    else res.push(b[j++]);\n  }\n  while (i < a.length) res.push(a[i++]);\n  while (j < b.length) res.push(b[j++]);\n  return res;\n}",
+    "codeLang": "js",
+    "tags": ["array", "two-pointers", "merge"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-valid-parentheses",
+    "question": "Given a string `s` containing only the characters '()[]{}', return true if every opening bracket is closed by the same type of bracket in the correct order. Example: Input s = \"()[]{}\" -> Output true; Input s = \"(]\" -> Output false.",
+    "answer": "Push every opening bracket onto a stack. On a closing bracket, the stack top must be its matching opener; if the stack is empty or the top does not match, return false. After processing all characters, the stack must be empty for the string to be valid.\n\n**Time O(n), Space O(n)**",
+    "code": "function isValid(s) {\n  const stack = [];\n  const pairs = { ')': '(', ']': '[', '}': '{' };\n  for (const c of s) {\n    if (c === '(' || c === '[' || c === '{') stack.push(c);\n    else if (stack.pop() !== pairs[c]) return false;\n  }\n  return stack.length === 0;\n}",
+    "codeLang": "js",
+    "tags": ["string", "stack"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-implement-queue-using-stacks",
+    "question": "Implement a FIFO queue using only two stacks. Support push(x), pop() (remove and return front), peek() (return front), and empty(). Example: push(1), push(2), peek() -> 1, pop() -> 1, empty() -> false.",
+    "answer": "Keep an `in` stack for pushes and an `out` stack for pops. On pop/peek, if `out` is empty, pour every element from `in` into `out`, which reverses the order so the oldest element ends up on top. Each element is moved at most once, giving amortized O(1) per operation.\n\n**Time O(1) amortized per op, Space O(n)**",
+    "code": "class MyQueue {\n  constructor() { this.in = []; this.out = []; }\n  push(x) { this.in.push(x); }\n  _shift() {\n    if (this.out.length === 0) {\n      while (this.in.length) this.out.push(this.in.pop());\n    }\n  }\n  pop() { this._shift(); return this.out.pop(); }\n  peek() { this._shift(); return this.out[this.out.length - 1]; }\n  empty() { return this.in.length === 0 && this.out.length === 0; }\n}",
+    "codeLang": "js",
+    "tags": ["stack", "queue", "design"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-reverse-linked-list",
+    "question": "Given the head of a singly linked list, reverse the list and return the new head. Example: Input 1->2->3->4->5 -> Output 5->4->3->2->1.",
+    "answer": "Iterate through the list maintaining a `prev` pointer initialized to null. For each node, save its `next`, point the node's `next` to `prev`, then advance both `prev` and the current pointer. When iteration ends, `prev` is the new head.\n\n**Time O(n), Space O(1)**",
+    "code": "function reverseList(head) {\n  let prev = null, cur = head;\n  while (cur) {\n    const next = cur.next;\n    cur.next = prev;\n    prev = cur;\n    cur = next;\n  }\n  return prev;\n}",
+    "codeLang": "js",
+    "tags": ["linked-list", "two-pointers", "in-place"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-merge-two-sorted-lists",
+    "question": "Given the heads of two sorted singly linked lists `l1` and `l2`, merge them into one sorted list and return its head. Example: Input 1->2->4 and 1->3->4 -> Output 1->1->2->3->4->4.",
+    "answer": "Use a dummy head node and a tail pointer. Compare the current nodes of both lists, attach the smaller one to the tail, and advance that list. When one list is exhausted, attach the remainder of the other. Return dummy.next as the merged head.\n\n**Time O(n + m), Space O(1)**",
+    "code": "function mergeTwoLists(l1, l2) {\n  const dummy = { next: null };\n  let tail = dummy;\n  while (l1 && l2) {\n    if (l1.val <= l2.val) { tail.next = l1; l1 = l1.next; }\n    else { tail.next = l2; l2 = l2.next; }\n    tail = tail.next;\n  }\n  tail.next = l1 || l2;\n  return dummy.next;\n}",
+    "codeLang": "js",
+    "tags": ["linked-list", "two-pointers", "merge"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-linked-list-cycle",
+    "question": "Given the head of a singly linked list, return true if the list has a cycle (a node reachable again by following next pointers). Example: a list whose tail points back to its second node -> Output true.",
+    "answer": "Use Floyd's tortoise-and-hare: a slow pointer advances one step and a fast pointer two steps per iteration. If there is a cycle, the fast pointer will eventually lap and meet the slow pointer. If fast reaches null, there is no cycle. This uses constant extra space.\n\n**Time O(n), Space O(1)**",
+    "code": "function hasCycle(head) {\n  let slow = head, fast = head;\n  while (fast && fast.next) {\n    slow = slow.next;\n    fast = fast.next.next;\n    if (slow === fast) return true;\n  }\n  return false;\n}",
+    "codeLang": "js",
+    "tags": ["linked-list", "two-pointers", "fast-slow-pointers"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-middle-of-linked-list",
+    "question": "Given the head of a singly linked list, return the middle node. If there are two middle nodes (even length), return the second one. Example: Input 1->2->3->4->5 -> Output node with value 3; Input 1->2->3->4->5->6 -> Output node with value 4.",
+    "answer": "Use fast and slow pointers from the head. Advance slow by one and fast by two each step. When fast runs off the end, slow sits at the middle. For even lengths this naturally lands on the second middle node.\n\n**Time O(n), Space O(1)**",
+    "code": "function middleNode(head) {\n  let slow = head, fast = head;\n  while (fast && fast.next) {\n    slow = slow.next;\n    fast = fast.next.next;\n  }\n  return slow;\n}",
+    "codeLang": "js",
+    "tags": ["linked-list", "two-pointers", "fast-slow-pointers"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-binary-search",
+    "question": "Given a sorted (ascending) integer array `nums` and a `target`, return the index of `target` or -1 if it is not present. Example: Input nums = [-1,0,3,5,9,12], target = 9 -> Output 4.",
+    "answer": "Maintain a search window with low and high bounds. Repeatedly inspect the middle element: if it equals the target return its index; if it is smaller, search the right half; otherwise search the left half. The window halves each step, so the search is logarithmic. Compute mid as `low + (high - low) / 2` to avoid overflow concerns.\n\n**Time O(log n), Space O(1)**",
+    "code": "function search(nums, target) {\n  let lo = 0, hi = nums.length - 1;\n  while (lo <= hi) {\n    const mid = lo + ((hi - lo) >> 1);\n    if (nums[mid] === target) return mid;\n    if (nums[mid] < target) lo = mid + 1;\n    else hi = mid - 1;\n  }\n  return -1;\n}",
+    "codeLang": "js",
+    "tags": ["array", "binary-search"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-first-bad-version",
+    "question": "You have versions 1..n; after some version all are bad. Given an API isBadVersion(v) returning a boolean, find the first bad version with the fewest calls. Example: n = 5 and version 4 is the first bad one -> Output 4.",
+    "answer": "This is binary search on the boolean predicate isBadVersion. Search for the leftmost version that is bad: if mid is bad, the answer is at mid or earlier so move high to mid; otherwise move low to mid + 1. When the window collapses, low points to the first bad version.\n\n**Time O(log n), Space O(1)**",
+    "code": "function firstBadVersion(n, isBadVersion) {\n  let lo = 1, hi = n;\n  while (lo < hi) {\n    const mid = lo + ((hi - lo) >> 1);\n    if (isBadVersion(mid)) hi = mid;\n    else lo = mid + 1;\n  }\n  return lo;\n}",
+    "codeLang": "js",
+    "tags": ["binary-search", "search-space"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-maximum-depth-binary-tree",
+    "question": "Given the root of a binary tree, return its maximum depth (number of nodes along the longest path from root to a leaf). Example: tree [3,9,20,null,null,15,7] -> Output 3.",
+    "answer": "Use recursion. The depth of an empty tree is 0. Otherwise the depth is 1 plus the larger of the depths of the left and right subtrees. The recursion naturally explores every node once.\n\n**Time O(n), Space O(h)** where h is the tree height (recursion stack)",
+    "code": "function maxDepth(root) {\n  if (!root) return 0;\n  return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-tree", "recursion", "dfs"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-invert-binary-tree",
+    "question": "Given the root of a binary tree, invert it (swap left and right children at every node) and return the root. Example: Input [4,2,7,1,3,6,9] -> Output [4,7,2,9,6,3,1].",
+    "answer": "Recursively swap the left and right children of each node. Base case is a null node, which returns null. After swapping at the current node, recurse into both subtrees so the entire tree is mirrored.\n\n**Time O(n), Space O(h)** for the recursion stack",
+    "code": "function invertTree(root) {\n  if (!root) return null;\n  const left = invertTree(root.left);\n  const right = invertTree(root.right);\n  root.left = right;\n  root.right = left;\n  return root;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-tree", "recursion", "dfs"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-same-tree",
+    "question": "Given the roots of two binary trees `p` and `q`, return true if they are structurally identical and have the same node values. Example: p = [1,2,3], q = [1,2,3] -> Output true.",
+    "answer": "Recurse on both trees in lockstep. If both nodes are null they match; if exactly one is null or their values differ they do not match. Otherwise compare the left subtrees and right subtrees recursively, requiring both to match.\n\n**Time O(n), Space O(h)** for the recursion stack",
+    "code": "function isSameTree(p, q) {\n  if (!p && !q) return true;\n  if (!p || !q || p.val !== q.val) return false;\n  return isSameTree(p.left, q.left) && isSameTree(p.right, q.right);\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-tree", "recursion", "dfs"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-symmetric-tree",
+    "question": "Given the root of a binary tree, return true if it is a mirror image of itself around its center. Example: [1,2,2,3,4,4,3] -> Output true; [1,2,2,null,3,null,3] -> Output false.",
+    "answer": "A tree is symmetric if its left and right subtrees are mirrors. Write a helper that compares two nodes: they mirror when both are null, or both are non-null with equal values and the left's left mirrors the right's right while the left's right mirrors the right's left.\n\n**Time O(n), Space O(h)** for the recursion stack",
+    "code": "function isSymmetric(root) {\n  const mirror = (a, b) => {\n    if (!a && !b) return true;\n    if (!a || !b || a.val !== b.val) return false;\n    return mirror(a.left, b.right) && mirror(a.right, b.left);\n  };\n  return !root || mirror(root.left, root.right);\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-tree", "recursion", "dfs"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-inorder-traversal",
+    "question": "Given the root of a binary tree, return its inorder traversal (left, node, right) as an array of values. Example: Input [1,null,2,3] -> Output [1,3,2].",
+    "answer": "Inorder visits the left subtree, then the node, then the right subtree. Recurse left, push the current value, then recurse right, accumulating values into a result array. For a binary search tree this yields values in sorted order.\n\n**Time O(n), Space O(h)** for the recursion stack",
+    "code": "function inorderTraversal(root) {\n  const res = [];\n  const dfs = (node) => {\n    if (!node) return;\n    dfs(node.left);\n    res.push(node.val);\n    dfs(node.right);\n  };\n  dfs(root);\n  return res;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-tree", "recursion", "dfs"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-search-in-bst",
+    "question": "Given the root of a binary search tree and an integer `val`, return the subtree rooted at the node whose value equals `val`, or null if it does not exist. Example: tree [4,2,7,1,3], val = 2 -> Output the subtree [2,1,3].",
+    "answer": "Exploit the BST ordering. Starting at the root, if the value matches return the node; if the target is smaller go left, otherwise go right. Each comparison discards half the remaining tree, so the search follows a single root-to-node path.\n\n**Time O(h), Space O(1)** where h is the tree height",
+    "code": "function searchBST(root, val) {\n  let node = root;\n  while (node) {\n    if (node.val === val) return node;\n    node = val < node.val ? node.left : node.right;\n  }\n  return null;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-search-tree", "binary-search"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-fibonacci-number",
+    "question": "Given an integer `n`, return the nth Fibonacci number where F(0)=0, F(1)=1, and F(n)=F(n-1)+F(n-2) for n>1. Example: Input n = 6 -> Output 8.",
+    "answer": "Compute iteratively with two rolling variables holding the two previous values, updating them n times. This avoids the exponential repeated work of naive recursion and uses only constant extra space instead of a full memo array.\n\n**Time O(n), Space O(1)**",
+    "code": "function fib(n) {\n  if (n < 2) return n;\n  let a = 0, b = 1;\n  for (let i = 2; i <= n; i++) {\n    const next = a + b;\n    a = b;\n    b = next;\n  }\n  return b;\n}",
+    "codeLang": "js",
+    "tags": ["math", "dynamic-programming", "recursion"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-climbing-stairs",
+    "question": "You are climbing a staircase with `n` steps and can take either 1 or 2 steps at a time. Return the number of distinct ways to reach the top. Example: Input n = 3 -> Output 3 (1+1+1, 1+2, 2+1).",
+    "answer": "The number of ways to reach step n equals the ways to reach step n-1 (then take one step) plus the ways to reach step n-2 (then take two steps). This is the Fibonacci recurrence, so iterate with two rolling variables for O(1) space.\n\n**Time O(n), Space O(1)**",
+    "code": "function climbStairs(n) {\n  let oneBack = 1, twoBack = 1;\n  for (let i = 2; i <= n; i++) {\n    const cur = oneBack + twoBack;\n    twoBack = oneBack;\n    oneBack = cur;\n  }\n  return oneBack;\n}",
+    "codeLang": "js",
+    "tags": ["dynamic-programming", "math", "recursion"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "dsa-fizzbuzz",
+    "question": "Given an integer `n`, return a string array `answer` of length n (1-indexed) where answer[i] is \"FizzBuzz\" if i is divisible by 3 and 5, \"Fizz\" if divisible by 3, \"Buzz\" if divisible by 5, otherwise the number as a string. Example: Input n = 5 -> Output [\"1\",\"2\",\"Fizz\",\"4\",\"Buzz\"].",
+    "answer": "Iterate from 1 to n. Build each entry by checking divisibility by 3 and by 5: append \"Fizz\" when divisible by 3 and \"Buzz\" when divisible by 5; if neither applies use the number as a string. This naturally produces \"FizzBuzz\" when both conditions hold.\n\n**Time O(n), Space O(n)** for the output",
+    "code": "function fizzBuzz(n) {\n  const res = [];\n  for (let i = 1; i <= n; i++) {\n    let s = '';\n    if (i % 3 === 0) s += 'Fizz';\n    if (i % 5 === 0) s += 'Buzz';\n    res.push(s || String(i));\n  }\n  return res;\n}",
+    "codeLang": "js",
+    "tags": ["math", "simulation", "string"],
+    "difficulty": "easy"
+  }
+]

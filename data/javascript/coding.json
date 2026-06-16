@@ -1,0 +1,138 @@
+[
+  {
+    "id": "javascript-implement-debounce",
+    "question": "Implement a debounce(fn, delay) utility. Explain when you would use it.",
+    "answer": "**Debouncing** delays invoking `fn` until `delay` ms have passed since the *last* call. Rapid calls keep resetting the timer, so `fn` runs only once after activity stops.\n\n**Key points an interviewer looks for:**\n- Use a closure to keep a single `timer` handle across calls.\n- `clearTimeout` on every invocation so only the trailing call survives.\n- Preserve `this` and `args` with `fn.apply(this, args)` (do not use an arrow that loses the caller's `this`).\n\n**Use cases:** search-as-you-type, window resize handlers, autosave, validating an input after the user stops typing.",
+    "code": "function debounce(fn, delay) {\n  let timer;\n  return function (...args) {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn.apply(this, args), delay);\n  };\n}\n\n// Usage\nconst onSearch = debounce((q) => console.log('search:', q), 300);\nonSearch('a');\nonSearch('ab');\nonSearch('abc'); // only this one fires, ~300ms later",
+    "codeLang": "js",
+    "tags": ["debounce", "closures", "this", "performance", "timers"]
+  },
+  {
+    "id": "javascript-implement-throttle",
+    "question": "Implement throttle(fn, wait) and explain how it differs from debounce.",
+    "answer": "**Throttling** guarantees `fn` runs at most once per `wait` window, no matter how often it is called. Unlike debounce (which fires once *after* activity stops), throttle fires *regularly during* activity.\n\nThe version below is leading + trailing: it invokes immediately if the window has elapsed, otherwise schedules a trailing call for the remaining time.\n\n**Use cases:** scroll position tracking, mousemove, drag, rate-limiting button clicks or analytics events.",
+    "code": "function throttle(fn, wait) {\n  let last = 0;\n  let timer = null;\n  return function (...args) {\n    const now = Date.now();\n    const remaining = wait - (now - last);\n    if (remaining <= 0) {\n      if (timer) { clearTimeout(timer); timer = null; }\n      last = now;\n      fn.apply(this, args);\n    } else if (!timer) {\n      timer = setTimeout(() => {\n        last = Date.now();\n        timer = null;\n        fn.apply(this, args);\n      }, remaining);\n    }\n  };\n}",
+    "codeLang": "js",
+    "tags": ["throttle", "closures", "performance", "timers"]
+  },
+  {
+    "id": "javascript-implement-curry",
+    "question": "Implement a generic curry(fn) that supports both curry(a)(b)(c) and partial application like curry(a, b)(c).",
+    "answer": "**Currying** transforms `f(a, b, c)` into a chain of unary/partial calls. The classic generic implementation collects arguments until their count reaches the original function's arity (`fn.length`), then invokes it.\n\n**How it works:**\n- `fn.length` gives the number of declared parameters.\n- If enough args have been gathered, call `fn`. Otherwise return a function that appends the next batch and recurses.\n- This naturally supports both fully-curried and partial-application styles.",
+    "code": "function curry(fn) {\n  return function curried(...args) {\n    if (args.length >= fn.length) {\n      return fn.apply(this, args);\n    }\n    return (...next) => curried.apply(this, [...args, ...next]);\n  };\n}\n\nconst sum = (a, b, c) => a + b + c;\nconst cs = curry(sum);\nconsole.log(cs(1)(2)(3));   // 6\nconsole.log(cs(1, 2)(3));   // 6\nconsole.log(cs(1)(2, 3));   // 6\nconsole.log(cs(1, 2, 3));   // 6",
+    "codeLang": "js",
+    "tags": ["currying", "closures", "functional", "rest-spread"]
+  },
+  {
+    "id": "javascript-closure-loop-var-let",
+    "question": "What does this loop log, and how do you fix it so it prints 0, 1, 2? Explain why.\n\nfor (var i = 0; i < 3; i++) { setTimeout(() => console.log(i), 0); }",
+    "answer": "It logs **`3, 3, 3`**.\n\n`var` is function-scoped, so all three callbacks **close over the same single `i`**. By the time the timeouts run (after the synchronous loop finishes), `i` is already `3`.\n\n**Fixes:**\n1. Use `let` — it creates a *new binding per iteration*, so each closure captures its own value.\n2. Use an IIFE to capture the current value in a parameter.\n3. Pass the value as a `setTimeout` argument: `setTimeout(console.log, 0, i)`.",
+    "code": "// Bug: prints 3, 3, 3\nfor (var i = 0; i < 3; i++) {\n  setTimeout(() => console.log(i), 0);\n}\n\n// Fix 1: let creates a fresh binding each iteration -> 0, 1, 2\nfor (let i = 0; i < 3; i++) {\n  setTimeout(() => console.log(i), 0);\n}\n\n// Fix 2: IIFE captures current value -> 0, 1, 2\nfor (var j = 0; j < 3; j++) {\n  (function (k) {\n    setTimeout(() => console.log(k), 0);\n  })(j);\n}",
+    "codeLang": "js",
+    "tags": ["closures", "scope", "var-let-const", "event-loop", "hoisting"]
+  },
+  {
+    "id": "javascript-event-loop-output-order",
+    "question": "Predict the exact output order. Explain the call stack, microtask queue, and macrotask queue.\n\nconsole.log('1');\nsetTimeout(() => console.log('2'), 0);\nPromise.resolve().then(() => console.log('3'));\nconsole.log('4');",
+    "answer": "Output: **`1`, `4`, `3`, `2`**.\n\n**Why:**\n1. `1` and `4` are synchronous — they run on the **call stack** first.\n2. `setTimeout` schedules a **macrotask** (timer queue).\n3. `Promise.then` schedules a **microtask**.\n4. After the synchronous script finishes, the event loop **drains the entire microtask queue before any macrotask** — so `3` prints, then `2`.\n\nThe rule to memorize: *microtasks (promises, queueMicrotask, MutationObserver) always run before the next macrotask (setTimeout, setInterval, I/O).*",
+    "code": "console.log('1');                              // sync\nsetTimeout(() => console.log('2'), 0);          // macrotask\nPromise.resolve().then(() => console.log('3')); // microtask\nconsole.log('4');                              // sync\n// Output: 1, 4, 3, 2",
+    "codeLang": "js",
+    "tags": ["event-loop", "microtask", "macrotask", "promises", "output-prediction"]
+  },
+  {
+    "id": "javascript-async-await-order",
+    "question": "Predict the output and explain how await interacts with the microtask queue.\n\nasync function f() { console.log('A'); await null; console.log('B'); }\nconsole.log('start'); f(); Promise.resolve().then(() => console.log('promise')); console.log('end');",
+    "answer": "Output: **`start`, `A`, `end`, `B`, `promise`**.\n\n**Why:**\n- `f()` runs synchronously up to the `await` — so `A` prints immediately.\n- `await null` suspends `f` and **schedules the continuation (`console.log('B')`) as a microtask**. Control then returns to the caller, which runs `Promise.resolve().then(...)`, registering the `promise` callback as a *second* microtask.\n- Because the continuation was queued *first* (at the `await`) and the explicit `.then` is registered *after* `f()` returns, the microtask queue is FIFO: `B`'s continuation runs before `promise`.\n- The synchronous code (`start`, `A`, `end`) prints in order, then the event loop drains the microtask queue (`B`, then `promise`).\n\n**Note:** In modern engines (V8 ≥ 7.2 / Node ≥ 12, per the ES2019 `await` optimization), `await` on an already-resolved value adds only a single microtask tick, so `B` reliably precedes `promise`. Older engines added extra ticks and could reorder this — a detail worth mentioning in a senior interview.",
+    "code": "async function f() {\n  console.log('A');\n  await null;          // suspend, queue continuation as microtask\n  console.log('B');\n}\nconsole.log('start');\nf();\nPromise.resolve().then(() => console.log('promise'));\nconsole.log('end');\n// Output: start, A, end, B, promise",
+    "codeLang": "js",
+    "tags": ["async-await", "event-loop", "microtask", "promises", "output-prediction"]
+  },
+  {
+    "id": "javascript-implement-promise-all",
+    "question": "Implement Promise.all from scratch. It should resolve with an array of results in order, or reject on the first rejection.",
+    "answer": "**Requirements:**\n- Resolve with results **in the original order**, regardless of which promise settles first (index the results by position).\n- Reject **immediately** on the first rejection (fail-fast).\n- Resolve with `[]` for an empty input.\n- Accept non-promise values (wrap with `Promise.resolve`).\n\nThe key trick is a `count` of resolved promises plus writing each result to `results[i]` so ordering is preserved.",
+    "code": "function promiseAll(promises) {\n  return new Promise((resolve, reject) => {\n    const results = [];\n    let count = 0;\n    if (promises.length === 0) return resolve(results);\n    promises.forEach((p, i) => {\n      Promise.resolve(p).then(\n        (value) => {\n          results[i] = value;\n          count += 1;\n          if (count === promises.length) resolve(results);\n        },\n        reject // first rejection rejects the whole thing\n      );\n    });\n  });\n}\n\npromiseAll([1, Promise.resolve(2), 3]).then((r) => console.log(r)); // [1, 2, 3]",
+    "codeLang": "js",
+    "tags": ["promises", "promise-all", "async", "implementation"]
+  },
+  {
+    "id": "javascript-promise-combinators",
+    "question": "Compare Promise.all, Promise.race, Promise.allSettled, and Promise.any. When does each settle?",
+    "answer": "- **`Promise.all`** — resolves with an array of all results when *every* promise resolves; **rejects on the first rejection** (fail-fast).\n- **`Promise.race`** — settles as soon as the *first* promise settles, whether it resolves **or** rejects.\n- **`Promise.allSettled`** — never rejects; waits for *all* to settle and returns `{ status, value }` / `{ status, reason }` objects. Best when you want every outcome.\n- **`Promise.any`** — resolves with the **first fulfilled** value; rejects only if *all* reject, throwing an `AggregateError`.\n\nMnemonic: `all` = all must succeed; `any` = at least one must succeed; `race` = first to finish wins (good or bad); `allSettled` = report everything.",
+    "code": "const ok = (v, ms) => new Promise((r) => setTimeout(() => r(v), ms));\nconst fail = (e, ms) => new Promise((_, j) => setTimeout(() => j(e), ms));\n\nPromise.all([ok(1, 10), ok(2, 20)]).then(console.log);        // [1, 2]\nPromise.race([ok('fast', 5), ok('slow', 50)]).then(console.log); // 'fast'\nPromise.allSettled([ok(1, 5), fail('x', 5)]).then(console.log);\n// [{status:'fulfilled',value:1}, {status:'rejected',reason:'x'}]\nPromise.any([fail('a', 5), ok('b', 10)]).then(console.log);   // 'b'",
+    "codeLang": "js",
+    "tags": ["promises", "promise-all", "promise-race", "allSettled", "any", "async"]
+  },
+  {
+    "id": "javascript-implement-bind",
+    "question": "Implement Function.prototype.bind (a myBind polyfill). Support partial application of arguments.",
+    "answer": "`bind` returns a **new function** with `this` permanently fixed to the provided context, and optionally **pre-fills leading arguments** (partial application). Later call-time arguments are appended after the bound ones.\n\n**Key points:**\n- Capture the original function as `fn = this` inside `myBind`.\n- Concatenate bound args with call-time args.\n- A production-grade version also handles `new` correctly, but interviewers usually accept the apply-based form below.",
+    "code": "Function.prototype.myBind = function (ctx, ...bound) {\n  const fn = this;\n  return function (...args) {\n    return fn.apply(ctx, [...bound, ...args]);\n  };\n};\n\nfunction greet(greeting, punctuation) {\n  return `${greeting}, ${this.name}${punctuation}`;\n}\nconst sayHiToAda = greet.myBind({ name: 'Ada' }, 'Hi');\nconsole.log(sayHiToAda('!')); // 'Hi, Ada!'",
+    "codeLang": "js",
+    "tags": ["this", "bind", "call-apply", "prototypes", "closures"]
+  },
+  {
+    "id": "javascript-this-binding-rules",
+    "question": "What does each call log, and why? Explain the difference between a method call, a detached call, and an arrow function.",
+    "answer": "`this` is determined by **how a function is called**, not where it is defined — except arrow functions, which capture `this` lexically.\n\n- `obj.regular()` — called as a method, so `this === obj` → logs the object's value.\n- `const f = obj.regular; f()` — **detached**: `this` is `undefined` in strict mode (or the global object in sloppy mode). This is the classic 'lost this' bug.\n- `obj.arrow()` — the arrow captured `this` from the **enclosing lexical scope** at definition time (here module/global), *not* `obj`. Arrows ignore the call site, so they should never be used as object methods that need `this`.\n\nFix the detached case with `.bind(obj)`, `call`/`apply`, or a wrapper.",
+    "code": "const obj = {\n  value: 42,\n  regular() { return this && this.value; },\n  arrow: () => (typeof this === 'undefined' ? 'no this' : this.value),\n};\n\nconsole.log(obj.regular());        // 42  (this === obj)\nconst f = obj.regular;\nconsole.log(f && f());             // undefined in strict mode (detached)\nconsole.log(obj.arrow());          // not obj.value -> lexical this\nconsole.log(obj.regular.call({ value: 7 })); // 7 (explicit binding)",
+    "codeLang": "js",
+    "tags": ["this", "binding", "arrow-functions", "call-apply", "scope"]
+  },
+  {
+    "id": "javascript-prototypal-inheritance",
+    "question": "Set up prototypal inheritance with constructor functions so Dog extends Animal and overrides a method. Explain the prototype chain.",
+    "answer": "Prototypal inheritance links objects through their `[[Prototype]]`. With constructor functions:\n\n1. **Call the parent constructor** with `Animal.call(this, ...)` to initialize own properties.\n2. **Link the prototypes**: `Dog.prototype = Object.create(Animal.prototype)` so instances inherit Animal's methods.\n3. **Restore the constructor** reference: `Dog.prototype.constructor = Dog`.\n4. Override methods by redefining them on `Dog.prototype`; lookups walk the chain `instance -> Dog.prototype -> Animal.prototype -> Object.prototype`.\n\nThe modern equivalent is `class Dog extends Animal { ... }` with `super(...)`, which compiles to this same chain.",
+    "code": "function Animal(name) { this.name = name; }\nAnimal.prototype.speak = function () { return `${this.name} makes a sound`; };\n\nfunction Dog(name) { Animal.call(this, name); }\nDog.prototype = Object.create(Animal.prototype);\nDog.prototype.constructor = Dog;\nDog.prototype.speak = function () { return `${this.name} barks`; };\n\nconst rex = new Dog('Rex');\nconsole.log(rex.speak());           // 'Rex barks'\nconsole.log(rex instanceof Animal); // true\nconsole.log(Object.getPrototypeOf(rex) === Dog.prototype); // true",
+    "codeLang": "js",
+    "tags": ["prototypes", "inheritance", "this", "constructors", "classes"]
+  },
+  {
+    "id": "javascript-deep-vs-shallow-copy",
+    "question": "Implement a deepClone that handles nested objects, arrays, Dates, and circular references. How does it differ from a shallow copy?",
+    "answer": "A **shallow copy** (`{...obj}`, `Object.assign`, `arr.slice()`) duplicates only the top level — nested objects are still shared by reference. A **deep copy** recursively duplicates everything.\n\n**Robust deepClone must handle:**\n- Primitives and `null` (return as-is).\n- Special objects like `Date` and `RegExp` (re-create them).\n- **Circular references** — track visited objects in a `WeakMap` to avoid infinite recursion.\n\nNote: `structuredClone(obj)` is the built-in modern solution and handles all of the above, but it **cannot clone functions or DOM nodes**. `JSON.parse(JSON.stringify(obj))` is the quick hack but drops functions, `undefined`, and breaks on cycles.",
+    "code": "function deepClone(value, seen = new WeakMap()) {\n  if (value === null || typeof value !== 'object') return value;\n  if (value instanceof Date) return new Date(value);\n  if (value instanceof RegExp) return new RegExp(value.source, value.flags);\n  if (seen.has(value)) return seen.get(value); // circular ref\n  const copy = Array.isArray(value) ? [] : {};\n  seen.set(value, copy);\n  for (const key of Reflect.ownKeys(value)) {\n    copy[key] = deepClone(value[key], seen);\n  }\n  return copy;\n}\n\nconst a = { x: 1, n: { y: 2 } };\na.self = a; // circular\nconst b = deepClone(a);\nb.n.y = 99;\nconsole.log(a.n.y, b.n.y, b.self === b); // 2 99 true",
+    "codeLang": "js",
+    "tags": ["deep-copy", "shallow-copy", "recursion", "WeakMap", "structuredClone"]
+  },
+  {
+    "id": "javascript-implement-flatten",
+    "question": "Implement a flatten(arr, depth) that mimics Array.prototype.flat using reduce and recursion.",
+    "answer": "`flat` flattens a nested array up to a given `depth` (default 1, `Infinity` for full flattening).\n\n**Approach with reduce:**\n- For each element, if it is an array *and* there is remaining depth, recurse with `depth - 1` and `concat` the result.\n- Otherwise push the element as-is.\n- When `depth` reaches 0, stop recursing.\n\nThis is a frequent FAANG-style question because it tests recursion, `reduce`, and base-case reasoning.",
+    "code": "function flatten(arr, depth = 1) {\n  return depth > 0\n    ? arr.reduce(\n        (acc, cur) =>\n          acc.concat(Array.isArray(cur) ? flatten(cur, depth - 1) : cur),\n        []\n      )\n    : arr.slice();\n}\n\nconsole.log(flatten([1, [2, [3, [4]]]]));          // [1, 2, [3, [4]]]\nconsole.log(flatten([1, [2, [3, [4]]]], Infinity)); // [1, 2, 3, 4]",
+    "codeLang": "js",
+    "tags": ["array-methods", "reduce", "recursion", "flatten", "polyfill"]
+  },
+  {
+    "id": "javascript-implement-map-reduce-filter",
+    "question": "Implement Array.prototype.myMap and Array.prototype.myReduce as polyfills.",
+    "answer": "These polyfills test whether you understand how the built-ins iterate and handle the callback signature.\n\n**myMap:** returns a *new* array; the callback receives `(element, index, array)` and `this` is bound to the optional `thisArg`.\n\n**myReduce:** folds the array into a single value. Critical edge cases:\n- If an `initialValue` is provided, start the accumulator there and iterate from index 0.\n- If **no** initial value, the accumulator starts as the first element and iteration begins at index 1.\n- Calling reduce on an empty array with no initial value should throw a `TypeError` — matching the spec.",
+    "code": "Array.prototype.myMap = function (cb, thisArg) {\n  const result = [];\n  for (let i = 0; i < this.length; i++) {\n    if (i in this) result[i] = cb.call(thisArg, this[i], i, this);\n  }\n  return result;\n};\n\nArray.prototype.myReduce = function (cb, initialValue) {\n  let acc = initialValue;\n  let start = 0;\n  if (arguments.length < 2) {\n    if (this.length === 0) throw new TypeError('Reduce of empty array with no initial value');\n    acc = this[0];\n    start = 1;\n  }\n  for (let i = start; i < this.length; i++) {\n    acc = cb(acc, this[i], i, this);\n  }\n  return acc;\n};\n\nconsole.log([1, 2, 3].myMap((x) => x * 2));            // [2, 4, 6]\nconsole.log([1, 2, 3, 4].myReduce((a, b) => a + b, 0)); // 10",
+    "codeLang": "js",
+    "tags": ["array-methods", "map", "reduce", "polyfill", "prototypes"]
+  },
+  {
+    "id": "javascript-tdz-hoisting",
+    "question": "What does this code output, and why? Explain hoisting and the temporal dead zone.\n\nconsole.log(a); var a = 1;\nconsole.log(b); let b = 2;",
+    "answer": "- `console.log(a)` logs **`undefined`**. `var` declarations are **hoisted** to the top of their scope and initialized to `undefined`; only the *assignment* stays in place.\n- `console.log(b)` throws **`ReferenceError: Cannot access 'b' before initialization`**. `let` and `const` are hoisted too, but remain in the **Temporal Dead Zone (TDZ)** — uninitialized and unreadable — from the start of the block until the declaration line executes.\n\n**Takeaway:** `var` is function-scoped and tolerates early reads (as `undefined`); `let`/`const` are block-scoped and forbid access before declaration, surfacing bugs earlier. Function *declarations* are fully hoisted (callable before their definition); function *expressions* assigned to `var` are not.",
+    "code": "console.log(a); // undefined (var hoisted, value not yet assigned)\nvar a = 1;\n\ntry {\n  console.log(b); // ReferenceError (TDZ)\n  let b = 2;\n} catch (e) {\n  console.log(e.constructor.name); // 'ReferenceError'\n}\n\nhoisted();                 // works: 'hi' (function declaration hoisted)\nfunction hoisted() { console.log('hi'); }",
+    "codeLang": "js",
+    "tags": ["hoisting", "temporal-dead-zone", "var-let-const", "scope", "output-prediction"]
+  },
+  {
+    "id": "javascript-type-coercion-equality",
+    "question": "Predict the output of these expressions and explain == vs === and type coercion.\n\n[] + [], [] + {}, 1 + '2', null == undefined, NaN === NaN, 0 == ''",
+    "answer": "Results:\n- `[] + []` → **`''`** (both arrays coerce to empty strings, concatenated).\n- `[] + {}` → **`'[object Object]'`** (array → `''`, object → `'[object Object]'`).\n- `1 + '2'` → **`'12'`** (`+` with a string concatenates).\n- `null == undefined` → **`true`** (they are loosely equal only to each other), but `null === undefined` is `false`.\n- `NaN === NaN` → **`false`** (`NaN` is never equal to anything; use `Number.isNaN`).\n- `0 == ''` → **`true`** (both coerce to `0`).\n\n**Rule:** `===` (strict) never coerces — compares type *and* value. `==` (loose) applies the abstract equality algorithm with coercion, producing surprises like `0 == ''` and `'' == false`. **Always prefer `===`** except the idiomatic `x == null` to catch both `null` and `undefined`.",
+    "code": "console.log([] + []);           // ''\nconsole.log([] + {});           // '[object Object]'\nconsole.log(1 + '2');           // '12'\nconsole.log('3' * 2);           // 6  (* forces numeric coercion)\nconsole.log(null == undefined); // true\nconsole.log(null === undefined);// false\nconsole.log(NaN === NaN);       // false\nconsole.log(0 == '');           // true\nconsole.log(0 === '');          // false",
+    "codeLang": "js",
+    "tags": ["type-coercion", "equality", "==-vs-===", "output-prediction", "NaN"]
+  },
+  {
+    "id": "javascript-generators-iterators",
+    "question": "Write a generator that yields a range of numbers and an infinite Fibonacci generator. Explain how generators and iterators work.",
+    "answer": "A **generator** (`function*`) returns an **iterator** that produces values lazily. `yield` pauses execution and returns a value; calling `.next()` resumes from where it left off, returning `{ value, done }`.\n\n**Why useful:**\n- **Lazy evaluation** — infinite sequences like Fibonacci are possible because values are produced on demand, not all at once.\n- Generators implement the **iterator protocol**, so they work with `for...of`, the spread operator, and `Array.from`.\n- Custom iterables implement `[Symbol.iterator]()` returning an object with a `next()` method.",
+    "code": "function* range(start, end, step = 1) {\n  for (let i = start; i < end; i += step) yield i;\n}\nconsole.log([...range(0, 10, 2)]); // [0, 2, 4, 6, 8]\n\nfunction* fib() {\n  let [a, b] = [0, 1];\n  while (true) {\n    yield a;\n    [a, b] = [b, a + b];\n  }\n}\nconst g = fib();\nconsole.log(Array.from({ length: 7 }, () => g.next().value));\n// [0, 1, 1, 2, 3, 5, 8]",
+    "codeLang": "js",
+    "tags": ["generators", "iterators", "lazy-evaluation", "symbol-iterator", "spread"]
+  }
+]

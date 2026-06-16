@@ -1,0 +1,192 @@
+[
+  {
+    "id": "nodejs-read-file-async",
+    "question": "Read a JSON config file asynchronously and handle a missing file gracefully.",
+    "answer": "Use `fs/promises` with `async/await`. Wrap in `try/catch`; treat `ENOENT` (file not found) as an empty config rather than crashing, and re-throw anything else.",
+    "code": "const fs = require('fs/promises');\n\nasync function readConfig(path) {\n  try {\n    const data = await fs.readFile(path, 'utf8');\n    return JSON.parse(data);\n  } catch (err) {\n    if (err.code === 'ENOENT') return {}; // no file yet: use defaults\n    throw err; // real error: bubble up\n  }\n}",
+    "codeLang": "js",
+    "tags": [
+      "fs",
+      "async-await",
+      "error-handling"
+    ]
+  },
+  {
+    "id": "nodejs-http-server",
+    "question": "Create a basic HTTP server (no framework) that returns JSON on GET /health.",
+    "answer": "Use the core `http` module. Inspect `req.method` and `req.url`, set the `Content-Type` header, and `res.end()` the serialized body. Anything else returns 404.",
+    "code": "const http = require('http');\n\nconst server = http.createServer((req, res) => {\n  if (req.method === 'GET' && req.url === '/health') {\n    res.writeHead(200, { 'Content-Type': 'application/json' });\n    res.end(JSON.stringify({ status: 'ok' }));\n    return;\n  }\n  res.writeHead(404, { 'Content-Type': 'text/plain' });\n  res.end('Not Found');\n});\n\nserver.listen(3000, () => console.log('listening on :3000'));",
+    "codeLang": "js",
+    "tags": [
+      "http",
+      "server"
+    ]
+  },
+  {
+    "id": "nodejs-promisify",
+    "question": "Implement your own promisify() that turns a Node-style callback function into one returning a Promise.",
+    "answer": "Return a wrapper that returns a `new Promise`, calling the original with the same args plus a `(err, result)` callback that rejects on error and resolves otherwise. Preserve `this` with `fn.call(this, ...)`.",
+    "code": "function promisify(fn) {\n  return function (...args) {\n    return new Promise((resolve, reject) => {\n      fn.call(this, ...args, (err, result) => {\n        if (err) return reject(err);\n        resolve(result);\n      });\n    });\n  };\n}\n\n// usage\nconst fs = require('fs');\nconst readFile = promisify(fs.readFile);\nreadFile('a.txt', 'utf8').then(console.log).catch(console.error);",
+    "codeLang": "js",
+    "tags": [
+      "promises",
+      "callbacks",
+      "util"
+    ]
+  },
+  {
+    "id": "nodejs-read-large-file-lines",
+    "question": "Read a very large file line-by-line without loading it all into memory.",
+    "answer": "Stream it. Pipe a read stream into `readline` and iterate with `for await...of`. Memory stays flat because you process one line at a time instead of buffering the whole file. `crlfDelay: Infinity` handles Windows line endings.",
+    "code": "const fs = require('fs');\nconst readline = require('readline');\n\nasync function countLines(path) {\n  const rl = readline.createInterface({\n    input: fs.createReadStream(path),\n    crlfDelay: Infinity,\n  });\n  let count = 0;\n  for await (const line of rl) {\n    if (line.trim()) count++;\n  }\n  return count;\n}",
+    "codeLang": "js",
+    "tags": [
+      "streams",
+      "readline",
+      "memory"
+    ]
+  },
+  {
+    "id": "nodejs-event-loop-output",
+    "question": "What does this print, and why? console.log('1'); setTimeout(()=>console.log('2'),0); setImmediate(()=>console.log('3')); Promise.resolve().then(()=>console.log('4')); process.nextTick(()=>console.log('5')); console.log('6');",
+    "answer": "**1, 6** print first (synchronous). Then the microtask phase runs: `process.nextTick` callbacks fire before promise callbacks, so **5** then **4**. Finally the event loop continues to the timers and check phases, printing **2** and **3**. The relative order of 2 (timer) vs 3 (immediate) is **not guaranteed** when both are scheduled from the main module. Key idea: `nextTick` > Promise microtasks > timers/immediate.",
+    "code": "console.log('1');\nsetTimeout(() => console.log('2'), 0);\nsetImmediate(() => console.log('3'));\nPromise.resolve().then(() => console.log('4'));\nprocess.nextTick(() => console.log('5'));\nconsole.log('6');\n// 1, 6, 5, 4, then 2 and 3 (2/3 order may vary)",
+    "codeLang": "js",
+    "tags": [
+      "event-loop",
+      "microtasks",
+      "output"
+    ]
+  },
+  {
+    "id": "nodejs-concurrency-limit",
+    "question": "Run many async tasks with a concurrency limit (at most N in flight at once).",
+    "answer": "`Promise.all` alone fires everything at once. Instead spawn N workers that pull from a shared index until the queue is empty. This caps concurrency while keeping the pipeline full.",
+    "code": "async function mapLimit(items, limit, worker) {\n  const results = new Array(items.length);\n  let i = 0;\n  async function run() {\n    while (i < items.length) {\n      const idx = i++;\n      results[idx] = await worker(items[idx], idx);\n    }\n  }\n  const n = Math.min(limit, items.length);\n  await Promise.all(Array.from({ length: n }, run));\n  return results;\n}",
+    "codeLang": "js",
+    "tags": [
+      "promises",
+      "concurrency"
+    ]
+  },
+  {
+    "id": "nodejs-retry-backoff",
+    "question": "Implement retry with exponential backoff for a flaky async operation.",
+    "answer": "Loop up to `retries` times. On failure, wait `base * 2**attempt` ms before trying again; re-throw once attempts are exhausted. Backoff avoids hammering a struggling dependency.",
+    "code": "function delay(ms) {\n  return new Promise((resolve) => setTimeout(resolve, ms));\n}\n\nasync function retry(fn, { retries = 3, base = 200 } = {}) {\n  let attempt = 0;\n  while (true) {\n    try {\n      return await fn();\n    } catch (err) {\n      if (attempt >= retries) throw err;\n      await delay(base * 2 ** attempt);\n      attempt++;\n    }\n  }\n}",
+    "codeLang": "js",
+    "tags": [
+      "async",
+      "resilience",
+      "retry"
+    ]
+  },
+  {
+    "id": "nodejs-transform-stream-pipeline",
+    "question": "Transform a file as it streams (e.g. uppercase it) using a Transform stream and pipeline().",
+    "answer": "A `Transform` stream reads chunks and pushes transformed chunks. Use `stream.pipeline()` (not `.pipe()`) because it propagates errors and cleans up every stream on failure.",
+    "code": "const { createReadStream, createWriteStream } = require('fs');\nconst { Transform, pipeline } = require('stream');\n\nconst upper = new Transform({\n  transform(chunk, _enc, cb) {\n    cb(null, chunk.toString().toUpperCase());\n  },\n});\n\npipeline(\n  createReadStream('in.txt'),\n  upper,\n  createWriteStream('out.txt'),\n  (err) => {\n    if (err) console.error('pipeline failed:', err);\n    else console.log('done');\n  }\n);",
+    "codeLang": "js",
+    "tags": [
+      "streams",
+      "transform",
+      "pipeline"
+    ]
+  },
+  {
+    "id": "nodejs-graceful-shutdown",
+    "question": "Shut an HTTP server down gracefully on SIGTERM/SIGINT.",
+    "answer": "Stop accepting new connections with `server.close()`, let in-flight requests finish, then exit. Add an `unref()`'d timeout as a hard backstop so a stuck connection cannot block shutdown forever.",
+    "code": "const http = require('http');\nconst server = http.createServer((req, res) => res.end('ok'));\nserver.listen(3000);\n\nfunction shutdown(signal) {\n  console.log(signal + ' received: closing server');\n  server.close(() => {\n    console.log('all connections closed');\n    process.exit(0);\n  });\n  setTimeout(() => process.exit(1), 10000).unref();\n}\n\n['SIGTERM', 'SIGINT'].forEach((s) => process.on(s, () => shutdown(s)));",
+    "codeLang": "js",
+    "tags": [
+      "process",
+      "signals",
+      "shutdown"
+    ]
+  },
+  {
+    "id": "nodejs-custom-event-emitter",
+    "question": "Create a class that extends EventEmitter and emits lifecycle events.",
+    "answer": "Extend `EventEmitter` and call `this.emit(name, payload)`. Consumers subscribe with `.on()` (repeatable) or `.once()` (auto-removed after first fire). Emitting asynchronously (via `setImmediate`) lets listeners attach before the event fires.",
+    "code": "const { EventEmitter } = require('events');\n\nclass Job extends EventEmitter {\n  run() {\n    this.emit('start');\n    setImmediate(() => this.emit('done', { ok: true }));\n  }\n}\n\nconst job = new Job();\njob.on('start', () => console.log('started'));\njob.once('done', (res) => console.log('done:', res));\njob.run();",
+    "codeLang": "js",
+    "tags": [
+      "events",
+      "EventEmitter",
+      "oop"
+    ]
+  },
+  {
+    "id": "nodejs-middleware-pipeline",
+    "question": "Implement a minimal Express-like middleware runner with next().",
+    "answer": "Keep an array of `(req, res, next)` functions. `next(err)` advances to the next middleware; passing an error short-circuits the chain. This is the core idea behind Express/Koa pipelines.",
+    "code": "function createApp() {\n  const stack = [];\n  return {\n    use(fn) { stack.push(fn); },\n    handle(req, res) {\n      let i = 0;\n      const next = (err) => {\n        if (err) return res.end('error: ' + err.message);\n        const fn = stack[i++];\n        if (!fn) return res.end();\n        fn(req, res, next);\n      };\n      next();\n    },\n  };\n}\n\nconst app = createApp();\napp.use((req, res, next) => { req.t = Date.now(); next(); });\napp.use((req, res) => res.end('handled in ' + (Date.now() - req.t) + 'ms'));",
+    "codeLang": "js",
+    "tags": [
+      "middleware",
+      "design",
+      "express-internals"
+    ]
+  },
+  {
+    "id": "nodejs-memoize-async-inflight",
+    "question": "Build a cache for an async function that also de-duplicates concurrent in-flight calls for the same key.",
+    "answer": "Cache the **promise**, not just the resolved value. Concurrent callers with the same key then await the same in-flight promise (no duplicate work). Add a TTL and evict on rejection so failures are not cached.",
+    "code": "function memoizeAsync(fn, ttl = 5000) {\n  const cache = new Map();\n  return async function (key) {\n    const hit = cache.get(key);\n    if (hit && Date.now() - hit.t < ttl) return hit.p;\n    const p = fn(key);\n    cache.set(key, { p, t: Date.now() });\n    try {\n      return await p;\n    } catch (err) {\n      cache.delete(key); // don't cache failures\n      throw err;\n    }\n  };\n}",
+    "codeLang": "js",
+    "tags": [
+      "caching",
+      "promises",
+      "performance"
+    ]
+  },
+  {
+    "id": "nodejs-worker-thread-cpu",
+    "question": "Offload a CPU-heavy computation to a worker thread so the event loop stays responsive.",
+    "answer": "CPU-bound loops block the single main thread. Move them to a `Worker` (separate V8 isolate); communicate via `workerData` in and `postMessage` out. Wrap it in a Promise for ergonomic `await`.",
+    "code": "// main.js\nconst { Worker } = require('worker_threads');\n\nfunction runHeavy(n) {\n  return new Promise((resolve, reject) => {\n    const worker = new Worker('./heavy.js', { workerData: n });\n    worker.on('message', resolve);\n    worker.on('error', reject);\n    worker.on('exit', (code) => {\n      if (code !== 0) reject(new Error('worker exited ' + code));\n    });\n  });\n}\n\n// heavy.js\nconst { parentPort, workerData } = require('worker_threads');\nlet sum = 0;\nfor (let i = 0; i < workerData; i++) sum += i;\nparentPort.postMessage(sum);",
+    "codeLang": "js",
+    "tags": [
+      "worker_threads",
+      "cpu",
+      "performance"
+    ]
+  },
+  {
+    "id": "nodejs-parse-json-body",
+    "question": "Manually parse a JSON request body from an incoming http request stream (no body-parser).",
+    "answer": "An incoming request is a readable stream. Accumulate `data` chunks, guard against oversized payloads, and `JSON.parse` on `end`. Reject on parse failure or stream error.",
+    "code": "function parseJsonBody(req) {\n  return new Promise((resolve, reject) => {\n    let raw = '';\n    req.on('data', (chunk) => {\n      raw += chunk;\n      if (raw.length > 1e6) {\n        reject(new Error('payload too large'));\n        req.destroy();\n      }\n    });\n    req.on('end', () => {\n      try {\n        resolve(raw ? JSON.parse(raw) : {});\n      } catch (err) {\n        reject(err);\n      }\n    });\n    req.on('error', reject);\n  });\n}",
+    "codeLang": "js",
+    "tags": [
+      "http",
+      "streams",
+      "parsing"
+    ]
+  },
+  {
+    "id": "nodejs-global-error-handlers",
+    "question": "Globally catch unhandled promise rejections and uncaught exceptions. What should you do after an uncaughtException?",
+    "answer": "Register `process.on('unhandledRejection', ...)` and `process.on('uncaughtException', ...)`. After an `uncaughtException` the process is in an undefined state — log, run minimal cleanup, then **exit and let a supervisor restart it**. Do not try to resume normal operation.",
+    "code": "process.on('unhandledRejection', (reason) => {\n  console.error('Unhandled rejection:', reason);\n});\n\nprocess.on('uncaughtException', (err) => {\n  console.error('Uncaught exception:', err);\n  // flush logs / close resources here, then bail out\n  process.exit(1);\n});",
+    "codeLang": "js",
+    "tags": [
+      "process",
+      "error-handling",
+      "reliability"
+    ]
+  },
+  {
+    "id": "nodejs-parallel-vs-sequential",
+    "question": "This function awaits inside a for-loop so requests run one at a time. Fix it to run them in parallel.",
+    "answer": "`await` inside a loop serializes the calls. Kick them all off first (e.g. with `.map`) and await together with `Promise.all`. Use `Promise.allSettled` instead if one failure should not reject the whole batch.",
+    "code": "// Sequential (slow): each await blocks the next iteration\nasync function slow(urls) {\n  const out = [];\n  for (const u of urls) out.push(await fetch(u));\n  return out;\n}\n\n// Parallel (fast): start all, then await together\nasync function fast(urls) {\n  return Promise.all(urls.map((u) => fetch(u)));\n}",
+    "codeLang": "js",
+    "tags": [
+      "async-await",
+      "Promise.all",
+      "performance"
+    ]
+  }
+]

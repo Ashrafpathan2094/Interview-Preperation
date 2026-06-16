@@ -1,0 +1,138 @@
+[
+  {
+    "id": "react-usedebounce-hook",
+    "question": "Implement a useDebounce custom hook that returns a debounced version of a value, then use it to debounce a search input.",
+    "answer": "A **debounce** delays propagating the latest value until the input has been quiet for `delay` ms. Store the value in state and (re)start a timer inside `useEffect` whenever `value` or `delay` changes. The **cleanup function clears the previous timer**, so rapid changes never resolve until the user stops typing.\n\nKey points an interviewer looks for:\n- `useEffect` cleanup to cancel the pending `setTimeout` (prevents stale updates).\n- `value` and `delay` in the dependency array.\n- Generic `<T>` so the hook is reusable for any value type.",
+    "code": "import { useEffect, useState } from \"react\";\n\nexport function useDebounce<T>(value: T, delay = 300): T {\n  const [debounced, setDebounced] = useState(value);\n\n  useEffect(() => {\n    const id = setTimeout(() => setDebounced(value), delay);\n    return () => clearTimeout(id); // cancel on change/unmount\n  }, [value, delay]);\n\n  return debounced;\n}\n\n// Usage: only fetch once the user pauses typing\nfunction Search() {\n  const [query, setQuery] = useState(\"\");\n  const debouncedQuery = useDebounce(query, 400);\n\n  useEffect(() => {\n    if (!debouncedQuery) return;\n    fetch(`/api/search?q=${debouncedQuery}`);\n  }, [debouncedQuery]);\n\n  return <input value={query} onChange={(e) => setQuery(e.target.value)} />;\n}",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useEffect", "custom-hook", "debounce", "performance"]
+  },
+  {
+    "id": "react-usefetch-hook",
+    "question": "Write a useFetch custom hook that manages data, loading, and error state, and cancels the request if the component unmounts or the URL changes.",
+    "answer": "A data-fetching hook should track **three pieces of state** (data, loading, error) and **abort in-flight requests** to avoid setting state on an unmounted component or showing results for a stale URL.\n\nUse `AbortController` and pass its signal to `fetch`. The `useEffect` cleanup aborts the previous request. Reset loading/error at the start of each run.",
+    "code": "import { useEffect, useState } from \"react\";\n\ninterface State<T> {\n  data: T | null;\n  loading: boolean;\n  error: Error | null;\n}\n\nexport function useFetch<T>(url: string): State<T> {\n  const [state, setState] = useState<State<T>>({\n    data: null,\n    loading: true,\n    error: null,\n  });\n\n  useEffect(() => {\n    const controller = new AbortController();\n    setState({ data: null, loading: true, error: null });\n\n    fetch(url, { signal: controller.signal })\n      .then((res) => {\n        if (!res.ok) throw new Error(`HTTP ${res.status}`);\n        return res.json() as Promise<T>;\n      })\n      .then((data) => setState({ data, loading: false, error: null }))\n      .catch((error: Error) => {\n        if (error.name === \"AbortError\") return; // ignore cancellations\n        setState({ data: null, loading: false, error });\n      });\n\n    return () => controller.abort();\n  }, [url]);\n\n  return state;\n}",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useEffect", "custom-hook", "data-fetching", "cleanup"]
+  },
+  {
+    "id": "react-useprevious-hook",
+    "question": "Implement a usePrevious hook that returns the value of a prop or state from the previous render.",
+    "answer": "`useRef` holds a **mutable value that persists across renders without triggering re-renders**. The trick: read `ref.current` (the previous value) *before* updating it inside `useEffect`, which runs *after* render. So the function body returns the old value, and the effect then stores the current one for next time.",
+    "code": "import { useEffect, useRef } from \"react\";\n\nexport function usePrevious<T>(value: T): T | undefined {\n  const ref = useRef<T | undefined>(undefined);\n\n  useEffect(() => {\n    ref.current = value; // runs AFTER render, so reads below see the old value\n  }, [value]);\n\n  return ref.current;\n}\n\n// Usage\nfunction Counter({ count }: { count: number }) {\n  const prev = usePrevious(count);\n  return <p>Now: {count}, before: {prev ?? \"-\"}</p>;\n}",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useRef", "useEffect", "custom-hook"]
+  },
+  {
+    "id": "react-stale-closure-counter-bug",
+    "question": "This counter increments by setInterval but always shows 1. Fix the bug. What causes it?",
+    "answer": "This is the classic **stale closure** bug. With an empty dependency array, the effect runs once and the interval callback closes over `count` from the **first render (0)**, so every tick computes `setCount(0 + 1)`.\n\n**Fix:** use the **functional updater** `setCount(c => c + 1)`, which always receives the latest state and does not depend on the captured `count`. This keeps the empty dependency array valid (we still only want one interval). Always clear the interval in cleanup.",
+    "code": "// BUG: count is captured as 0 forever\nuseEffect(() => {\n  const id = setInterval(() => setCount(count + 1), 1000);\n  return () => clearInterval(id);\n}, []); // count not in deps -> stale closure\n\n// FIX: functional updater reads the latest state\nuseEffect(() => {\n  const id = setInterval(() => setCount((c) => c + 1), 1000);\n  return () => clearInterval(id);\n}, []);",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useState", "useEffect", "stale-closure", "bug-fix"]
+  },
+  {
+    "id": "react-useeffect-output-order",
+    "question": "What does this component log on its first render and on a re-render triggered by clicking the button? Explain the order.",
+    "answer": "**On first render** it logs:\n```\nrender\neffect: 0\n```\nThe component body (`render`) runs first during render; the effect runs **after** the browser paints.\n\n**On clicking** (count 0 -> 1) it logs:\n```\nrender\ncleanup: 0\neffect: 1\n```\nReact re-renders (`render`), then **runs the previous effect's cleanup** with the old captured value (`0`), then runs the new effect (`1`). Cleanup of the old effect always runs *before* the next effect, not at unmount only.",
+    "code": "function Demo() {\n  const [count, setCount] = useState(0);\n\n  console.log(\"render\");\n\n  useEffect(() => {\n    console.log(\"effect:\", count);\n    return () => console.log(\"cleanup:\", count);\n  }, [count]);\n\n  return <button onClick={() => setCount((c) => c + 1)}>{count}</button>;\n}",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useEffect", "cleanup", "output", "render-cycle"]
+  },
+  {
+    "id": "react-list-keys-index-bug",
+    "question": "What is the bug with using the array index as a key in this editable list, and how do you fix it?",
+    "answer": "Using the **array index as `key`** breaks React's reconciliation when items are reordered, inserted, or deleted. React matches elements by key, so removing the first item shifts every index down by one - React thinks each row's *content* changed rather than that one row was removed. This causes **wrong DOM state to be reused**: input values, focus, and component state get associated with the wrong item.\n\n**Fix:** use a **stable, unique id** from the data as the key. Index keys are only acceptable for static lists that never reorder.",
+    "code": "// BUG: deleting an item leaves the wrong text in the inputs\n{items.map((item, i) => (\n  <input key={i} defaultValue={item.text} />\n))}\n\n// FIX: stable id from the data\n{items.map((item) => (\n  <input key={item.id} defaultValue={item.text} />\n))}",
+    "codeLang": "tsx",
+    "tags": ["lists", "keys", "reconciliation", "bug-fix"]
+  },
+  {
+    "id": "react-controlled-vs-uncontrolled",
+    "question": "Convert this uncontrolled input into a controlled component, and explain the difference.",
+    "answer": "**Uncontrolled** inputs keep their own value in the DOM; you read it via a `ref` (or `defaultValue`). **Controlled** inputs have their value driven by React state via `value` + `onChange`, making React the single source of truth.\n\nControlled is preferred when you need to **validate, transform, conditionally disable, or react to** input as the user types. Uncontrolled is lighter for simple forms or integrating non-React code.",
+    "code": "// Uncontrolled: DOM owns the value\nfunction Uncontrolled() {\n  const ref = useRef<HTMLInputElement>(null);\n  const submit = () => alert(ref.current?.value);\n  return (\n    <>\n      <input ref={ref} defaultValue=\"\" />\n      <button onClick={submit}>Submit</button>\n    </>\n  );\n}\n\n// Controlled: React state owns the value\nfunction Controlled() {\n  const [value, setValue] = useState(\"\");\n  return (\n    <>\n      <input value={value} onChange={(e) => setValue(e.target.value)} />\n      <button onClick={() => alert(value)}>Submit</button>\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["forms", "controlled", "uncontrolled", "useState", "useRef"]
+  },
+  {
+    "id": "react-memo-usecallback-rerender",
+    "question": "The child re-renders on every parent render even though its props look unchanged. Fix it using React.memo and useCallback.",
+    "answer": "`React.memo` skips re-rendering a component when its props are **shallowly equal**. But the inline `onClick` arrow is a **new function identity on every parent render**, so memo always sees a changed prop.\n\n**Fix:** wrap the callback in `useCallback` so its identity is stable across renders (empty deps here because it only uses the functional updater). Now `React.memo(Child)` actually short-circuits. The same reasoning applies to objects/arrays passed as props - stabilize them with `useMemo`.",
+    "code": "const Child = React.memo(function Child({ onClick }: { onClick: () => void }) {\n  console.log(\"Child render\");\n  return <button onClick={onClick}>+1</button>;\n});\n\nfunction Parent() {\n  const [count, setCount] = useState(0);\n\n  // BUG: new function each render -> memo is defeated\n  // const inc = () => setCount((c) => c + 1);\n\n  // FIX: stable identity\n  const inc = useCallback(() => setCount((c) => c + 1), []);\n\n  return (\n    <>\n      <p>{count}</p>\n      <Child onClick={inc} />\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["performance", "React.memo", "useCallback", "re-render", "bug-fix"]
+  },
+  {
+    "id": "react-usememo-expensive-calc",
+    "question": "When and how do you use useMemo? Memoize an expensive filtered/sorted list so it doesn't recompute on unrelated state changes.",
+    "answer": "`useMemo` **caches the result of an expensive computation** and only recomputes when its dependencies change. Without it, typing in an unrelated input would re-run the sort/filter on every keystroke because the component re-renders.\n\nGuidelines:\n- Use it for **genuinely expensive** computations or to keep a **referentially stable** object/array passed to memoized children.\n- Don't wrap trivial calculations - the memoization overhead can exceed the savings.\n- Dependencies must list every value the computation reads.",
+    "code": "function ProductList({ products, query }: { products: Product[]; query: string }) {\n  const [unrelated, setUnrelated] = useState(0);\n\n  const visible = useMemo(() => {\n    // pretend this is O(n log n) over a large list\n    return products\n      .filter((p) => p.name.includes(query))\n      .sort((a, b) => a.price - b.price);\n  }, [products, query]); // recomputes only when these change\n\n  return (\n    <>\n      <button onClick={() => setUnrelated((n) => n + 1)}>{unrelated}</button>\n      <ul>{visible.map((p) => <li key={p.id}>{p.name}</li>)}</ul>\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["performance", "useMemo", "memoization"]
+  },
+  {
+    "id": "react-usereducer-counter",
+    "question": "Refactor this multi-action component from several useState calls to useReducer.",
+    "answer": "`useReducer` is preferred when **state transitions are complex or interrelated**, or when the next state depends on the previous one through several actions. It centralizes update logic in a pure `reducer(state, action)` function, making transitions predictable and testable, and lets you dispatch typed actions instead of scattering setters.\n\nRule of thumb: a few independent values -> `useState`; a cohesive state object with many actions -> `useReducer`.",
+    "code": "type State = { count: number; step: number };\ntype Action =\n  | { type: \"increment\" }\n  | { type: \"decrement\" }\n  | { type: \"setStep\"; step: number }\n  | { type: \"reset\" };\n\nfunction reducer(state: State, action: Action): State {\n  switch (action.type) {\n    case \"increment\":\n      return { ...state, count: state.count + state.step };\n    case \"decrement\":\n      return { ...state, count: state.count - state.step };\n    case \"setStep\":\n      return { ...state, step: action.step };\n    case \"reset\":\n      return { count: 0, step: 1 };\n    default:\n      return state;\n  }\n}\n\nfunction Counter() {\n  const [state, dispatch] = useReducer(reducer, { count: 0, step: 1 });\n  return (\n    <>\n      <p>{state.count}</p>\n      <button onClick={() => dispatch({ type: \"increment\" })}>+{state.step}</button>\n      <button onClick={() => dispatch({ type: \"reset\" })}>reset</button>\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["hooks", "useReducer", "state-management", "refactor"]
+  },
+  {
+    "id": "react-context-theme",
+    "question": "Build a Theme context with a custom useTheme hook to avoid prop drilling. How do you minimize unnecessary re-renders?",
+    "answer": "The **Context API** shares values across the tree without **prop drilling**. Create a context, wrap the tree in a `Provider`, and consume with a custom hook that throws if used outside the provider (a common interview detail).\n\n**Re-render caveat:** every consumer re-renders whenever the provider's `value` changes identity. So **memoize the `value`** with `useMemo`. For high-frequency or unrelated updates, split into multiple contexts (state vs. dispatch) or reach for a dedicated state library. Context is for low-frequency global data (theme, auth, locale), not as a general state manager.",
+    "code": "type Theme = \"light\" | \"dark\";\nconst ThemeContext = createContext<\n  { theme: Theme; toggle: () => void } | null\n>(null);\n\nexport function ThemeProvider({ children }: { children: React.ReactNode }) {\n  const [theme, setTheme] = useState<Theme>(\"light\");\n  const toggle = useCallback(\n    () => setTheme((t) => (t === \"light\" ? \"dark\" : \"light\")),\n    []\n  );\n  // memoize so consumers don't re-render on unrelated parent renders\n  const value = useMemo(() => ({ theme, toggle }), [theme, toggle]);\n  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;\n}\n\nexport function useTheme() {\n  const ctx = useContext(ThemeContext);\n  if (!ctx) throw new Error(\"useTheme must be used within ThemeProvider\");\n  return ctx;\n}",
+    "codeLang": "tsx",
+    "tags": ["context", "custom-hook", "prop-drilling", "useMemo", "re-render"]
+  },
+  {
+    "id": "react-forwardref-imperative",
+    "question": "Expose a focus() method on a custom input component to its parent using forwardRef and useImperativeHandle.",
+    "answer": "Function components can't receive `ref` by default. **`forwardRef`** lets a parent pass a ref through to a child. **`useImperativeHandle`** customizes *what* that ref exposes - instead of the raw DOM node, you expose a controlled API (here, `focus` and `clear`).\n\nThis is the idiomatic way to give a parent imperative control (focus, scroll, play/pause) while keeping internals encapsulated.\n\n*Note:* In React 19 you can accept `ref` as a normal prop and skip `forwardRef`, but `forwardRef` remains the canonical answer for 18 and earlier.",
+    "code": "interface FancyInputHandle {\n  focus: () => void;\n  clear: () => void;\n}\n\nconst FancyInput = forwardRef<FancyInputHandle>((_props, ref) => {\n  const inputRef = useRef<HTMLInputElement>(null);\n\n  useImperativeHandle(ref, () => ({\n    focus: () => inputRef.current?.focus(),\n    clear: () => {\n      if (inputRef.current) inputRef.current.value = \"\";\n    },\n  }));\n\n  return <input ref={inputRef} />;\n});\n\nfunction Parent() {\n  const ref = useRef<FancyInputHandle>(null);\n  return (\n    <>\n      <FancyInput ref={ref} />\n      <button onClick={() => ref.current?.focus()}>Focus</button>\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["refs", "forwardRef", "useImperativeHandle"]
+  },
+  {
+    "id": "react-error-boundary",
+    "question": "Implement an Error Boundary that shows a fallback UI when a child throws during render. What can't it catch?",
+    "answer": "An **error boundary** is a class component implementing `getDerivedStateFromError` (to render fallback UI) and/or `componentDidCatch` (to log). It catches errors thrown during **rendering, lifecycle methods, and constructors of its descendants**.\n\nIt does **NOT** catch:\n- Errors in **event handlers** (use try/catch there).\n- **Asynchronous** code (`setTimeout`, fetch callbacks).\n- Errors during **server-side rendering**.\n- Errors thrown in the **boundary itself**.\n\nThere is no built-in hook equivalent; the common practice is to use `react-error-boundary` or a small class component.",
+    "code": "import { Component, ErrorInfo, ReactNode } from \"react\";\n\ninterface Props { fallback: ReactNode; children: ReactNode; }\ninterface State { hasError: boolean; }\n\nexport class ErrorBoundary extends Component<Props, State> {\n  state: State = { hasError: false };\n\n  static getDerivedStateFromError(): State {\n    return { hasError: true }; // render fallback on next render\n  }\n\n  componentDidCatch(error: Error, info: ErrorInfo) {\n    console.error(\"Caught:\", error, info.componentStack);\n  }\n\n  render() {\n    return this.state.hasError ? this.props.fallback : this.props.children;\n  }\n}\n\n// Usage\n// <ErrorBoundary fallback={<p>Something went wrong.</p>}>\n//   <BuggyComponent />\n// </ErrorBoundary>",
+    "codeLang": "tsx",
+    "tags": ["error-boundary", "class-component", "error-handling"]
+  },
+  {
+    "id": "react-lazy-suspense",
+    "question": "Code-split a heavy component with React.lazy and Suspense, including a fallback. Why does this improve performance?",
+    "answer": "`React.lazy` lets you **dynamically import** a component so its code is split into a separate bundle that loads **only when first rendered**. `Suspense` shows a `fallback` while that chunk (or any suspended data) loads.\n\nBenefits:\n- **Smaller initial bundle** -> faster first load / time-to-interactive.\n- Heavy, rarely-used routes/modals load on demand.\n\nThe lazily-loaded component must be a **default export**, and the `<Suspense>` boundary must wrap it (or an ancestor).",
+    "code": "import { lazy, Suspense, useState } from \"react\";\n\nconst HeavyChart = lazy(() => import(\"./HeavyChart\")); // separate chunk\n\nfunction Dashboard() {\n  const [show, setShow] = useState(false);\n  return (\n    <>\n      <button onClick={() => setShow(true)}>Load chart</button>\n      {show && (\n        <Suspense fallback={<p>Loading chart…</p>}>\n          <HeavyChart />\n        </Suspense>\n      )}\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["code-splitting", "lazy", "Suspense", "performance"]
+  },
+  {
+    "id": "react-portal-modal",
+    "question": "Render a modal outside the parent DOM hierarchy using createPortal. Why is a portal needed here?",
+    "answer": "**`createPortal`** renders children into a **different DOM node** (e.g. `document.body`) while keeping them in the React tree - so context and event bubbling still work as if they were children.\n\nPortals are needed for **overlays** (modals, tooltips, dropdowns) because the parent may have `overflow: hidden`, `transform`, or a low `z-index` / stacking context that would clip or mis-stack the overlay. Rendering at the body level escapes those constraints. Note that React events still propagate through the **React tree**, not the DOM tree, which is sometimes surprising.",
+    "code": "import { createPortal } from \"react-dom\";\n\nfunction Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {\n  return createPortal(\n    <div className=\"overlay\" onClick={onClose}>\n      <div className=\"dialog\" onClick={(e) => e.stopPropagation()}>\n        {children}\n      </div>\n    </div>,\n    document.body // mounted outside the parent hierarchy\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["portals", "createPortal", "modal"]
+  },
+  {
+    "id": "react-usetransition-filter",
+    "question": "Use useTransition to keep a search input responsive while filtering a large list. How does it differ from useDeferredValue?",
+    "answer": "`useTransition` (React 18) marks a state update as a **non-urgent transition** so React can keep the **urgent** update (the input value) responsive and interrupt/deprioritize the heavy list render. It returns `[isPending, startTransition]`.\n\n**`useTransition` vs `useDeferredValue`:**\n- Use **`useTransition`** when you control the state update and can wrap the setter (you own the dispatch).\n- Use **`useDeferredValue`** when you only have a *value* (e.g. a prop) and want a lagging copy without touching the setter.\n\nBoth let React render stale UI while computing the expensive update, but neither is a true debounce - they're interruptible/deprioritized rendering.",
+    "code": "function FilterableList({ items }: { items: string[] }) {\n  const [query, setQuery] = useState(\"\");\n  const [list, setList] = useState(items);\n  const [isPending, startTransition] = useTransition();\n\n  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    const value = e.target.value;\n    setQuery(value); // urgent: keeps input snappy\n    startTransition(() => {\n      // non-urgent: heavy filtering can be interrupted\n      setList(items.filter((i) => i.includes(value)));\n    });\n  };\n\n  return (\n    <>\n      <input value={query} onChange={onChange} />\n      {isPending && <span>Updating…</span>}\n      <ul>{list.map((i) => <li key={i}>{i}</li>)}</ul>\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["concurrent", "useTransition", "useDeferredValue", "performance", "react-18"]
+  },
+  {
+    "id": "react-lift-state-up",
+    "question": "These two sibling inputs need to stay in sync but each holds its own state. Refactor by lifting state up.",
+    "answer": "When **two components must share/reflect the same data**, move the state to their **closest common ancestor** and pass it down as props plus a setter callback - this is **lifting state up**. The siblings become controlled by the parent and stay automatically in sync, with a single source of truth.\n\nThis is the standard answer before reaching for Context or a state library, which you'd use only when the shared state is needed by many distant components.",
+    "code": "// AFTER: state lives in the common parent\nfunction TemperatureConverter() {\n  const [celsius, setCelsius] = useState(0);\n  const fahrenheit = celsius * 9 / 5 + 32;\n\n  return (\n    <>\n      <input\n        type=\"number\"\n        value={celsius}\n        onChange={(e) => setCelsius(Number(e.target.value))}\n      />\n      <input\n        type=\"number\"\n        value={fahrenheit}\n        onChange={(e) => setCelsius((Number(e.target.value) - 32) * 5 / 9)}\n      />\n    </>\n  );\n}",
+    "codeLang": "tsx",
+    "tags": ["lifting-state-up", "state-management", "refactor"]
+  }
+]

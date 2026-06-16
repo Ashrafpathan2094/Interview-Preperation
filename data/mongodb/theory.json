@@ -1,0 +1,154 @@
+[
+  {
+    "id": "mongodb-bson-vs-json",
+    "question": "What is BSON, and how does it differ from JSON in MongoDB?",
+    "answer": "**BSON** (Binary JSON) is the binary-encoded serialization format MongoDB uses to **store documents on disk and transmit them over the wire**. JSON is the human-readable text representation you usually see in the shell and drivers.\n\n**Key differences:**\n- **Richer types:** BSON adds types JSON lacks — `ObjectId`, `Date`, `Binary`, `Decimal128`, `Int32`/`Int64`, `Timestamp`, and a regex type. JSON only has string, number, boolean, null, object, array.\n- **Traversable / length-prefixed:** every BSON document and many fields are length-prefixed, so the engine can **skip** to a field without parsing the whole document. Pure JSON must be scanned linearly.\n- **Not always smaller:** BSON stores field-name strings plus length and type metadata, so for small documents it can actually be *larger* than the equivalent JSON. Its goal is fast traversal and type fidelity, not minimal size.\n\n**3+ level nuance:** the 16 MB document limit is a BSON limit. Field names are stored in **every** document, so short field names save real space at scale (or use a mapping layer).",
+    "tags": ["bson", "documents", "internals", "data-types"]
+  },
+  {
+    "id": "mongodb-objectid-structure",
+    "question": "What is the `_id` field and how is an `ObjectId` structured?",
+    "answer": "Every MongoDB document has a unique, immutable **`_id`** that acts as the primary key. If you don't supply one, the driver/server generates an `ObjectId`.\n\nAn **`ObjectId`** is a 12-byte value:\n- **4 bytes** — Unix timestamp (seconds) of creation.\n- **5 bytes** — a random value generated per process.\n- **3 bytes** — an incrementing counter, randomly initialized.\n\n**Implications at the 3+ level:**\n- Because the high-order bytes are a timestamp, ObjectIds are **roughly monotonically increasing**, so the default `_id` index keeps new inserts near the right edge of the B-tree (good for insert locality). You can also extract approximate creation time via `getTimestamp()`.\n- `_id` is **always indexed** and **cannot be changed** after insert — to \"change\" it you must delete and re-insert.\n- You may use any unique value for `_id` (e.g. an email or composite key) to enforce uniqueness and save a separate index, but random `_id`s (like UUIDv4) hurt insert locality and index cache behavior.",
+    "code": "const oid = new ObjectId();\noid.getTimestamp(); // -> Date the ObjectId was created",
+    "codeLang": "js",
+    "tags": ["objectid", "_id", "primary-key", "documents"]
+  },
+  {
+    "id": "mongodb-embedding-vs-referencing",
+    "question": "When should you embed documents versus reference them?",
+    "answer": "This is the central schema-design trade-off in MongoDB. The guiding principle is **\"data that is accessed together should be stored together.\"**\n\n**Embed when:**\n- The relationship is **contains / one-to-few** (e.g. a user's addresses).\n- Child data is **always read with the parent** and has no independent lifecycle.\n- You want a **single-document atomic** read/write (no transaction needed).\n\n**Reference when:**\n- The relationship is **one-to-many** that is unbounded or large (a single document can't safely hold thousands of subdocuments — 16 MB limit, and growing arrays fragment).\n- Child entities are **queried/updated on their own** or shared across parents (many-to-many).\n- Duplicating the data would create an expensive consistency problem on update.\n\n**3+ level nuances:**\n- The **\"unbounded array\" anti-pattern**: embedding an ever-growing array (e.g. all comments on a viral post) leads to document moves, large reads, and eventually the 16 MB ceiling. Prefer referencing or the *subset / bucket* pattern.\n- Embedding favors read performance and atomicity; referencing favors normalization and write flexibility but requires `$lookup` or application-side joins.",
+    "tags": ["schema-design", "data-modeling", "embedding", "referencing"]
+  },
+  {
+    "id": "mongodb-document-size-limit",
+    "question": "Why is there a 16 MB document size limit and how do you work around it?",
+    "answer": "The **16 MB BSON document limit** exists to keep documents small enough to fit comfortably in RAM, prevent a single document from consuming excessive bandwidth, and discourage unbounded-growth schemas that perform poorly.\n\n**Workarounds:**\n- **Referencing** instead of embedding for large/unbounded relationships.\n- The **bucket / subset patterns** — split a huge array across multiple documents (e.g. one bucket per hour of sensor data).\n- **GridFS** for files larger than 16 MB. GridFS splits a file into 255 KB **chunks** stored in `fs.chunks`, with metadata in `fs.files`. It is *not* a performance feature — it's specifically for content that exceeds the BSON limit (large images, video, audio).\n\n**Misconception:** GridFS is not the right tool for small files; for those, a normal `BinData` field or external object storage (e.g. S3 with a reference) is usually better.",
+    "tags": ["bson", "gridfs", "limits", "data-modeling"]
+  },
+  {
+    "id": "mongodb-index-fundamentals",
+    "question": "How do indexes work in MongoDB, and what are the main types?",
+    "answer": "Indexes are **B-tree** structures storing a sorted subset of fields plus a pointer to the document. Without one, a query does a **collection scan (`COLLSCAN`)** — reads every document. An index turns that into an efficient `IXSCAN`.\n\n**Main types:**\n- **Single-field** — one key, ascending or descending (direction is irrelevant for single-field but matters for compound sort).\n- **Compound** — multiple fields in a defined order; governed by the **ESR rule** (Equality, Sort, Range field order).\n- **Multikey** — automatically created when a field is an **array**; one index entry per array element. A compound index can include at most **one** array field.\n- **Text** — tokenized full-text search; only one text index per collection.\n- **Hashed** — hashes the value; used for hashed shard keys and equality lookups (no range queries).\n- **Geospatial** — `2dsphere` / `2d` for location queries.\n- **TTL** — auto-expires documents.\n- **Wildcard** — indexes unknown/varying field names.\n- **Partial / sparse** — index only documents matching a filter / only those having the field.\n\n**Trade-off:** indexes speed reads but **slow writes** (every insert/update/delete must maintain them) and consume RAM and disk. The working set of indexes should ideally fit in RAM.",
+    "code": "db.orders.createIndex({ customerId: 1, createdAt: -1 });",
+    "codeLang": "js",
+    "tags": ["indexing", "b-tree", "performance"]
+  },
+  {
+    "id": "mongodb-compound-index-prefix-esr",
+    "question": "How does a compound index work, and what are the prefix and ESR rules?",
+    "answer": "A **compound index** sorts by its keys in the **order declared**, like a phone book sorted by (lastName, firstName).\n\n**Prefix rule:** a query can use a compound index `{a:1, b:1, c:1}` only if it filters on a **left-justified prefix** — `{a}`, `{a,b}`, or `{a,b,c}`. A query on just `{b}` or `{c}` **cannot** use this index (it would need a different index). This is why you don't need a separate index on `{a}` if you already have `{a,b}`.\n\n**ESR rule** (the order to place fields):\n1. **Equality** fields first (e.g. `status: 'active'`).\n2. **Sort** fields next — lets the index satisfy the sort without an in-memory sort.\n3. **Range** fields last (`$gt`, `$lt`, `$in` over ranges).\n\nPlacing a range field before a sort field breaks the index's ability to provide sorted output, forcing an expensive blocking **`SORT`** stage.\n\n**Misconception:** ascending/descending direction only matters for **sort** and for **multi-field sort** consistency — for pure equality it's irrelevant.",
+    "code": "// Query: find active orders for a region, newest first\ndb.orders.find({ status: 'active', region: 'EU' }).sort({ createdAt: -1 });\n// ESR-optimal index:\ndb.orders.createIndex({ status: 1, region: 1, createdAt: -1 });",
+    "codeLang": "js",
+    "tags": ["indexing", "compound-index", "esr", "prefix"]
+  },
+  {
+    "id": "mongodb-covered-query",
+    "question": "What is a covered query, and why is it fast?",
+    "answer": "A **covered query** is one where **all the fields the query needs — both the filter and the returned projection — are present in a single index**, so MongoDB answers it **entirely from the index without fetching the actual documents**.\n\n**Requirements:**\n- All fields in the filter and projection are part of one index.\n- The projection **excludes `_id`** (unless `_id` is in the index), because `_id` is returned by default.\n- No field returns an array (multikey fields can't cover).\n\nIn `explain()` output a covered query shows an `IXSCAN` with **no `FETCH`** stage and `totalDocsExamined: 0`. Because it avoids reading documents from disk/cache, it's significantly faster and lighter on the working set.\n\n**Misconception:** simply having an index on the filter does not make a query covered — the *projected* fields must be in the index too, and `_id` must be explicitly excluded.",
+    "code": "db.users.createIndex({ email: 1, name: 1 });\n// Covered: needs only indexed fields, _id excluded\ndb.users.find({ email: 'a@b.com' }, { _id: 0, name: 1 });",
+    "codeLang": "js",
+    "tags": ["indexing", "covered-query", "performance", "projection"]
+  },
+  {
+    "id": "mongodb-ttl-index",
+    "question": "What is a TTL index and how does expiration actually work?",
+    "answer": "A **TTL (Time To Live) index** automatically deletes documents after a configured number of seconds, based on a **date field**. It's commonly used for sessions, logs, caches, and event data.\n\n```js\ndb.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 });\n```\n\n**How it works / nuances at the 3+ level:**\n- A **background thread runs roughly every 60 seconds**, so deletion is **not precise** — a document can live up to ~60s past its expiry (longer under load). It is eventual, not real-time.\n- The indexed field must be a **BSON `Date`** (or an array of dates — then the **earliest** date is used). If the field is missing or not a date, the document never expires.\n- Set `expireAfterSeconds: 0` to expire **at** the exact time stored in the date field (useful for a precise per-document expiry).\n- TTL indexes are **single-field only** and **do not work on capped collections**. On sharded clusters the deleter runs on the primary of each shard.",
+    "code": "// Expire each doc at the exact time in `expireAt`\ndb.tokens.createIndex({ expireAt: 1 }, { expireAfterSeconds: 0 });",
+    "codeLang": "js",
+    "tags": ["indexing", "ttl", "expiration"]
+  },
+  {
+    "id": "mongodb-aggregation-pipeline",
+    "question": "What is the aggregation pipeline and how do its stages work?",
+    "answer": "The **aggregation pipeline** processes documents through an **ordered sequence of stages**, where each stage transforms the stream and feeds its output into the next — conceptually like Unix pipes.\n\n**Common stages:**\n- **`$match`** — filters documents (like `find`). Put it **early** to reduce the data flowing downstream and to use indexes.\n- **`$project` / `$set` / `$unset`** — reshape documents, add computed fields.\n- **`$group`** — aggregate by a key with accumulators (`$sum`, `$avg`, `$max`, `$push`, `$addToSet`).\n- **`$sort`** — order documents (uses an index only if early, before any transform that breaks the order).\n- **`$unwind`** — deconstruct an array into one document per element.\n- **`$lookup`** — left outer join to another collection.\n- **`$limit` / `$skip`**, **`$count`**, **`$facet`** (multiple sub-pipelines), **`$out` / `$merge`** (write results).\n\n**3+ level points:**\n- The optimizer can **reorder/merge** some stages (e.g. push `$match` before `$sort`/`$project`), but you should still order them deliberately.\n- Only the **first `$match`/`$sort`/`$geoNear`** can use an index; once documents are transformed, later stages run in memory.\n- **Blocking stages** like `$group` and `$sort` are limited to **100 MB of RAM**; exceeding it errors unless you set `allowDiskUse: true` (note: since MongoDB 6.0 pipelines spill to disk by default).",
+    "code": "db.orders.aggregate([\n  { $match: { status: 'paid' } },\n  { $group: { _id: '$customerId', total: { $sum: '$amount' } } },\n  { $sort: { total: -1 } },\n  { $limit: 10 }\n]);",
+    "codeLang": "js",
+    "tags": ["aggregation", "pipeline", "$match", "$group"]
+  },
+  {
+    "id": "mongodb-lookup-joins",
+    "question": "How does `$lookup` work, and what are its performance considerations?",
+    "answer": "**`$lookup`** performs a **left outer join** between the current pipeline collection and another collection in the *same* database, attaching matched documents as a new **array field**.\n\n```js\ndb.orders.aggregate([\n  { $lookup: {\n      from: 'customers',\n      localField: 'customerId',\n      foreignField: '_id',\n      as: 'customer'\n  }},\n  { $unwind: '$customer' } // flatten the 1-element array\n]);\n```\n\n**Performance considerations at the 3+ level:**\n- For each input document, `$lookup` queries the foreign collection; an **index on the `foreignField`** is essential or it becomes an N×M scan.\n- It returns an **array** even for a single match — pair with `$unwind` for one-to-one relations.\n- The **subquery form** (`let` + `pipeline`) lets you filter the joined collection and join on conditions beyond equality.\n- `$lookup` does **not** work across databases and historically did not run on sharded foreign collections (now supported in recent versions). At scale it can be expensive — sometimes embedding/denormalizing or doing the join in the app is faster.\n\n**Misconception:** MongoDB is not relational — heavy reliance on `$lookup` often signals a schema that should embed data instead.",
+    "code": "// Subquery form: join with extra filtering\ndb.orders.aggregate([\n  { $lookup: {\n      from: 'items',\n      let: { oid: '$_id' },\n      pipeline: [\n        { $match: { $expr: { $eq: ['$orderId', '$$oid'] }, inStock: true } }\n      ],\n      as: 'items'\n  }}\n]);",
+    "codeLang": "js",
+    "tags": ["aggregation", "$lookup", "joins", "performance"]
+  },
+  {
+    "id": "mongodb-explain-query-plans",
+    "question": "How do you read `explain()` output and diagnose a slow query?",
+    "answer": "`explain()` shows how the query planner executes a query. Use **`explain('executionStats')`** to get actual runtime numbers.\n\n**Key fields to read:**\n- **`winningPlan.stage`** — `IXSCAN` (good, used an index) vs **`COLLSCAN`** (bad, full scan).\n- **`FETCH`** — documents read after the index lookup; absent in a **covered query**.\n- **`SORT`** — an in-memory (\"blocking\") sort; means no index satisfied the sort. Bad for large result sets and capped at 100 MB.\n- **`totalKeysExamined`** vs **`totalDocsExamined`** vs **`nReturned`** — the ideal ratio is close to **1:1:1**. Examining far more keys/docs than returned means a poorly selective index.\n- **`executionTimeMillis`** — wall-clock time.\n\n**Diagnosis workflow:**\n1. Run with `executionStats`; look for `COLLSCAN` or a `SORT` stage.\n2. Check the examined-vs-returned ratio for selectivity.\n3. Add or reorder a compound index using the **ESR** rule; aim to also satisfy the sort and ideally cover the projection.\n4. Re-run and confirm `IXSCAN`, no `SORT`, and ratios near 1:1.\n\n**Misconception:** the planner caches plans — a query may use a stale cached plan; `explain` always re-plans, and `allPlansExecution` verbosity shows rejected candidate plans.",
+    "code": "db.orders.find({ status: 'paid' }).sort({ createdAt: -1 }).explain('executionStats');",
+    "codeLang": "js",
+    "tags": ["query-optimization", "explain", "performance", "indexing"]
+  },
+  {
+    "id": "mongodb-replica-set",
+    "question": "What is a replica set and how does replication work?",
+    "answer": "A **replica set** is a group of `mongod` instances maintaining the **same data set** for redundancy and high availability. It has one **primary** (accepts all writes) and one or more **secondaries** that replicate the primary's data.\n\n**How replication works:**\n- Every write on the primary is recorded in the **oplog** (operations log), a special **capped collection** in the `local` database.\n- Secondaries continuously tail the oplog and **apply the same operations** asynchronously, staying eventually consistent. The oplog records **idempotent** operations so replaying is safe.\n- If the primary becomes unreachable, the remaining members hold an **election** (Raft-like protocol) to promote a new primary — typically within seconds.\n\n**3+ level points:**\n- A set needs a **majority** to elect/keep a primary. With an even number of data nodes, add an **arbiter** (votes, holds no data) to break ties — but prefer odd numbers of data-bearing nodes.\n- **Replication lag** matters: secondaries can fall behind, so reads from secondaries may be stale.\n- Members can have **priority 0** (never primary), be **hidden** (for analytics/backup), or **delayed** (for recovery from human error).",
+    "tags": ["replication", "replica-set", "high-availability", "oplog"]
+  },
+  {
+    "id": "mongodb-elections-oplog",
+    "question": "How do replica set elections work, and what is the role of the oplog?",
+    "answer": "**Elections** choose a new primary when the current one is unavailable. MongoDB uses a protocol based on **Raft**:\n- Each member sends heartbeats every 2 seconds. If a secondary can't reach the primary within the **election timeout (default 10s)**, it calls for an election.\n- A candidate needs votes from a **majority of voting members** to win. This majority requirement prevents **split-brain** (two primaries).\n- Eligibility depends on **priority**, **how up-to-date** the member's oplog is, and votes. A member with `priority: 0` can never become primary.\n\n**The oplog** is the backbone of replication and recovery:\n- It's a **capped collection** (`local.oplog.rs`) of idempotent write operations.\n- Secondaries **tail** it to replicate; it also powers **change streams**.\n- Its **size bounds the replication window** — if a secondary is offline longer than the oplog can retain operations, it falls off the oplog and needs a full **initial sync** (resync).\n\n**Misconception:** during an election there is a brief window with **no primary**, so writes fail; well-behaved drivers retry (`retryWrites`).",
+    "tags": ["replication", "elections", "oplog", "high-availability"]
+  },
+  {
+    "id": "mongodb-sharding-overview",
+    "question": "What is sharding and what are the components of a sharded cluster?",
+    "answer": "**Sharding** is MongoDB's mechanism for **horizontal scaling** — partitioning a collection's data across multiple machines (shards) to support data sets and throughput beyond a single server's capacity.\n\n**Components of a sharded cluster:**\n- **Shards** — each is itself a **replica set** holding a subset of the data.\n- **`mongos`** routers — query routers the application connects to; they route operations to the right shard(s) and merge results.\n- **Config servers** — a replica set storing the cluster **metadata** (which chunk lives on which shard).\n\n**How data is distributed:** a collection is split by a **shard key** into **chunks** (logical ranges). The **balancer** migrates chunks between shards to keep them evenly loaded.\n\n**3+ level points:**\n- Choosing the shard key is the **most consequential** decision — it's hard to change (you can refine/reshard in newer versions but it's costly).\n- Queries that include the shard key are **targeted** (hit one/few shards); queries without it become **scatter-gather** (broadcast to all shards), which doesn't scale.\n- Sharding adds operational complexity — only shard when you genuinely outgrow vertical scaling and replica sets.",
+    "tags": ["sharding", "horizontal-scaling", "mongos", "shard-key"]
+  },
+  {
+    "id": "mongodb-shard-key-selection",
+    "question": "What makes a good shard key, and what are ranged vs hashed sharding trade-offs?",
+    "answer": "The shard key determines how data and load distribute. A good key has three properties:\n- **High cardinality** — many possible values so data can split into many chunks.\n- **Low frequency** — values aren't dominated by a few hot values.\n- **Non-monotonic** (for ranged) — avoids a single \"hot shard\" on inserts.\n\n**Ranged sharding** keeps documents with nearby key values on the same shard.\n- Pro: efficient **range queries** are targeted to few shards.\n- Con: a **monotonically increasing** key (timestamp, ObjectId) sends all new writes to one shard — the **hot-shard** anti-pattern.\n\n**Hashed sharding** hashes the key to distribute writes evenly.\n- Pro: excellent **write distribution**, fixes the monotonic-key problem.\n- Con: **range queries** become scatter-gather because adjacent values land on different shards.\n\n**3+ level points:**\n- **Compound shard keys** can combine a low-cardinality grouping field with a high-cardinality one to get both locality and distribution.\n- If one shard is overloaded while others are idle (\"jumbo chunks\" / hotspotting), the cause is almost always a poor shard key — the balancer can't fix a fundamentally skewed key.",
+    "code": "sh.shardCollection('app.events', { userId: 'hashed' });",
+    "codeLang": "js",
+    "tags": ["sharding", "shard-key", "hashed", "ranged"]
+  },
+  {
+    "id": "mongodb-write-concern",
+    "question": "What is write concern and how does it affect durability and performance?",
+    "answer": "**Write concern** specifies the **acknowledgement** a write requires before the driver considers it successful — it trades durability against latency.\n\n**`w` (acknowledgement):**\n- `w: 0` — fire and forget; no acknowledgement (fastest, least safe).\n- `w: 1` — acknowledged by the **primary** only.\n- `w: 'majority'` — acknowledged by a **majority of voting members**, guaranteeing the write survives a failover and won't be rolled back. **This is the default since MongoDB 5.0** (older versions defaulted to `w: 1`).\n- `w: <n>` — acknowledged by *n* members.\n\n**`j` (journal):** `j: true` requires the write to be written to the **on-disk journal**, surviving a crash of the acknowledging node(s).\n\n**`wtimeout`:** a millisecond cap to avoid blocking forever if not enough members acknowledge.\n\n**3+ level nuance:**\n- `w: 1` can be **rolled back** if the primary fails before replicating — for money/critical data use `w: 'majority'`.\n- Higher write concern increases latency and is sensitive to replication lag and node availability.\n- Write concern is about **propagation/durability**; read concern is the complementary read-side guarantee.",
+    "code": "db.payments.insertOne(doc, { writeConcern: { w: 'majority', j: true, wtimeout: 5000 } });",
+    "codeLang": "js",
+    "tags": ["write-concern", "durability", "replication", "consistency"]
+  },
+  {
+    "id": "mongodb-read-concern-preference",
+    "question": "What is the difference between read concern and read preference?",
+    "answer": "They sound similar but control different things.\n\n**Read preference** = **WHICH member** the read is routed to:\n- `primary` (default), `primaryPreferred`, `secondary`, `secondaryPreferred`, `nearest`.\n- Reading from **secondaries** offloads the primary but can return **stale** data due to replication lag. Use it for analytics/reporting, not read-your-own-writes flows.\n\n**Read concern** = **WHAT consistency/isolation** the returned data must satisfy:\n- `local` (default) — most recent data on the queried node, may be rolled back.\n- `majority` — only data acknowledged by a majority, so it **won't be rolled back**.\n- `linearizable` — reflects all majority-acknowledged writes that completed before the read (single-document, primary only, can be slow).\n- `snapshot` — a consistent point-in-time view (used in transactions).\n- `available` — lowest latency on sharded clusters, may return orphaned docs.\n\n**3+ level point:** combining `read preference: secondary` with `read concern: majority` still risks staleness — the secondary may simply be behind. For strong read-your-writes, read from the primary with `majority`/`linearizable`, or use causal consistency sessions.",
+    "tags": ["read-concern", "read-preference", "consistency", "replication"]
+  },
+  {
+    "id": "mongodb-transactions-acid",
+    "question": "Does MongoDB support ACID transactions, and what are the trade-offs?",
+    "answer": "**Yes.** Single-document operations have **always** been atomic. **Multi-document ACID transactions** were added for replica sets in **4.0** and for **sharded clusters in 4.2**.\n\n```js\nconst session = client.startSession();\ntry {\n  session.startTransaction();\n  await accounts.updateOne({ _id: a }, { $inc: { bal: -100 } }, { session });\n  await accounts.updateOne({ _id: b }, { $inc: { bal:  100 } }, { session });\n  await session.commitTransaction();\n} catch (e) {\n  await session.abortTransaction();\n} finally {\n  await session.endSession();\n}\n```\n\n**Trade-offs / 3+ level points:**\n- Transactions have **real overhead** — they hold locks and snapshots, can cause write conflicts, and there's a default **60-second** time limit.\n- They use **snapshot isolation** and must use a session; reads see a consistent snapshot.\n- **Design philosophy:** if you frequently *need* multi-document transactions, your schema is probably too normalized — **embedding** related data into one document gives atomicity for free. Transactions are an escape hatch, not the default tool.\n- Long-running or large transactions can hit the **16 MB oplog entry** consideration and increase the chance of `TransientTransactionError`, which the driver may retry.",
+    "code": "// Always wrap with retry on TransientTransactionError in production\n// (drivers expose withTransaction() which retries automatically)\nawait session.withTransaction(async () => {\n  await accounts.updateOne({ _id: a }, { $inc: { bal: -100 } }, { session });\n  await accounts.updateOne({ _id: b }, { $inc: { bal:  100 } }, { session });\n});",
+    "codeLang": "js",
+    "tags": ["transactions", "acid", "atomicity", "sessions"]
+  },
+  {
+    "id": "mongodb-capped-collections",
+    "question": "What are capped collections and when are they useful?",
+    "answer": "A **capped collection** is a **fixed-size** collection that behaves like a circular buffer: once it reaches its size (or document-count) cap, the **oldest documents are automatically overwritten** by new inserts — no explicit deletion.\n\n```js\ndb.createCollection('logs', { capped: true, size: 100000, max: 1000 });\n```\n\n**Key properties:**\n- **Insertion order is preserved**, and natural-order reads return documents in insertion order with no index needed — very fast for append-and-tail workloads.\n- High-throughput inserts with bounded storage make them ideal for **logs, recent events, and caches**. The **oplog itself is a capped collection.**\n\n**Constraints at the 3+ level:**\n- You **cannot delete** individual documents (only `drop` the whole collection).\n- Updates that would **grow** a document beyond its original size are rejected (historically) / discouraged.\n- **No sharding**, and **TTL indexes don't apply** (the size cap is the expiry mechanism).\n- For most \"expire old data\" needs, a **TTL index on a normal collection** is more flexible than a capped collection.",
+    "code": "db.createCollection('events', { capped: true, size: 5242880, max: 5000 });",
+    "codeLang": "js",
+    "tags": ["capped-collections", "oplog", "data-modeling"]
+  },
+  {
+    "id": "mongodb-wiredtiger-storage-engine",
+    "question": "What is the WiredTiger storage engine and what does it provide?",
+    "answer": "**WiredTiger** has been MongoDB's **default storage engine since 3.2**, replacing the legacy **MMAPv1** engine (removed in 4.2).\n\n**What it provides:**\n- **Document-level concurrency control** — multiple writers can modify different documents in the same collection simultaneously (MMAPv1 used collection-level locking, a major bottleneck).\n- **Compression** — both data (snappy by default; zlib/zstd optional) and indexes (prefix compression), reducing storage and I/O.\n- **MVCC (multi-version concurrency control)** — readers see a consistent snapshot without blocking writers; this underpins transactions and `majority` read concern.\n- **Checkpoints + journal (WAL)** — durable, crash-safe writes. Checkpoints flush a consistent snapshot ~every 60s; the journal recovers writes since the last checkpoint.\n- **Internal cache** — WiredTiger manages its own cache (default ~50% of RAM minus 1 GB) for the working set; the OS file-system cache holds the rest.\n\n**3+ level point:** WiredTiger's MVCC and document-level locking are what make MongoDB's concurrency and transactions viable; understanding the cache sizing is important for performance tuning (the working set should fit in cache).",
+    "tags": ["wiredtiger", "storage-engine", "internals", "concurrency"]
+  },
+  {
+    "id": "mongodb-update-operators-upsert",
+    "question": "How do update operators, atomicity, and upserts work in MongoDB?",
+    "answer": "Updates use **update operators** rather than replacing the whole document (unless you pass a plain replacement document).\n\n**Common operators:**\n- **`$set` / `$unset`** — set or remove fields.\n- **`$inc`** — atomically increment a number.\n- **`$push` / `$addToSet` / `$pull`** — array modifications (`$addToSet` avoids duplicates).\n- **`$rename`, `$min`, `$max`, `$mul`, `$currentDate`**.\n\n**Atomicity:** a single document update is **always atomic**, even when it modifies multiple fields/arrays. Concurrent updates to the same document don't interleave partially.\n\n**Upsert:** `{ upsert: true }` inserts a new document if no match is found, applying the filter equality fields plus the update. Combined with `$setOnInsert`, you can set fields only on creation.\n\n**3+ level points:**\n- `updateOne` vs `updateMany` vs `replaceOne` matter — `replaceOne`/passing a non-operator document **replaces** the entire doc and can silently drop fields.\n- **`findOneAndUpdate`** returns the document (before or after via `returnDocument`) and is the building block for atomic counters/queues.\n- Use **`$` and `$[]` / `$[<identifier>]`** positional operators with `arrayFilters` to update specific array elements atomically.",
+    "code": "db.counters.findOneAndUpdate(\n  { _id: 'orderId' },\n  { $inc: { seq: 1 }, $setOnInsert: { createdAt: new Date() } },\n  { upsert: true, returnDocument: 'after' }\n);",
+    "codeLang": "js",
+    "tags": ["crud", "update-operators", "atomicity", "upsert"]
+  }
+]
