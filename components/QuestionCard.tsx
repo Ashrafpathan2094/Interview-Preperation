@@ -12,7 +12,10 @@ export default function QuestionCard({
   q: Question;
   index: number;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false); // answer revealed
+  const [full, setFull] = useState(false); // detailed explanation expanded
+
+  const hasShort = Boolean(q.short && q.short.trim());
 
   return (
     <article className="question-card">
@@ -34,10 +37,43 @@ export default function QuestionCard({
 
       {open && (
         <div className="answer">
-          <div className="answer-prose">
-            <ReactMarkdown>{q.answer}</ReactMarkdown>
-          </div>
-          {q.code && <CodeBlock code={q.code} lang={q.codeLang} />}
+          {hasShort ? (
+            <>
+              <div className="short-answer">
+                <span className="short-label">Short answer</span>
+                <div className="answer-prose">
+                  <ReactMarkdown>{q.short as string}</ReactMarkdown>
+                </div>
+              </div>
+
+              <button
+                className="reveal-btn reveal-btn--secondary"
+                aria-expanded={full}
+                onClick={() => setFull((v) => !v)}
+              >
+                {full
+                  ? "Hide full explanation ▴"
+                  : "Show full explanation ▸"}
+              </button>
+
+              {full && (
+                <div className="full-answer">
+                  <div className="answer-prose">
+                    <ReactMarkdown>{q.answer}</ReactMarkdown>
+                  </div>
+                  {q.code && <CodeBlock code={q.code} lang={q.codeLang} />}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="answer-prose">
+                <ReactMarkdown>{q.answer}</ReactMarkdown>
+              </div>
+              {q.code && <CodeBlock code={q.code} lang={q.codeLang} />}
+            </>
+          )}
+
           {q.tags && q.tags.length > 0 && (
             <div className="tags">
               {q.tags.map((t) => (

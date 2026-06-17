@@ -1,0 +1,155 @@
+[
+  {
+    "id": "git-undo-last-commit-keep-changes",
+    "question": "You committed too early. Write the command(s) to undo the last commit but keep its changes staged in your working tree, and explain what HEAD does.",
+    "short": "Use `git reset --soft HEAD~1` to move HEAD back one commit while keeping changes staged. The commit disappears but your work stays ready to re-commit.",
+    "answer": "`git reset --soft HEAD~1` moves the branch pointer (and HEAD) back by one commit but leaves the **index** and **working directory** untouched, so the changes from the undone commit remain **staged**.\n\n**The three reset modes:**\n- `--soft` -> moves HEAD only; index + working dir keep changes (changes stay **staged**).\n- `--mixed` (default) -> moves HEAD + resets index; changes stay in working dir but **unstaged**.\n- `--hard` -> moves HEAD + resets index + working dir; **changes are discarded** (dangerous).\n\n`HEAD~1` means \"the commit one before the current HEAD\". `HEAD` is a pointer to the tip of the currently checked-out branch.\n\nUse `--soft` when you just want to re-do the commit message or add more files; use `--mixed` to re-stage selectively. Never `--hard` unless you are sure you want to lose the work.",
+    "code": "# Undo last commit, keep changes staged\ngit reset --soft HEAD~1\n\n# Re-commit with a better message / more files\ngit add forgotten-file.js\ngit commit -m \"feat: add login flow with validation\"\n\n# Variants:\n# git reset --mixed HEAD~1   # keep changes, but unstaged (default)\n# git reset --hard HEAD~1    # DISCARD the changes entirely",
+    "codeLang": "bash",
+    "tags": ["reset", "HEAD", "undo", "three-trees", "staging"]
+  },
+  {
+    "id": "git-revert-pushed-commit",
+    "question": "A bad commit was already pushed to the shared main branch and others have pulled it. Write the command to safely undo it, and explain why you would not use git reset here.",
+    "short": "Use `git revert <hash>` to create a new commit that inverts the bad one. It is safe for shared history because it adds a commit instead of rewriting it.",
+    "answer": "`git revert <commit-hash>` creates a **new commit** that applies the inverse of the target commit's changes. The original commit stays in history, so no one's pulled history is rewritten.\n\n**Why not `git reset` on a shared branch?** `reset` rewrites history by moving the branch pointer backward. After pushing that with `--force`, every teammate who already pulled the bad commit now has a diverged history, causing painful conflicts on their next pull. **Rule of thumb: `reset` for local/private history, `revert` for published history.**\n\nIf you need to revert a **merge commit**, you must tell Git which parent to keep with `-m 1`.",
+    "code": "# Safe undo of a pushed commit\ngit revert a1b2c3d\n# opens editor for the revert commit message, then:\ngit push origin main\n\n# Revert without auto-committing (to batch several reverts)\ngit revert --no-commit a1b2c3d\ngit revert --no-commit e4f5g6h\ngit commit -m \"Revert broken release commits\"\n\n# Revert a MERGE commit, keeping mainline (parent 1)\ngit revert -m 1 <merge-commit-hash>",
+    "codeLang": "bash",
+    "tags": ["revert", "reset", "shared-history", "undo", "merge-commit"]
+  },
+  {
+    "id": "git-resolve-merge-conflict",
+    "question": "You run git merge feature and get a conflict. Walk through the commands and the exact steps to resolve it, including how to inspect the conflicted files.",
+    "short": "List conflicts with `git status`, edit files to remove `<<<<<<<`/`=======`/`>>>>>>>` markers, `git add` the resolved files, then `git commit` to complete the merge.",
+    "answer": "When a merge conflicts, Git pauses and marks the affected files. The workflow:\n\n1. **See what's conflicted:** `git status` lists files under *Unmerged paths*.\n2. **Open each file** and find the conflict markers:\n   - `<<<<<<< HEAD` -> your current branch's version (above `=======`).\n   - `=======` -> divider.\n   - `>>>>>>> feature` -> the incoming branch's version (below).\n3. **Edit** to keep the correct combination and **delete all three marker lines**.\n4. **Stage** each resolved file with `git add`.\n5. **Complete** the merge with `git commit` (Git pre-fills a merge message).\n\nUseful helpers: `git diff` shows the conflict hunks; `git mergetool` opens a visual tool; `git merge --abort` bails out and returns to the pre-merge state. You can also choose a whole side with `git checkout --ours <file>` or `--theirs <file>`.",
+    "code": "git merge feature\n# CONFLICT (content): Merge conflict in src/app.js\n\ngit status        # see \"Unmerged paths\"\n\n# A conflicted file looks like:\n# <<<<<<< HEAD\n#   const port = 3000;\n# =======\n#   const port = 8080;\n# >>>>>>> feature\n\n# Edit src/app.js to the desired final content, removing markers, then:\ngit add src/app.js\ngit commit            # finishes the merge\n\n# Escape hatches:\n# git merge --abort                 # cancel and restore pre-merge state\n# git checkout --theirs src/app.js  # take the incoming version wholesale\n# git checkout --ours   src/app.js  # keep current branch version wholesale",
+    "codeLang": "bash",
+    "tags": ["merge", "conflict", "resolution", "status", "mergetool"]
+  },
+  {
+    "id": "git-rebase-vs-merge",
+    "question": "Show how to update your feature branch with the latest main using both merge and rebase. When would you pick each, and what is the golden rule of rebasing?",
+    "short": "`git merge main` preserves history with a merge commit; `git rebase main` replays your commits on top for a linear history. Rebase locally, never rebase pushed/shared commits.",
+    "answer": "Both bring the latest `main` into your feature branch, but they shape history differently.\n\n**Merge** (`git merge main` from your feature branch) creates a **merge commit** tying the two histories together. History is non-linear but truthful: it records exactly when integration happened. Safe for shared branches.\n\n**Rebase** (`git rebase main`) **replays** your feature commits one-by-one on top of the current `main`, producing a **clean linear history** with no merge commits. It rewrites your commits' hashes (they're new commits).\n\n**The golden rule of rebasing:** never rebase commits that have been pushed and that others may have based work on. Rewriting shared history forces everyone else into conflicts. Rebase your own local, unpushed work to tidy it before sharing; merge when integrating shared branches.\n\nMany teams use: rebase the feature branch onto main to linearize, then a single merge (or squash-merge) into main.",
+    "code": "# --- Option A: MERGE main into your feature branch ---\ngit checkout feature\ngit fetch origin\ngit merge origin/main      # creates a merge commit, history forks/joins\n\n# --- Option B: REBASE feature onto latest main ---\ngit checkout feature\ngit fetch origin\ngit rebase origin/main     # replays your commits on top -> linear history\n# resolve any conflicts, then:\ngit rebase --continue      # (or --abort to bail out)\n\n# Because rebase rewrites hashes, pushing an already-pushed branch needs:\ngit push --force-with-lease origin feature   # safer than --force",
+    "codeLang": "bash",
+    "tags": ["rebase", "merge", "history", "force-with-lease", "workflow"]
+  },
+  {
+    "id": "git-interactive-rebase-squash",
+    "question": "Your feature branch has 5 messy commits. Write the command to squash them into one clean commit before opening a PR, and describe the interactive rebase options.",
+    "short": "Run `git rebase -i HEAD~5`, change `pick` to `squash` (or `s`) on all but the first commit, save, then write the combined message.",
+    "answer": "`git rebase -i HEAD~5` opens an editor listing the last 5 commits (oldest at top), each prefixed with an action keyword.\n\n**Common interactive-rebase keywords:**\n- `pick` (`p`) -> keep the commit as-is.\n- `reword` (`r`) -> keep the commit but edit its message.\n- `squash` (`s`) -> merge into the previous commit, **combining** both messages.\n- `fixup` (`f`) -> like squash but **discards** this commit's message.\n- `edit` (`e`) -> stop to amend the commit (e.g., split it).\n- `drop` (`d`) -> delete the commit entirely.\n- Reorder lines to reorder commits.\n\nTo squash 5 into 1: leave the first as `pick`, change the other four to `squash` (or `fixup` to drop their messages). Save, then Git prompts you to write the final combined message.\n\nSince this **rewrites history**, only do it on unpushed/private commits, or push with `--force-with-lease`.",
+    "code": "git rebase -i HEAD~5\n\n# Editor opens with:\n#   pick   a1b2c3d  wip\n#   pick   b2c3d4e  more wip\n#   pick   c3d4e5f  fix typo\n#   pick   d4e5f6g  oops\n#   pick   e5f6g7h  done\n#\n# Change it to:\n#   pick   a1b2c3d  wip\n#   squash b2c3d4e  more wip\n#   squash c3d4e5f  fix typo\n#   squash d4e5f6g  oops\n#   squash e5f6g7h  done\n# Save -> write the single combined message.\n\n# If already pushed:\ngit push --force-with-lease origin feature",
+    "codeLang": "bash",
+    "tags": ["rebase", "interactive", "squash", "fixup", "history"]
+  },
+  {
+    "id": "git-cherry-pick-hotfix",
+    "question": "A single bug-fix commit on the develop branch needs to go onto the release branch without bringing any other changes. Write the commands and explain cherry-pick.",
+    "short": "Check out the target branch and run `git cherry-pick <hash>` to copy just that one commit onto it as a new commit.",
+    "answer": "`git cherry-pick <commit-hash>` takes the changes introduced by a specific commit and applies them as a **new commit** on your current branch. It's ideal for porting an isolated fix between branches without merging everything else.\n\n**Workflow:** find the commit hash (e.g., via `git log`), check out the destination branch, then cherry-pick. You can cherry-pick a range or multiple hashes at once. Conflicts are resolved like a merge, then `git cherry-pick --continue`.\n\nUseful flags:\n- `-x` appends a line referencing the original commit (good traceability for backports).\n- `--no-commit` applies changes without committing, so you can batch several.\n- `-n` is the short form of `--no-commit`.\n\nNote the cherry-picked commit gets a **new hash**, so the same change now lives in two places, which can cause minor duplicate-commit noise if both branches later merge.",
+    "code": "# Find the fix on develop\ngit log --oneline develop\n# a1b2c3d  fix: null check on user session\n\n# Apply ONLY that commit to the release branch\ngit checkout release\ngit cherry-pick -x a1b2c3d   # -x records the source hash in the message\n\n# Multiple commits / a range\ngit cherry-pick a1b2c3d e4f5g6h\ngit cherry-pick a1b2c3d^..e4f5g6h   # inclusive range\n\n# On conflict:\n# ...resolve files... then:\ngit add .\ngit cherry-pick --continue",
+    "codeLang": "bash",
+    "tags": ["cherry-pick", "backport", "hotfix", "branching"]
+  },
+  {
+    "id": "git-stash-switch-branch",
+    "question": "You're mid-change on a feature and must urgently switch branches to fix something. Write the commands to shelve your work, switch, then restore it. Explain stash pop vs apply.",
+    "short": "`git stash push` shelves uncommitted changes and cleans the working tree; switch branches, then `git stash pop` to restore and remove from the stash (or `apply` to keep it).",
+    "answer": "`git stash` saves your **uncommitted** changes (tracked, staged + unstaged) onto a stack and reverts your working directory to a clean HEAD, letting you switch branches freely.\n\n- `git stash push -m \"msg\"` -> save with a label (plain `git stash` also works).\n- `git stash list` -> view the stack (`stash@{0}` is newest).\n- `git stash pop` -> reapply the latest stash **and remove it** from the stack.\n- `git stash apply` -> reapply but **keep** it in the stack (useful to apply to several branches).\n- `git stash drop stash@{n}` -> delete a specific entry.\n\nBy default untracked/ignored files are NOT stashed; add `-u` (include untracked) or `-a` (include ignored). If applying causes a conflict, resolve it like a merge; with `pop` the entry is kept if conflicts occur so you don't lose it.",
+    "code": "# Shelve current work\ngit stash push -m \"WIP: profile page layout\"\n\n# Now the working tree is clean -> handle the urgent fix\ngit checkout hotfix\n# ...fix, commit, push...\n\n# Come back and restore\ngit checkout feature\ngit stash list            # stash@{0}: On feature: WIP: profile page layout\ngit stash pop             # reapply newest AND drop it\n\n# Keep the stash for reuse on another branch:\ngit stash apply stash@{0}\n\n# Include untracked files when stashing:\ngit stash push -u -m \"WIP incl new files\"",
+    "codeLang": "bash",
+    "tags": ["stash", "pop", "apply", "branching", "workflow"]
+  },
+  {
+    "id": "git-amend-last-commit",
+    "question": "You just committed but forgot to add a file and made a typo in the message. Write the command to fix both without creating a new commit. What's the caveat?",
+    "short": "Stage the missing file then run `git commit --amend` to fold it into the previous commit and edit the message. Caveat: it rewrites the commit, so don't amend pushed commits.",
+    "answer": "`git commit --amend` replaces the most recent commit with a new one that includes whatever is currently staged plus an (optionally) edited message.\n\n- To **add a forgotten file**: `git add file` then `git commit --amend`.\n- To **only fix the message**: `git commit --amend -m \"new message\"`.\n- To keep the message unchanged (e.g., just adding a file): `git commit --amend --no-edit`.\n\n**Caveat:** amending creates a brand-new commit object with a new hash; it rewrites history. That's fine for the latest **local/unpushed** commit. If the commit was already pushed and shared, amending then pushing requires `--force-with-lease` and will disrupt anyone who pulled the old commit, so avoid amending public history.",
+    "code": "# Forgot a file + bad message\ngit add src/utils.js\ngit commit --amend -m \"fix: handle empty config in loader\"\n\n# Just add a file, keep the existing message:\ngit add assets/logo.svg\ngit commit --amend --no-edit\n\n# If it was already pushed (use with care):\ngit push --force-with-lease origin feature",
+    "codeLang": "bash",
+    "tags": ["amend", "commit", "history", "force-with-lease"]
+  },
+  {
+    "id": "git-reflog-recover-lost-commit",
+    "question": "You ran git reset --hard and lost a commit you actually needed. Write the commands to find and recover it. How long does this window last?",
+    "short": "Use `git reflog` to find the lost commit's hash, then recover it with `git checkout -b recovered <hash>` or `git reset --hard <hash>`.",
+    "answer": "`git reflog` records every move of `HEAD` (commits, resets, checkouts, rebases) even when those commits are no longer reachable from any branch. After a destructive `reset --hard`, the orphaned commit still appears in the reflog, so you can recover it.\n\n**Recovery steps:**\n1. `git reflog` -> find the line showing the state *before* the reset; copy its hash (e.g., `HEAD@{1}`).\n2. Restore it: create a branch at that commit (`git checkout -b recovered <hash>`) or move the current branch back (`git reset --hard <hash>`), or `git cherry-pick <hash>` to bring just that commit.\n\n**Window:** reflog entries are local and pruned over time, governed by `gc.reflogExpire` (default **90 days** for reachable entries, 30 for unreachable). Recover promptly, and note reflog is per-clone, so a fresh clone won't have it.",
+    "code": "# What happened to HEAD recently?\ngit reflog\n# 9f8e7d6 HEAD@{0}: reset: moving to HEAD~3\n# a1b2c3d HEAD@{1}: commit: the work I lost      <-- want this\n# ...\n\n# Recover onto a new branch (safest)\ngit checkout -b recovered a1b2c3d\n\n# Or move current branch back to it\ngit reset --hard a1b2c3d\n\n# Or grab just that one commit\ngit cherry-pick a1b2c3d",
+    "codeLang": "bash",
+    "tags": ["reflog", "recovery", "reset", "lost-commit"]
+  },
+  {
+    "id": "git-bisect-find-regression",
+    "question": "A test that used to pass now fails, and you don't know which of 200 commits broke it. Write the git bisect workflow to find the offending commit.",
+    "short": "Start with `git bisect start`, mark the current commit `bad` and a known-good commit `good`; Git binary-searches, you mark each checkout good/bad until it pinpoints the culprit.",
+    "answer": "`git bisect` performs a **binary search** through history to find the commit that introduced a regression, taking ~log2(N) steps instead of checking every commit.\n\n**Workflow:**\n1. `git bisect start`.\n2. `git bisect bad` -> mark the current (broken) commit.\n3. `git bisect good <hash>` -> mark a commit known to work.\n4. Git checks out a commit halfway between. Test it, then run `git bisect good` or `git bisect bad`.\n5. Repeat; Git narrows the range until it reports *\"<hash> is the first bad commit\"*.\n6. `git bisect reset` -> return to your original HEAD.\n\n**Automate it** with `git bisect run <script>`: Git runs the script at each step, treating exit code 0 as good and non-zero (1-127, except 125) as bad, finding the culprit hands-free.",
+    "code": "git bisect start\ngit bisect bad                 # current commit is broken\ngit bisect good v1.4.0         # this tag/commit was fine\n\n# Git checks out a midpoint commit; test it, then:\ngit bisect good   # or: git bisect bad\n# ...repeat until Git prints \"<hash> is the first bad commit\"\n\ngit bisect reset   # back to where you started\n\n# Fully automated with a test command:\ngit bisect start HEAD v1.4.0\ngit bisect run npm test        # exit 0 = good, non-zero = bad",
+    "codeLang": "bash",
+    "tags": ["bisect", "debugging", "regression", "binary-search"]
+  },
+  {
+    "id": "git-detached-head-recover",
+    "question": "After git checkout <commit-hash> you see \"You are in detached HEAD state\", make a commit, then switch branches. Explain what happened and write the command to save that work.",
+    "short": "Checking out a commit (not a branch) detaches HEAD; commits made there belong to no branch and become orphaned on switch. Save them with `git branch <name> <hash>` (or branch before switching).",
+    "answer": "Normally `HEAD` points to a branch name, which points to a commit. When you `git checkout <commit-hash>` (or a tag), `HEAD` points **directly at the commit**, no branch is following it. That's **detached HEAD**.\n\nYou can still build and commit, but those commits aren't on any branch. The moment you `git checkout some-branch`, the new commits become **unreachable** (orphaned) because nothing references them, only the reflog remembers them.\n\n**To save the work:** create a branch that points to the detached commit *before* (or right after) leaving:\n- Before switching: `git switch -c new-branch` (or `git checkout -b new-branch`).\n- If you already switched away: find the hash with `git reflog` and run `git branch new-branch <hash>`.",
+    "code": "git checkout a1b2c3d\n# Note: switching to 'a1b2c3d'. You are in 'detached HEAD' state...\n\n# You make commits here -> they belong to NO branch\ngit commit -am \"experiment\"\n\n# SAVE the work by anchoring a branch to it:\ngit switch -c experiment-branch     # modern syntax\n# or (equivalent):\ngit checkout -b experiment-branch\n\n# If you ALREADY left and orphaned it:\ngit reflog                          # find the commit hash\ngit branch experiment-branch a1b2c3d",
+    "codeLang": "bash",
+    "tags": ["detached-head", "HEAD", "branch", "reflog", "recovery"]
+  },
+  {
+    "id": "git-fetch-vs-pull",
+    "question": "Explain the difference between git fetch and git pull with commands, and show how to inspect incoming changes before merging them into your branch.",
+    "short": "`git fetch` downloads remote commits without changing your working branch; `git pull` is `fetch` + `merge` (or rebase). Fetch first to review, then merge.",
+    "answer": "`git fetch` downloads new commits, branches, and tags from the remote into your local **remote-tracking branches** (e.g., `origin/main`) but does **not** touch your working branch or files. It's read-only and always safe.\n\n`git pull` is a convenience that does `git fetch` **then** `git merge` (or `git rebase` with `--rebase`) of the upstream into your current branch, immediately changing your working tree.\n\n**Safer practice:** `fetch` first, inspect what's incoming with `git log HEAD..origin/main` or `git diff HEAD origin/main`, then merge/rebase deliberately. `git pull --rebase` avoids a merge commit by replaying your local commits on top of the fetched ones, which many teams prefer for a clean history.",
+    "code": "# Just download, change nothing locally\ngit fetch origin\n\n# Review what arrived before integrating\ngit log --oneline HEAD..origin/main    # commits you don't have yet\ngit diff HEAD origin/main              # the actual changes\n\n# Integrate when ready\ngit merge origin/main                  # equivalent to the merge half of pull\n\n# All-in-one (fetch + merge):\ngit pull origin main\n\n# Fetch + rebase (linear history, no merge commit):\ngit pull --rebase origin main",
+    "codeLang": "bash",
+    "tags": ["fetch", "pull", "remote", "tracking-branch", "merge"]
+  },
+  {
+    "id": "git-track-remote-branch",
+    "question": "You created a local branch and want to push it and set it to track the remote so future git push/pull need no arguments. Write the commands and show how to check tracking.",
+    "short": "Push with `git push -u origin <branch>` to create the upstream and set tracking. After that, plain `git push`/`git pull` work. Check with `git branch -vv`.",
+    "answer": "A **tracking branch** is a local branch linked to a remote branch (its *upstream*). Once set, Git knows where `git push`/`git pull` should go and can show ahead/behind counts.\n\n- `git push -u origin feature` (`-u` = `--set-upstream`) pushes the branch and records `origin/feature` as its upstream in one step.\n- Afterwards, a bare `git push` or `git pull` on that branch just works.\n- Set/change upstream for an existing branch: `git branch --set-upstream-to=origin/feature`.\n- Inspect tracking with `git branch -vv` (shows `[origin/feature: ahead 2]`).\n- When you `git checkout` a branch name that exists only on the remote, Git auto-creates a local tracking branch.",
+    "code": "# Create + switch to a local branch\ngit switch -c feature/payments\n\n# Push it and set upstream tracking in one go\ngit push -u origin feature/payments\n\n# Now these need no extra args:\ngit push\ngit pull\n\n# Verify tracking relationships (note the [origin/...] column)\ngit branch -vv\n# * feature/payments 9f8e7d6 [origin/feature/payments] add checkout API\n\n# Set/repoint upstream for an existing branch:\ngit branch --set-upstream-to=origin/feature/payments",
+    "codeLang": "bash",
+    "tags": ["remote", "tracking-branch", "push", "upstream", "branch"]
+  },
+  {
+    "id": "git-tags-annotated-vs-lightweight",
+    "question": "Create a tag for a release v1.2.0, push it to the remote, and explain the difference between annotated and lightweight tags. Which should you use for releases?",
+    "short": "Use an annotated tag (`git tag -a v1.2.0 -m \"...\"`) for releases, then `git push origin v1.2.0`. Annotated tags store metadata; lightweight tags are just a name pointer.",
+    "answer": "Tags mark a specific commit, typically a release point.\n\n**Annotated tags** (`git tag -a`) are full objects in the Git database storing the tagger's name, email, date, a message, and an optional GPG signature. **Use these for releases**, they're versioned, documented, and signable.\n\n**Lightweight tags** (`git tag <name>` with no `-a`/`-m`) are just a named pointer to a commit, like a branch that never moves, with no extra metadata. Fine for private/temporary bookmarks.\n\nKey commands: `git tag` lists tags; `git show v1.2.0` displays tag + commit details; `git tag -d` deletes locally. **Tags are not pushed by default**, push explicitly with `git push origin v1.2.0`, or all at once with `git push origin --tags`. You can also tag an older commit by appending its hash.",
+    "code": "# Annotated tag (recommended for releases)\ngit tag -a v1.2.0 -m \"Release 1.2.0: checkout revamp\"\n\n# Lightweight tag (just a pointer)\ngit tag v1.2.0-rc1\n\n# Tag a specific past commit\ngit tag -a v1.1.9 a1b2c3d -m \"Backfilled tag\"\n\n# Tags are NOT pushed by default:\ngit push origin v1.2.0          # one tag\ngit push origin --tags          # all tags\n\n# Inspect / delete\ngit show v1.2.0\ngit tag -d v1.2.0-rc1                 # delete locally\ngit push origin --delete v1.2.0-rc1  # delete on remote",
+    "codeLang": "bash",
+    "tags": ["tags", "annotated", "lightweight", "release", "push"]
+  },
+  {
+    "id": "git-gitignore-already-tracked",
+    "question": "You added node_modules/ and a .env file to .gitignore, but they still show up in git status because they were already committed. Write the commands to stop tracking them while keeping the local files.",
+    "short": "`.gitignore` only ignores untracked files. Remove already-tracked files from the index with `git rm -r --cached`, then commit; the local files stay on disk.",
+    "answer": "`.gitignore` only affects **untracked** files, Git keeps tracking anything already committed even if it later matches an ignore rule. To stop tracking them without deleting them locally, remove them from the **index** with `--cached`.\n\n**Steps:**\n1. Ensure the patterns are in `.gitignore`.\n2. `git rm -r --cached node_modules .env` removes them from tracking but leaves the files on disk (`--cached` = index only).\n3. Commit the removal. From now on they're ignored.\n\nTo clear the entire index and re-add respecting `.gitignore` (handy when many files are affected): `git rm -r --cached .` then `git add .`. Also useful: `git check-ignore -v <path>` tells you which rule is ignoring (or not) a given file.",
+    "code": "# .gitignore already contains:\n#   node_modules/\n#   .env\n\n# Stop tracking, but KEEP the files on disk:\ngit rm -r --cached node_modules\ngit rm --cached .env\n\ngit commit -m \"chore: stop tracking node_modules and .env\"\n\n# Bulk approach: reset the whole index against .gitignore\ngit rm -r --cached .\ngit add .\ngit commit -m \"chore: apply .gitignore to tracked files\"\n\n# Debug which rule ignores a path:\ngit check-ignore -v config/.env",
+    "codeLang": "bash",
+    "tags": ["gitignore", "rm-cached", "index", "tracking"]
+  },
+  {
+    "id": "git-precommit-hook",
+    "question": "Write a pre-commit hook that blocks a commit if linting fails, and explain where hooks live and why they aren't shared by default.",
+    "short": "Put an executable script at `.git/hooks/pre-commit` that runs the linter and exits non-zero to abort the commit. Hooks live in `.git/hooks` and aren't committed, so they're not shared.",
+    "answer": "**Git hooks** are scripts Git runs automatically at lifecycle events. The `pre-commit` hook runs before a commit is created; if it exits with a **non-zero** status, the commit is aborted, perfect for enforcing lint/tests/format.\n\n**Where they live:** `.git/hooks/`. Git ships `*.sample` templates there; remove the `.sample` extension and make the file executable (`chmod +x`) to activate it.\n\n**Why not shared:** the `.git/` directory is local and never committed/pushed, so hooks don't travel with the repo. To share hooks across a team you either commit them to a tracked folder and point Git there with `git config core.hooksPath <dir>`, or use a tool like **Husky** (JS) or **pre-commit** (Python) that wires this up automatically. Hooks can be bypassed with `git commit --no-verify`, so they're a convenience guardrail, not a security control, enforce critically in CI too.",
+    "code": "# File: .git/hooks/pre-commit   (make executable: chmod +x)\n#!/bin/sh\n\necho \"Running lint before commit...\"\nif ! npm run lint --silent; then\n  echo \"Lint failed - commit aborted.\"\n  exit 1     # non-zero aborts the commit\nfi\n\nexit 0       # zero allows the commit\n\n# Share hooks across the team (tracked folder):\n#   git config core.hooksPath .githooks\n# Bypass in a pinch (skips the hook):\n#   git commit --no-verify -m \"...\"",
+    "codeLang": "bash",
+    "tags": ["hooks", "pre-commit", "automation", "lint", "husky"]
+  },
+  {
+    "id": "git-three-trees-diff-staging",
+    "question": "Explain what `git diff`, `git diff --staged`, and `git diff HEAD` each show in terms of Git's three trees, and give commands to stage and unstage a file.",
+    "short": "`git diff` = working dir vs index (unstaged); `git diff --staged` = index vs HEAD (staged); `git diff HEAD` = working dir vs HEAD (all changes). Stage with `git add`, unstage with `git restore --staged`.",
+    "answer": "Git tracks content across **three trees**:\n- **Working directory** -> the actual files you edit.\n- **Index / staging area** -> the snapshot you've marked for the next commit (`git add` writes here).\n- **HEAD** -> the last commit on the current branch.\n\n**What each diff compares:**\n- `git diff` -> Working directory vs **Index** (your **unstaged** changes).\n- `git diff --staged` (a.k.a. `--cached`) -> Index vs **HEAD** (what will be **committed**).\n- `git diff HEAD` -> Working directory vs **HEAD** (staged + unstaged combined).\n\n**Moving changes between trees:**\n- `git add <file>` -> working dir -> index (stage).\n- `git restore --staged <file>` (or `git reset HEAD <file>`) -> index -> working dir (unstage, keeps edits).\n- `git restore <file>` -> discard working-dir edits, restoring from index.",
+    "code": "# Edit then partially stage\ngit add src/a.js              # working dir -> index\n\n# Unstaged changes (working dir vs index)\ngit diff\n\n# Staged changes (index vs HEAD) -> what the next commit captures\ngit diff --staged\n\n# Everything vs last commit (staged + unstaged)\ngit diff HEAD\n\n# Unstage a file but KEEP your edits\ngit restore --staged src/a.js      # modern\n# git reset HEAD src/a.js          # older equivalent\n\n# Throw away working-dir edits for a file (DANGER: loses changes)\ngit restore src/a.js",
+    "codeLang": "bash",
+    "tags": ["three-trees", "diff", "staging", "index", "restore"]
+  }
+]

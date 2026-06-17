@@ -24,6 +24,21 @@ import javascriptMixed from "@/data/javascript/mixed.json";
 import typescriptTheory from "@/data/typescript/theory.json";
 import typescriptCoding from "@/data/typescript/coding.json";
 import typescriptMixed from "@/data/typescript/mixed.json";
+import htmlTheory from "@/data/html/theory.json";
+import htmlCoding from "@/data/html/coding.json";
+import htmlMixed from "@/data/html/mixed.json";
+import cssTheory from "@/data/css/theory.json";
+import cssCoding from "@/data/css/coding.json";
+import cssMixed from "@/data/css/mixed.json";
+import gitTheory from "@/data/git/theory.json";
+import gitCoding from "@/data/git/coding.json";
+import gitMixed from "@/data/git/mixed.json";
+import webapisTheory from "@/data/web-apis/theory.json";
+import webapisCoding from "@/data/web-apis/coding.json";
+import webapisMixed from "@/data/web-apis/mixed.json";
+import sysdesignTheory from "@/data/system-design/theory.json";
+import sysdesignCoding from "@/data/system-design/coding.json";
+import sysdesignMixed from "@/data/system-design/mixed.json";
 import dsaEasy from "@/data/dsa/easy.json";
 import dsaHard from "@/data/dsa/hard.json";
 
@@ -35,76 +50,40 @@ function section(id: string, title: string, data: unknown): Section {
   return { id, title, questions: data as Question[] };
 }
 
-function techTopic(
+const DEFAULT_TITLES: [string, string, string] = [
+  "Theory",
+  "Coding / Practical",
+  "Both",
+];
+
+// Standard three-section topic. `titles` overrides the tab labels (e.g. for
+// System Design, where "write code" does not apply). Section ids stay stable
+// (theory/coding/mixed) so the tab + URL logic is uniform.
+function topic3(
   slug: string,
   name: string,
   blurb: string,
   theory: unknown,
   coding: unknown,
-  mixed: unknown
+  mixed: unknown,
+  titles: [string, string, string] = DEFAULT_TITLES
 ): Topic {
   return {
     slug,
     name,
     blurb,
     sections: [
-      section("theory", "Theory", theory),
-      section("coding", "Coding / Practical", coding),
-      section("mixed", "Both", mixed),
+      section("theory", titles[0], theory),
+      section("coding", titles[1], coding),
+      section("mixed", titles[2], mixed),
     ],
   };
 }
 
+// Ordered as a rough learning curriculum: language → markup/style → frameworks
+// → backend → data → web/APIs → tooling → design → DSA.
 export const topics: Topic[] = [
-  techTopic(
-    "react",
-    "React",
-    "Components, hooks, rendering & performance.",
-    reactTheory,
-    reactCoding,
-    reactMixed
-  ),
-  techTopic(
-    "angular",
-    "Angular",
-    "Components, DI, RxJS & change detection.",
-    angularTheory,
-    angularCoding,
-    angularMixed
-  ),
-  techTopic(
-    "nodejs",
-    "Node.js",
-    "Event loop, streams, async & modules.",
-    nodejsTheory,
-    nodejsCoding,
-    nodejsMixed
-  ),
-  techTopic(
-    "mongodb",
-    "MongoDB",
-    "Documents, indexing, aggregation & schema design.",
-    mongodbTheory,
-    mongodbCoding,
-    mongodbMixed
-  ),
-  techTopic(
-    "sql",
-    "SQL",
-    "Joins, indexing, transactions & query tuning.",
-    sqlTheory,
-    sqlCoding,
-    sqlMixed
-  ),
-  techTopic(
-    "express",
-    "Express",
-    "Middleware, routing, errors & security.",
-    expressTheory,
-    expressCoding,
-    expressMixed
-  ),
-  techTopic(
+  topic3(
     "javascript",
     "JavaScript",
     "Closures, prototypes, async & the event loop.",
@@ -112,13 +91,102 @@ export const topics: Topic[] = [
     javascriptCoding,
     javascriptMixed
   ),
-  techTopic(
+  topic3(
     "typescript",
     "TypeScript",
     "Types, generics, narrowing & utility types.",
     typescriptTheory,
     typescriptCoding,
     typescriptMixed
+  ),
+  topic3(
+    "html",
+    "HTML",
+    "Semantic markup, forms, accessibility & metadata.",
+    htmlTheory,
+    htmlCoding,
+    htmlMixed
+  ),
+  topic3(
+    "css",
+    "CSS",
+    "Box model, flexbox, grid, specificity & responsive design.",
+    cssTheory,
+    cssCoding,
+    cssMixed
+  ),
+  topic3(
+    "react",
+    "React",
+    "Components, hooks, rendering & performance.",
+    reactTheory,
+    reactCoding,
+    reactMixed
+  ),
+  topic3(
+    "angular",
+    "Angular",
+    "Components, DI, RxJS & change detection.",
+    angularTheory,
+    angularCoding,
+    angularMixed
+  ),
+  topic3(
+    "nodejs",
+    "Node.js",
+    "Event loop, streams, async & modules.",
+    nodejsTheory,
+    nodejsCoding,
+    nodejsMixed
+  ),
+  topic3(
+    "express",
+    "Express",
+    "Middleware, routing, errors & security.",
+    expressTheory,
+    expressCoding,
+    expressMixed
+  ),
+  topic3(
+    "mongodb",
+    "MongoDB",
+    "Documents, indexing, aggregation & schema design.",
+    mongodbTheory,
+    mongodbCoding,
+    mongodbMixed
+  ),
+  topic3(
+    "sql",
+    "SQL",
+    "Joins, indexing, transactions & query tuning.",
+    sqlTheory,
+    sqlCoding,
+    sqlMixed
+  ),
+  topic3(
+    "web-apis",
+    "Web & REST APIs",
+    "HTTP, REST design, auth, CORS & caching.",
+    webapisTheory,
+    webapisCoding,
+    webapisMixed
+  ),
+  topic3(
+    "git",
+    "Git",
+    "Branching, merge vs rebase, conflicts & workflows.",
+    gitTheory,
+    gitCoding,
+    gitMixed
+  ),
+  topic3(
+    "system-design",
+    "System Design",
+    "Scaling, caching, data stores & architecture trade-offs.",
+    sysdesignTheory,
+    sysdesignCoding,
+    sysdesignMixed,
+    ["Concepts", "Design Exercises", "Scenarios"]
   ),
   {
     slug: "dsa",

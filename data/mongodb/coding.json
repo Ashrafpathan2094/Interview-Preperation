@@ -5,7 +5,14 @@
     "answer": "Use `updateOne` with `{ upsert: true }`. When no document matches the filter, MongoDB **creates one** using the filter fields plus the update operators.\n\n- `$inc` increments `stock` for existing docs, and on insert starts it from 0 (so the new doc gets 5).\n- **`$setOnInsert`** applies its fields **only when an insert happens** (not on updates) - perfect for setting a `createdAt` once without overwriting it on later updates.\n- The result's `upsertedId` is non-null only when a new document was created.\n\nA common mistake is referencing the same field in both `$inc` and `$setOnInsert`, which throws a conflict error.",
     "code": "db.products.updateOne(\n  { sku: \"ABC-123\" },                 // filter\n  {\n    $inc: { stock: 5 },               // +5 if exists; 0 + 5 = 5 on insert\n    $setOnInsert: { createdAt: new Date(), sku: \"ABC-123\" }\n  },\n  { upsert: true }\n);\n\n// Result example on a brand-new product:\n// { matchedCount: 0, modifiedCount: 0, upsertedCount: 1, upsertedId: ObjectId(\"...\") }",
     "codeLang": "js",
-    "tags": ["crud", "upsert", "$inc", "$setOnInsert", "updateOne"]
+    "tags": [
+      "crud",
+      "upsert",
+      "$inc",
+      "$setOnInsert",
+      "updateOne"
+    ],
+    "short": "Use `updateOne` with `{ upsert: true }`: `$inc` adds 5 (starting from 0 on insert) and `$setOnInsert` sets fields like `createdAt` only when a new doc is created. Don't reference the same field in both or it conflicts."
   },
   {
     "id": "mongodb-bulkwrite-batch",
@@ -13,7 +20,14 @@
     "answer": "`bulkWrite` sends an array of write operations in a **single round trip**, which is far faster than issuing them one at a time.\n\n- **`ordered: true`** (default): operations run **sequentially**; on the first error MongoDB **stops** and does not attempt the rest.\n- **`ordered: false`**: operations may run in any order and MongoDB **continues past errors**, reporting all failures at the end. Use this for higher throughput when operations are independent.\n\n`bulkWrite` is **not** a transaction - partial writes can persist. Wrap it in a session/transaction if you need atomicity across the whole batch.",
     "code": "db.inventory.bulkWrite(\n  [\n    { insertOne: { document: { sku: \"A1\", qty: 10 } } },\n    { updateOne: {\n        filter: { sku: \"B2\" },\n        update: { $inc: { qty: -1 } },\n        upsert: true\n    } },\n    { deleteMany: { filter: { qty: { $lte: 0 } } } },\n    { replaceOne: {\n        filter: { sku: \"C3\" },\n        replacement: { sku: \"C3\", qty: 100 }\n    } }\n  ],\n  { ordered: false } // keep going past individual errors\n);",
     "codeLang": "js",
-    "tags": ["crud", "bulkWrite", "performance", "ordered", "batch"]
+    "tags": [
+      "crud",
+      "bulkWrite",
+      "performance",
+      "ordered",
+      "batch"
+    ],
+    "short": "`bulkWrite` sends mixed ops in one round trip. `ordered: true` runs sequentially and stops on first error; `ordered: false` continues past errors for higher throughput. It's not a transaction, so partial writes can persist."
   },
   {
     "id": "mongodb-agg-revenue-per-customer",
@@ -21,7 +35,15 @@
     "answer": "Stage order matters for both **correctness and performance**.\n\n1. **`$match` first** to filter on status and date range so the pipeline processes the fewest documents - and so MongoDB can use an index on `status`/`createdAt`.\n2. **`$group`** by `customerId`, summing `amount`.\n3. **`$sort`** then **`$limit`** to get the top 5. Putting `$sort` before `$limit` lets MongoDB do a top-K sort (it keeps only the largest 5 in memory).\n\nRule of thumb: filter and project early to shrink the data flowing through later stages.",
     "code": "db.orders.aggregate([\n  { $match: {\n      status: \"completed\",\n      createdAt: { $gte: ISODate(\"2024-01-01\"), $lt: ISODate(\"2025-01-01\") }\n  } },\n  { $group: {\n      _id: \"$customerId\",\n      totalRevenue: { $sum: \"$amount\" },\n      orderCount: { $sum: 1 }\n  } },\n  { $sort: { totalRevenue: -1 } },\n  { $limit: 5 },\n  { $project: { _id: 0, customerId: \"$_id\", totalRevenue: 1, orderCount: 1 } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$match", "$group", "$sort", "$limit", "optimization"]
+    "tags": [
+      "aggregation",
+      "$match",
+      "$group",
+      "$sort",
+      "$limit",
+      "optimization"
+    ],
+    "short": "`$match` first (index-friendly filter), then `$group` by customer summing `amount`, then `$sort` before `$limit` so MongoDB does a top-K sort. Filter and project early to shrink the data flowing downstream."
   },
   {
     "id": "mongodb-agg-lookup-join",
@@ -29,7 +51,14 @@
     "answer": "`$lookup` performs a **left outer join**. `localField`/`foreignField` match documents from `users` into an array field (`user`). Use **`$unwind`** to flatten that single-element array into an object.\n\n**Performance:** `$lookup` scans the foreign collection for each input document **unless the `foreignField` is indexed**. Since we join on `users._id` (already uniquely indexed), this is fast. If you join on a non-`_id` field, create an index on that `foreignField` in the joined collection, or the join degrades to a full collection scan per input doc.",
     "code": "db.orders.aggregate([\n  { $lookup: {\n      from: \"users\",\n      localField: \"userId\",\n      foreignField: \"_id\",   // _id is indexed -> efficient join\n      as: \"user\"\n  } },\n  { $unwind: \"$user\" },        // [ {..} ] -> {..}\n  { $project: {\n      _id: 0,\n      orderId: \"$_id\",\n      email: \"$user.email\",\n      amount: 1\n  } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$lookup", "$unwind", "join", "indexing"]
+    "tags": [
+      "aggregation",
+      "$lookup",
+      "$unwind",
+      "join",
+      "indexing"
+    ],
+    "short": "`$lookup` is a left outer join into an array; `$unwind` flattens it. It scans the foreign collection per input doc unless `foreignField` is indexed; joining on indexed `users._id` keeps it fast."
   },
   {
     "id": "mongodb-agg-unwind-tag-counts",
@@ -37,7 +66,13 @@
     "answer": "`$unwind` **deconstructs an array field**, emitting one document per element. After unwinding `tags`, each document has a single scalar `tags` value, so a normal `$group` by `$tags` with `$sum: 1` counts occurrences.\n\nKey points:\n- By default `$unwind` **drops** documents whose array is missing or empty. Pass `{ preserveNullAndEmptyArrays: true }` to keep them.\n- A document with N tags produces N rows, so the post is counted once per tag - exactly what we want here.",
     "code": "db.posts.aggregate([\n  { $unwind: \"$tags\" },\n  { $group: { _id: \"$tags\", postCount: { $sum: 1 } } },\n  { $sort: { postCount: -1 } },\n  { $project: { _id: 0, tag: \"$_id\", postCount: 1 } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$unwind", "$group", "arrays"]
+    "tags": [
+      "aggregation",
+      "$unwind",
+      "$group",
+      "arrays"
+    ],
+    "short": "`$unwind` emits one doc per tag, then `$group` by `$tags` with `$sum: 1` counts posts per tag, sorted descending. Note `$unwind` drops missing/empty arrays unless `preserveNullAndEmptyArrays` is set."
   },
   {
     "id": "mongodb-agg-second-highest-salary",
@@ -45,7 +80,15 @@
     "answer": "The classic SQL puzzle, done with the aggregation pipeline:\n\n1. **`$group`** by `$salary` to collapse duplicates into **distinct** salary values (and collect the names at each).\n2. **`$sort`** salaries descending.\n3. **`$skip: 1`** to drop the top salary, then **`$limit: 1`** to take the next one - that's the second-highest distinct salary.\n\nGrouping by salary first is what makes it *distinct*; skipping rows of the original collection would incorrectly skip ties.",
     "code": "db.employees.aggregate([\n  { $group: {\n      _id: \"$salary\",\n      employees: { $push: \"$name\" }\n  } },\n  { $sort: { _id: -1 } },\n  { $skip: 1 },   // drop the highest distinct salary\n  { $limit: 1 },  // take the second-highest\n  { $project: { _id: 0, salary: \"$_id\", employees: 1 } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$group", "$sort", "$skip", "$limit", "puzzle"]
+    "tags": [
+      "aggregation",
+      "$group",
+      "$sort",
+      "$skip",
+      "$limit",
+      "puzzle"
+    ],
+    "short": "`$group` by `$salary` to collapse duplicates into distinct values, `$sort` descending, then `$skip: 1` and `$limit: 1` to get the second-highest distinct salary. Grouping first makes it correctly distinct despite ties."
   },
   {
     "id": "mongodb-agg-bucket-monthly",
@@ -53,7 +96,14 @@
     "answer": "Group by a **derived month** using date expression operators. `$month` extracts the month number (1-12) from a date field; you could also use `$dateToString` for `YYYY-MM` keys.\n\n- `$match` narrows to the year first (index-friendly).\n- `$group` by `{ $month: \"$createdAt\" }` and `$sum` the amount.\n- `$sort` by the month so output is chronological.\n\nFor timezone-correct buckets, pass `{ date: \"$createdAt\", timezone: \"Asia/Kolkata\" }` to the date operator.",
     "code": "db.orders.aggregate([\n  { $match: {\n      createdAt: { $gte: ISODate(\"2024-01-01\"), $lt: ISODate(\"2025-01-01\") }\n  } },\n  { $group: {\n      _id: { $month: \"$createdAt\" },\n      revenue: { $sum: \"$amount\" }\n  } },\n  { $sort: { _id: 1 } },\n  { $project: { _id: 0, month: \"$_id\", revenue: 1 } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$group", "$month", "dates", "reporting"]
+    "tags": [
+      "aggregation",
+      "$group",
+      "$month",
+      "dates",
+      "reporting"
+    ],
+    "short": "`$match` the year first, `$group` by `{ $month: \"$createdAt\" }` summing `amount`, then `$sort` by month. Pass a `timezone` to the date operator for timezone-correct buckets."
   },
   {
     "id": "mongodb-compound-index-esr",
@@ -61,7 +111,14 @@
     "answer": "Apply the **ESR rule** (Equality, Sort, Range) for ordering compound index keys:\n\n1. **Equality** fields first: `status` and `region` (both matched with `=`).\n2. **Sort** field next: `createdAt` - placing it right after the equality keys lets MongoDB return results **already sorted** from the index, avoiding an in-memory sort (which fails past the 100MB limit unless `allowDiskUse`).\n3. **Range** fields would come last (none here).\n\nNote the sort direction: an index `{ createdAt: -1 }` (or `1`) can serve the sort because MongoDB can scan an index in either direction.",
     "code": "// Optimal index following Equality -> Sort -> Range\ndb.orders.createIndex(\n  { status: 1, region: 1, createdAt: -1 },\n  { name: \"status_region_createdAt\" }\n);\n\n// Verify the planner uses it and avoids an in-memory SORT stage:\ndb.orders.find({ status: \"shipped\", region: \"EU\" })\n  .sort({ createdAt: -1 })\n  .explain(\"executionStats\");",
     "codeLang": "js",
-    "tags": ["indexing", "compound-index", "ESR", "sort", "optimization"]
+    "tags": [
+      "indexing",
+      "compound-index",
+      "ESR",
+      "sort",
+      "optimization"
+    ],
+    "short": "Follow the ESR rule: equality fields (`status`, `region`) first, then the sort field (`createdAt`), then ranges. Putting the sort key after equality lets the index serve sorted results and avoid an in-memory sort."
   },
   {
     "id": "mongodb-ttl-index",
@@ -69,7 +126,13 @@
     "answer": "A **TTL (time-to-live) index** is a single-field index on a **date** field with `expireAfterSeconds`. A background thread (runs roughly every 60 seconds) deletes documents whose date field is older than the threshold.\n\nGotchas interviewers probe:\n- The indexed field must be a **BSON Date** (or an array of dates - then the **earliest** date is used). Non-date values are ignored and never expire.\n- **Deletion is not exact** - there can be up to ~60s of lag after expiry due to the background sweep.\n- You **cannot** put a TTL on `_id` or use a compound index for TTL.\n- To set an absolute expiry time instead, store the target date and use `expireAfterSeconds: 0`.",
     "code": "// Delete each session 3600s after its createdAt\ndb.sessions.createIndex(\n  { createdAt: 1 },\n  { expireAfterSeconds: 3600, name: \"session_ttl\" }\n);\n\n// Alternative: expire AT a stored absolute time\n// db.sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });\n// then insert { expiresAt: ISODate(\"2026-06-16T12:00:00Z\") }",
     "codeLang": "js",
-    "tags": ["indexing", "ttl-index", "expiration", "sessions"]
+    "tags": [
+      "indexing",
+      "ttl-index",
+      "expiration",
+      "sessions"
+    ],
+    "short": "A TTL index is a single-field index on a Date with `expireAfterSeconds`; a ~60s background sweep deletes expired docs. The field must be a BSON Date, deletion lags up to ~60s, and `_id`/compound TTL aren't allowed."
   },
   {
     "id": "mongodb-text-index-search",
@@ -77,7 +140,14 @@
     "answer": "Create a **text index** over the searchable fields, then query with the **`$text`** operator. MongoDB tokenizes, stems, and removes stop words.\n\n- Each collection can have **only one** text index, but it may cover multiple fields.\n- `$search` with space-separated terms is an **OR** by default; wrap a phrase in escaped quotes for an exact phrase.\n- Project **`{ score: { $meta: \"textScore\" } }`** and sort by it to rank by relevance.\n- Use field **weights** to make `title` matches count more than `body`.",
     "code": "db.articles.createIndex(\n  { title: \"text\", body: \"text\" },\n  { weights: { title: 5, body: 1 }, name: \"article_text\" }\n);\n\ndb.articles.find(\n  { $text: { $search: \"mongodb indexing\" } },\n  { score: { $meta: \"textScore\" }, title: 1 }\n).sort({ score: { $meta: \"textScore\" } });",
     "codeLang": "js",
-    "tags": ["indexing", "text-index", "$text", "full-text-search", "relevance"]
+    "tags": [
+      "indexing",
+      "text-index",
+      "$text",
+      "full-text-search",
+      "relevance"
+    ],
+    "short": "Create a text index over `title`/`body` (one per collection, optional weights), then query with `$text: { $search: ... }`. Project `{ score: { $meta: \"textScore\" } }` and sort by it to rank by relevance."
   },
   {
     "id": "mongodb-transaction-transfer",
@@ -85,7 +155,14 @@
     "answer": "Multi-document transactions (replica sets / sharded clusters) make several writes **all-or-nothing**. The pattern:\n\n1. `startSession()` and `startTransaction()`.\n2. Perform the writes **passing the session** to every operation - omitting it leaves a write outside the transaction.\n3. `commitTransaction()` on success; `abortTransaction()` in the catch block.\n4. Always `endSession()` in a finally.\n\nProduction tip: wrap in a retry loop for `TransientTransactionError`/`UnknownTransactionCommitResult`, or use the driver's `withTransaction()` helper which retries automatically. Keep transactions short - they hold locks and have a default 60s lifetime.",
     "code": "const session = client.startSession();\ntry {\n  await session.withTransaction(async () => {\n    const accounts = client.db(\"bank\").collection(\"accounts\");\n    const debit = await accounts.updateOne(\n      { _id: \"A\", balance: { $gte: 100 } },\n      { $inc: { balance: -100 } },\n      { session }\n    );\n    if (debit.modifiedCount !== 1) {\n      throw new Error(\"Insufficient funds\"); // triggers abort\n    }\n    await accounts.updateOne(\n      { _id: \"B\" },\n      { $inc: { balance: 100 } },\n      { session }\n    );\n  }); // withTransaction commits, and auto-retries transient errors\n} finally {\n  await session.endSession();\n}",
     "codeLang": "js",
-    "tags": ["transactions", "session", "acid", "withTransaction", "atomicity"]
+    "tags": [
+      "transactions",
+      "session",
+      "acid",
+      "withTransaction",
+      "atomicity"
+    ],
+    "short": "Start a session, pass it to every write, then commit on success or abort on error. Use the driver's `withTransaction()` helper for automatic retries of transient errors, and keep transactions short since they hold locks."
   },
   {
     "id": "mongodb-explain-covered-query",
@@ -93,7 +170,14 @@
     "answer": "A **covered query** is satisfied **entirely from an index** - MongoDB never fetches the actual documents. Conditions:\n\n- All **queried** fields are in the index.\n- All **returned** (projected) fields are in the index.\n- You **exclude `_id`** (`_id: 0`) unless `_id` is part of the index.\n\nIn `explain(\"executionStats\")`, a covered query shows the winning plan ending in an **`IXSCAN`** with **no `FETCH` stage**, and `totalDocsExamined: 0`. This is one of the fastest possible read patterns.",
     "code": "db.users.createIndex({ email: 1, name: 1 });\n\n// Covered: queried + projected fields all in the index, _id excluded\nconst plan = db.users.find(\n  { email: \"jane@x.com\" },\n  { _id: 0, email: 1, name: 1 }\n).explain(\"executionStats\");\n\n// Confirm: plan.executionStats.totalDocsExamined === 0\n// winningPlan stages: IXSCAN with NO FETCH",
     "codeLang": "js",
-    "tags": ["optimization", "explain", "covered-query", "indexing", "projection"]
+    "tags": [
+      "optimization",
+      "explain",
+      "covered-query",
+      "indexing",
+      "projection"
+    ],
+    "short": "A covered query is served entirely from an index (no document fetch): all queried and projected fields are in the index and `_id` is excluded. In `explain`, it shows an IXSCAN with no FETCH and `totalDocsExamined: 0`."
   },
   {
     "id": "mongodb-explain-regex-anchor",
@@ -101,7 +185,14 @@
     "answer": "A B-tree index on a string is ordered by **prefix**. MongoDB can use an index for a regex **only when the pattern is anchored at the start** (`/^.../`) and is not case-insensitive - then it becomes a range scan over a prefix.\n\nThe pattern `/gmail\\.com$/` is anchored at the **end**, so MongoDB must test every indexed value - effectively a **full index/collection scan** (`explain` shows a high `totalKeysExamined` or `COLLSCAN`).\n\n**Fixes:**\n- For a **prefix** search (`/^john/`) the index works directly.\n- For an end/contains match, store a **reversed or normalized field** (e.g. a `domain` field) and index/query that exactly.\n- For real text matching, use a **text index** instead.",
     "code": "// SLOW: end-anchored regex cannot use the email index as a range\ndb.users.find({ email: /gmail\\.com$/ }).explain(\"executionStats\");\n\n// FIX 1: prefix-anchored queries DO use the index\ndb.users.find({ email: /^john/ });\n\n// FIX 2: extract and index an exact-match domain field\n// db.users.updateMany({}, [{ $set: { domain: { $arrayElemAt: [ { $split: [\"$email\", \"@\"] }, 1 ] } } }]);\ndb.users.createIndex({ domain: 1 });\ndb.users.find({ domain: \"gmail.com\" }); // exact match, uses index",
     "codeLang": "js",
-    "tags": ["optimization", "explain", "regex", "indexing", "bug-fix"]
+    "tags": [
+      "optimization",
+      "explain",
+      "regex",
+      "indexing",
+      "bug-fix"
+    ],
+    "short": "Indexes only help start-anchored, case-sensitive regexes (`/^.../`). The end-anchored `/gmail\\.com$/` forces a full scan; fix by storing and indexing an exact `domain` field (or using a text index)."
   },
   {
     "id": "mongodb-schema-embed-vs-reference",
@@ -109,7 +200,13 @@
     "answer": "**Embedding** stores comments inside the post document; **referencing** stores comments in a separate collection linked by `postId`.\n\n**Embed when:**\n- Data is read together (one query gets the post + comments).\n- The child set is **bounded** and small.\n- Children don't need to be queried independently.\n\n**Reference when:**\n- The array would grow **unbounded** (risking the **16MB document limit** and huge in-place updates).\n- Children are large, shared, or queried/updated on their own.\n- You need high write throughput on children without rewriting the parent.\n\nFor comments, references (or the **subset/bucket pattern**) usually win because comment counts are unbounded.",
     "code": "// EMBEDDED - great for small, bounded, read-together data\n{\n  _id: ObjectId(\"...\"),\n  title: \"MongoDB tips\",\n  comments: [\n    { user: \"ana\", text: \"nice!\", at: ISODate(\"2026-01-01\") }\n  ]\n}\n\n// REFERENCED - comments grow unbounded -> separate collection\n// posts\n{ _id: ObjectId(\"p1\"), title: \"MongoDB tips\" }\n// comments\n{ _id: ObjectId(\"c1\"), postId: ObjectId(\"p1\"), user: \"ana\", text: \"nice!\" }\n\ndb.comments.createIndex({ postId: 1, _id: -1 }); // fast \"comments for a post\"",
     "codeLang": "js",
-    "tags": ["schema-design", "embedding", "referencing", "data-modeling"]
+    "tags": [
+      "schema-design",
+      "embedding",
+      "referencing",
+      "data-modeling"
+    ],
+    "short": "Embed when data is read together, bounded, and small; reference when the child set grows unbounded (16MB limit), is large/shared, or queried independently. Comments usually favor referencing or the bucket pattern."
   },
   {
     "id": "mongodb-capped-collection",
@@ -117,7 +214,13 @@
     "answer": "A **capped collection** is a fixed-size, **insertion-ordered ring buffer**. Once it reaches `size` (bytes) or `max` (document count), the **oldest documents are overwritten** automatically - ideal for logs, caches, and recent-events feeds.\n\nConstraints to mention:\n- You **cannot delete** individual documents, and updates must **not grow** a document's size.\n- Documents are returned in **natural (insertion) order** without needing a sort.\n- Size is **mandatory**; `max` is an optional secondary cap.\n- A capped collection cannot be sharded. Modern alternative: use a **TTL index** on a normal collection for time-based expiry.",
     "code": "db.createCollection(\"logs\", {\n  capped: true,\n  size: 1048576,  // 1 MB cap (required)\n  max: 5000       // optional: also cap at 5000 docs\n});\n\ndb.logs.insertOne({ level: \"info\", msg: \"started\", at: new Date() });\n\n// Tail in insertion order (oldest -> newest) without a sort:\ndb.logs.find().limit(10);",
     "codeLang": "js",
-    "tags": ["capped-collection", "logging", "createCollection", "data-modeling"]
+    "tags": [
+      "capped-collection",
+      "logging",
+      "createCollection",
+      "data-modeling"
+    ],
+    "short": "A capped collection is a fixed-size, insertion-ordered ring buffer that overwrites the oldest docs when full. You can't delete docs or grow them, `size` is required, it can't be sharded; a TTL index is the modern alternative."
   },
   {
     "id": "mongodb-output-array-positional-update",
@@ -125,7 +228,14 @@
     "answer": "This uses the **positional `$` operator**, which targets **the first array element matched by the query**. The filter `'items.sku': 'B'` finds the element with `sku: 'B'`, and `items.$.qty` increments **only that element's** `qty`.\n\nResult: the `B` item's `qty` goes from 2 to **3**; `A` is unchanged.\n\nKey facts:\n- `$` updates **only the first** matching element. To update **all** matches, use the **filtered positional** operator `$[elem]` with `arrayFilters`, or `$[]` for every element.\n- The array field used in `$` **must appear in the query** or MongoDB errors.",
     "code": "// Before:\n// { _id: 1, items: [ { sku: \"A\", qty: 5 }, { sku: \"B\", qty: 2 } ] }\n\ndb.carts.updateOne(\n  { _id: 1, \"items.sku\": \"B\" },\n  { $inc: { \"items.$.qty\": 1 } }\n);\n\n// After:\n// { _id: 1, items: [ { sku: \"A\", qty: 5 }, { sku: \"B\", qty: 3 } ] }\n\n// To update ALL matching elements instead:\n// db.carts.updateOne(\n//   { _id: 1 },\n//   { $inc: { \"items.$[e].qty\": 1 } },\n//   { arrayFilters: [ { \"e.sku\": \"B\" } ] }\n// );",
     "codeLang": "js",
-    "tags": ["crud", "arrays", "positional-operator", "arrayFilters", "output"]
+    "tags": [
+      "crud",
+      "arrays",
+      "positional-operator",
+      "arrayFilters",
+      "output"
+    ],
+    "short": "The positional `$` updates only the first array element matched by the query, so `B`'s qty goes 2 to 3 and `A` is unchanged. Use `$[elem]` with `arrayFilters` (or `$[]`) to update all matching elements."
   },
   {
     "id": "mongodb-output-projection-elemmatch",
@@ -133,6 +243,13 @@
     "answer": "`$elemMatch` requires **a single array element** to satisfy **all** the listed conditions **simultaneously**. So this returns students who have at least one `scores` entry that is *both* `subject: 'math'` **and** `score >= 90`.\n\nWithout `$elemMatch`, the query `{ 'scores.subject': 'math', 'scores.score': { $gte: 90 } }` matches if **different** elements satisfy each condition - e.g. a math score of 40 **and** a science score of 95 would wrongly match. That's the classic trap.\n\n`$elemMatch` can also be used in **projection** to return only the first matching array element.",
     "code": "// Doc A matches, Doc B does NOT (no single element is math AND >=90)\n// A: { scores: [ { subject: \"math\", score: 92 } ] }\n// B: { scores: [ { subject: \"math\", score: 40 }, { subject: \"sci\", score: 95 } ] }\n\ndb.students.find({\n  scores: { $elemMatch: { subject: \"math\", score: { $gte: 90 } } }\n});\n\n// Projection form: return ONLY the matching element\ndb.students.find(\n  { _id: 1 },\n  { scores: { $elemMatch: { subject: \"math\" } } }\n);",
     "codeLang": "js",
-    "tags": ["crud", "$elemMatch", "arrays", "query", "output"]
+    "tags": [
+      "crud",
+      "$elemMatch",
+      "arrays",
+      "query",
+      "output"
+    ],
+    "short": "Returns docs with at least one `scores` element that is *both* `subject: 'math'` and `score >= 90`. Without `$elemMatch`, the two conditions could match across different elements — the classic trap. It also works in projection to return the first matching element."
   }
 ]

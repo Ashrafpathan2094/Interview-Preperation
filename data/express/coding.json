@@ -5,7 +5,13 @@
     "answer": "Custom middleware is a function with the signature `(req, res, next)`. To measure response time, capture a timestamp when the request enters, then read it back when the response finishes. The `res` object is an event emitter, so listening for the `finish` event is the correct way to know when the response has been fully sent (rather than logging before the handler runs).\n\n**Key points:**\n- **Mount order matters** — register the logger with `app.use()` *before* your routes so it runs first.\n- **Always call `next()`** — if you forget it (and don't end the response), the request hangs forever because control never passes to the next middleware or route handler.\n- Use `res.on('finish', ...)` instead of timing inline, so the duration includes the full handler execution.",
     "code": "const express = require('express');\nconst app = express();\n\nfunction requestLogger(req, res, next) {\n  const start = process.hrtime.bigint();\n\n  res.on('finish', () => {\n    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;\n    console.log(\n      `${req.method} ${req.originalUrl} ${res.statusCode} - ${durationMs.toFixed(2)}ms`\n    );\n  });\n\n  next(); // pass control to the next middleware/route\n}\n\napp.use(requestLogger);\n\napp.get('/', (req, res) => res.send('hello'));\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["middleware", "logging", "next", "lifecycle"]
+    "tags": [
+      "middleware",
+      "logging",
+      "next",
+      "lifecycle"
+    ],
+    "short": "A `(req, res, next)` middleware times requests via `res.on('finish')`, logging method, URL and duration. Register it with `app.use()` before routes, and always call `next()` or the request hangs."
   },
   {
     "id": "express-middleware-execution-order-output",
@@ -13,7 +19,13 @@
     "answer": "Middleware runs **top-to-bottom in the order it is registered**, and only continues to the next function when `next()` is called.\n\n**Console output (in order):**\n```\nA\nB\n```\n\n**Client receives:** `Handled by B` with status 200.\n\n**Why:**\n1. `A` logs and calls `next()`, so control moves on.\n2. `B` logs, then calls `res.send(...)` which **ends the response**. It does **not** call `next()`.\n3. Because the response already ended and `next()` was never called, `C` **never runs** — nothing else logs and no further handler executes.\n\nIf `B` had also called `next()` after `res.send()`, Express would throw an `ERR_HTTP_HEADERS_SENT` error because you cannot send headers twice. The rule: in a given handler, either end the response **or** call `next()`, never both for the same request.",
     "code": "const express = require('express');\nconst app = express();\n\napp.use((req, res, next) => {\n  console.log('A');\n  next();\n});\n\napp.get('/data', (req, res, next) => {\n  console.log('B');\n  res.send('Handled by B');\n});\n\napp.get('/data', (req, res) => {\n  console.log('C');\n  res.send('Handled by C');\n});\n\napp.listen(3000);\n// Request: GET /data",
     "codeLang": "js",
-    "tags": ["middleware", "execution-order", "next", "output"]
+    "tags": [
+      "middleware",
+      "execution-order",
+      "next",
+      "output"
+    ],
+    "short": "Middleware runs top-to-bottom only while `next()` is called. Logs `A` then `B`; client gets `Handled by B` (200). `C` never runs because B ends the response without calling `next()`."
   },
   {
     "id": "express-error-handling-middleware-4arg",
@@ -21,7 +33,13 @@
     "answer": "Express identifies error-handling middleware **purely by its arity** — it must declare **exactly four arguments**: `(err, req, res, next)`. Even if you don't use `next`, you must keep all four parameters or Express treats it as a normal middleware and never passes errors to it.\n\n**Rules:**\n- **Placement:** register it **last**, after all routes and other middleware, with `app.use(...)`. Express only routes to it when an error is passed via `next(err)` or thrown synchronously in a handler.\n- **Set a sensible status** — default to `500` if none was set.\n- **Don't leak internals** in production; log the full error server-side, return a safe message to the client.\n- Optionally check `res.headersSent` and delegate to the default Express handler if the response already started.",
     "code": "const express = require('express');\nconst app = express();\n\napp.get('/user/:id', (req, res, next) => {\n  const user = null; // pretend lookup failed\n  if (!user) {\n    const err = new Error('User not found');\n    err.status = 404;\n    return next(err); // forward to the error handler\n  }\n  res.json(user);\n});\n\n// Centralized error handler — MUST have 4 args and be registered LAST\napp.use((err, req, res, next) => {\n  if (res.headersSent) return next(err);\n  const status = err.status || 500;\n  console.error(err.stack);\n  res.status(status).json({\n    error: status === 500 ? 'Internal Server Error' : err.message\n  });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["error-handling", "middleware", "next", "status-codes"]
+    "tags": [
+      "error-handling",
+      "middleware",
+      "next",
+      "status-codes"
+    ],
+    "short": "Express identifies error handlers solely by their four args `(err, req, res, next)`; register it last. Default status to 500, log server-side, return safe messages, and check `res.headersSent`."
   },
   {
     "id": "express-async-error-handling-wrapper",
@@ -29,7 +47,13 @@
     "answer": "**The bug:** In Express 4, if an `async` handler rejects, the rejection is **not** automatically forwarded to the error-handling middleware. The promise rejects silently, `next()` is never called, and the request hangs.\n\n**Two correct fixes:**\n1. Wrap the body in `try/catch` and call `next(err)` in the catch.\n2. Use a higher-order `asyncHandler` wrapper that catches rejections and forwards them automatically — the idiomatic DRY solution.\n\n**Note on Express 5:** Express 5 (stable since Oct 2024) automatically forwards rejected promises from async handlers to the error handler, so the wrapper is no longer strictly required — but it remains the standard pattern in Express 4 codebases and is still safe in Express 5.",
     "code": "const express = require('express');\nconst app = express();\napp.use(express.json());\n\n// Reusable wrapper: forwards any rejected promise to next()\nconst asyncHandler = (fn) => (req, res, next) =>\n  Promise.resolve(fn(req, res, next)).catch(next);\n\nasync function fetchUser(id) {\n  if (!id) throw Object.assign(new Error('Missing id'), { status: 400 });\n  return { id, name: 'Ada' };\n}\n\napp.get('/user/:id', asyncHandler(async (req, res) => {\n  const user = await fetchUser(req.params.id); // a throw here is now caught\n  res.json(user);\n}));\n\napp.use((err, req, res, next) => {\n  res.status(err.status || 500).json({ error: err.message });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["async", "error-handling", "promises", "express5"]
+    "tags": [
+      "async",
+      "error-handling",
+      "promises",
+      "express5"
+    ],
+    "short": "In Express 4, rejected async handlers aren't auto-forwarded, so the request hangs. Fix with try/catch + `next(err)` or a reusable `asyncHandler` wrapper. Express 5 forwards rejections automatically."
   },
   {
     "id": "express-route-params-query-parsing",
@@ -37,7 +61,13 @@
     "answer": "- **`req.params`** holds **named route segments** (`/users/:id` -> `req.params.id`). Always strings.\n- **`req.query`** holds the parsed **query string** (`?page=2&limit=10` -> `req.query.page`). Also strings (or arrays/objects), so you must coerce and validate numeric values.\n\n**Practical tips:**\n- Coerce with `Number(...)` / `parseInt` and guard against `NaN` and out-of-range values.\n- Provide sensible defaults for missing query params.\n- Never trust query input — clamp `limit` to avoid abuse (e.g., a client requesting `limit=1000000`).",
     "code": "const express = require('express');\nconst app = express();\n\n// GET /users/42/posts?page=2&limit=10\napp.get('/users/:userId/posts', (req, res) => {\n  const { userId } = req.params;          // \"42\" (string)\n\n  const page = Math.max(1, parseInt(req.query.page, 10) || 1);\n  let limit = parseInt(req.query.limit, 10) || 20;\n  limit = Math.min(Math.max(limit, 1), 100); // clamp 1..100\n\n  const offset = (page - 1) * limit;\n\n  res.json({ userId, page, limit, offset });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["routing", "req.params", "req.query", "validation"]
+    "tags": [
+      "routing",
+      "req.params",
+      "req.query",
+      "validation"
+    ],
+    "short": "`req.params` holds named route segments and `req.query` holds the parsed query string; both are strings. Coerce numeric values, guard against `NaN`, provide defaults, and clamp limits."
   },
   {
     "id": "express-body-parsing-json-urlencoded",
@@ -45,7 +75,13 @@
     "answer": "**The bug:** Express does **not** parse request bodies by default. Without body-parsing middleware, `req.body` is `undefined`.\n\n**Fix:** Register the built-in parsers **before** your routes:\n- `express.json()` parses `Content-Type: application/json`.\n- `express.urlencoded({ extended: true })` parses `application/x-www-form-urlencoded` (HTML form posts). `extended: true` uses the `qs` library to support nested objects.\n\n**Common gotchas:**\n- The parser only runs if the request's `Content-Type` matches; a client sending JSON without the header will still produce an empty body.\n- Set a `limit` to prevent large-payload DoS, e.g. `express.json({ limit: '10kb' })`.\n- Order matters: parsers must be registered above the routes that read `req.body`.",
     "code": "const express = require('express');\nconst app = express();\n\n// Register BEFORE routes\napp.use(express.json({ limit: '10kb' }));\napp.use(express.urlencoded({ extended: true, limit: '10kb' }));\n\napp.post('/signup', (req, res) => {\n  // Now req.body is populated for both JSON and form posts\n  const { email, password } = req.body;\n  if (!email || !password) {\n    return res.status(400).json({ error: 'email and password required' });\n  }\n  res.status(201).json({ email });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["body-parsing", "express.json", "urlencoded", "middleware"]
+    "tags": [
+      "body-parsing",
+      "express.json",
+      "urlencoded",
+      "middleware"
+    ],
+    "short": "`req.body` is undefined because Express doesn't parse bodies by default. Register `express.json()` and `express.urlencoded({extended:true})` before routes, set a `limit`, and ensure the `Content-Type` matches."
   },
   {
     "id": "express-app-use-vs-app-method",
@@ -53,7 +89,13 @@
     "answer": "- **`app.use([path], fn)`** mounts middleware that matches **any HTTP method** and matches the path as a **prefix** (so `/api` matches `/api`, `/api/x`, `/api/x/y`).\n- **`app.get(path, fn)`** / `app.post(...)` etc. match a **specific method** and require an **exact path match** (subject to route patterns).\n\n**Output for `GET /api/x`:**\n```\nuse /api ran\nGET handler ran\n```\n**Output for `POST /api/x`:**\n```\nuse /api ran\n```\n(then a 404, because no POST route or response was produced)\n\n**Why:** `app.use('/api', ...)` runs on both requests because it ignores the method and matches the `/api` prefix. The `app.get('/api/x', ...)` only fires for the GET. The POST has no matching method handler, so after the `use` middleware calls `next()`, Express falls through to its default 404.",
     "code": "const express = require('express');\nconst app = express();\n\napp.use('/api', (req, res, next) => {\n  console.log('use /api ran');\n  next();\n});\n\napp.get('/api/x', (req, res) => {\n  console.log('GET handler ran');\n  res.send('x');\n});\n\napp.listen(3000);\n// Try: GET /api/x  and  POST /api/x",
     "codeLang": "js",
-    "tags": ["app.use", "app.METHOD", "routing", "output"]
+    "tags": [
+      "app.use",
+      "app.METHOD",
+      "routing",
+      "output"
+    ],
+    "short": "`app.use()` matches any method on a path prefix; `app.get()` matches a specific method and exact path. `GET /api/x` logs both lines; `POST /api/x` runs only the `use` then 404s."
   },
   {
     "id": "express-router-modular-structure",
@@ -61,7 +103,13 @@
     "answer": "`express.Router()` creates a **mini-application** — an isolated, mountable stack of middleware and routes. It is the standard way to structure large apps: each feature gets its own router file, and the main app mounts them under a path prefix.\n\n**Benefits:**\n- **Separation of concerns** — each router file owns one resource.\n- **Router-level middleware** — `router.use(...)` applies only to routes in that router (e.g., auth on `/users`).\n- **Clean mounting** — `app.use('/users', usersRouter)` prefixes every route inside, so the router defines paths relative to the mount point (`/` -> `/users`, `/:id` -> `/users/:id`).",
     "code": "// routes/users.js\nconst express = require('express');\nconst router = express.Router();\n\n// router-level middleware (applies only to this router)\nrouter.use((req, res, next) => {\n  console.log('users router hit:', req.method, req.originalUrl);\n  next();\n});\n\nrouter.get('/', (req, res) => res.json([{ id: 1, name: 'Ada' }]));\nrouter.get('/:id', (req, res) => res.json({ id: req.params.id }));\nrouter.post('/', (req, res) => res.status(201).json(req.body));\n\nmodule.exports = router;\n\n// app.js\nconst express = require('express');\nconst usersRouter = require('./routes/users');\nconst app = express();\napp.use(express.json());\napp.use('/users', usersRouter); // mounts at /users\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["router", "structure", "modular", "middleware"]
+    "tags": [
+      "router",
+      "structure",
+      "modular",
+      "middleware"
+    ],
+    "short": "`express.Router()` is a mountable mini-app for structuring large apps by resource. Mount with `app.use('/users', router)` to prefix routes, and use `router.use()` for router-scoped middleware."
   },
   {
     "id": "express-jwt-auth-middleware",
@@ -69,7 +117,13 @@
     "answer": "**JWT middleware** reads the `Authorization: Bearer <token>` header, verifies the signature with your secret, and attaches the decoded payload to `req.user` so downstream handlers can use it. Verification failures should return **401 Unauthorized**.\n\n**JWT vs sessions:**\n- **JWT (stateless):** the token itself carries the claims, signed by the server. No server-side store needed, scales horizontally easily. Downside: tokens can't be easily revoked before expiry — mitigate with short expiry + refresh tokens.\n- **Sessions (stateful):** the server stores session data (e.g., in Redis) and the client holds only a session id cookie. Easy to revoke (delete the session), but requires a shared store across instances.\n\n**Security notes:** keep the secret in env vars, use a short `expiresIn`, verify the algorithm, and send tokens only over HTTPS.",
     "code": "const jwt = require('jsonwebtoken');\n\nfunction authenticate(req, res, next) {\n  const header = req.headers.authorization || '';\n  const [scheme, token] = header.split(' ');\n\n  if (scheme !== 'Bearer' || !token) {\n    return res.status(401).json({ error: 'Missing Bearer token' });\n  }\n\n  try {\n    const payload = jwt.verify(token, process.env.JWT_SECRET, {\n      algorithms: ['HS256']\n    });\n    req.user = payload; // { sub, role, ... }\n    next();\n  } catch (err) {\n    return res.status(401).json({ error: 'Invalid or expired token' });\n  }\n}\n\n// usage\n// app.get('/profile', authenticate, (req, res) => res.json(req.user));\nmodule.exports = authenticate;",
     "codeLang": "js",
-    "tags": ["authentication", "jwt", "middleware", "security"]
+    "tags": [
+      "authentication",
+      "jwt",
+      "middleware",
+      "security"
+    ],
+    "short": "JWT middleware reads the `Authorization: Bearer` header, verifies the signature, and attaches the payload to `req.user`, returning 401 on failure. JWTs are stateless/scalable but hard to revoke; sessions are stateful but easily revoked."
   },
   {
     "id": "express-rbac-middleware-factory",
@@ -77,7 +131,14 @@
     "answer": "A **middleware factory** is a function that returns a middleware, letting you parameterize behavior — here, the allowed roles. This avoids writing a separate guard per route.\n\n**Pattern:**\n- `allowRoles(...roles)` returns `(req, res, next) => { ... }`.\n- It assumes an earlier `authenticate` middleware has already set `req.user`.\n- Return **403 Forbidden** (not 401) when the user is authenticated but lacks the role — 401 means *not authenticated*, 403 means *authenticated but not permitted*.\n- Compose guards: `app.get('/admin', authenticate, allowRoles('admin'), handler)`.",
     "code": "function allowRoles(...roles) {\n  return (req, res, next) => {\n    const role = req.user && req.user.role;\n    if (!role) {\n      return res.status(401).json({ error: 'Not authenticated' });\n    }\n    if (!roles.includes(role)) {\n      return res.status(403).json({ error: 'Forbidden: insufficient role' });\n    }\n    next();\n  };\n}\n\n// usage: authenticate sets req.user, then RBAC guard runs\n// app.get('/admin/reports',\n//   authenticate,\n//   allowRoles('admin', 'superadmin'),\n//   (req, res) => res.json({ secret: true })\n// );\nmodule.exports = allowRoles;",
     "codeLang": "js",
-    "tags": ["authorization", "rbac", "middleware", "security", "status-codes"]
+    "tags": [
+      "authorization",
+      "rbac",
+      "middleware",
+      "security",
+      "status-codes"
+    ],
+    "short": "A factory `allowRoles(...roles)` returns a guard middleware that checks `req.user.role` (set by prior auth). Return 401 if unauthenticated, 403 if authenticated without the role, and compose guards on routes."
   },
   {
     "id": "express-security-helmet-cors-ratelimit",
@@ -85,7 +146,13 @@
     "answer": "Three production-essential layers, all registered early in the middleware stack:\n\n- **`helmet()`** sets safe HTTP response headers (CSP, `X-Content-Type-Options`, HSTS, etc.) to mitigate common attacks like clickjacking and MIME sniffing.\n- **`cors()`** controls cross-origin access. Don't use a wildcard `*` with credentials — specify an explicit `origin` (and set `credentials: true` only if you need cookies/auth headers cross-site).\n- **`express-rate-limit`** caps requests per IP per window to blunt brute-force and DoS attempts; apply a tighter limit to sensitive routes like `/login`.\n\n**Order:** put `helmet` and `cors` near the top, and mount rate limiters before the routes they protect.",
     "code": "const express = require('express');\nconst helmet = require('helmet');\nconst cors = require('cors');\nconst rateLimit = require('express-rate-limit');\n\nconst app = express();\n\napp.use(helmet()); // secure headers\n\napp.use(cors({\n  origin: 'https://app.example.com', // explicit origin, not '*'\n  credentials: true\n}));\n\nconst apiLimiter = rateLimit({\n  windowMs: 15 * 60 * 1000, // 15 min\n  max: 100,                 // 100 req/IP/window\n  standardHeaders: true,\n  legacyHeaders: false\n});\napp.use('/api', apiLimiter);\n\n// stricter limit on auth\nconst loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 5 });\napp.post('/api/login', loginLimiter, (req, res) => res.json({ ok: true }));\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["security", "helmet", "cors", "rate-limiting"]
+    "tags": [
+      "security",
+      "helmet",
+      "cors",
+      "rate-limiting"
+    ],
+    "short": "Harden APIs with `helmet()` for secure headers, `cors()` scoped to an explicit origin (never `*` with credentials), and `express-rate-limit` per IP. Register them early, with stricter limits on auth routes."
   },
   {
     "id": "express-input-validation-sanitization",
@@ -93,7 +160,13 @@
     "answer": "Never trust client input. Validate **shape, type, and constraints** and reject bad requests with **400** before any business logic runs. Sanitization (trimming, normalizing email, escaping) reduces injection and stored-XSS risk.\n\n**Approach shown:** `express-validator`, the most common library, exposes a chain API plus a middleware to collect results. You declare validation rules as an array of middleware, then a final middleware checks `validationResult(req)` and short-circuits with the errors if any failed. This keeps validation declarative and out of the handler.\n\n**Production notes:** validate on the server even if the client validates; normalize emails; hash passwords (e.g., bcrypt) — never store plaintext.",
     "code": "const express = require('express');\nconst { body, validationResult } = require('express-validator');\n\nconst app = express();\napp.use(express.json());\n\nconst validateSignup = [\n  body('email').isEmail().normalizeEmail(),\n  body('password').isString().isLength({ min: 8 }),\n  body('name').trim().escape().notEmpty(),\n  (req, res, next) => {\n    const errors = validationResult(req);\n    if (!errors.isEmpty()) {\n      return res.status(400).json({ errors: errors.array() });\n    }\n    next();\n  }\n];\n\napp.post('/signup', validateSignup, (req, res) => {\n  // req.body is now validated & sanitized\n  res.status(201).json({ email: req.body.email });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["validation", "sanitization", "security", "express-validator"]
+    "tags": [
+      "validation",
+      "sanitization",
+      "security",
+      "express-validator"
+    ],
+    "short": "Validate input shape/type/constraints and sanitize before business logic, rejecting bad requests with 400. Use `express-validator` chains plus a middleware checking `validationResult(req)`; always validate server-side and hash passwords."
   },
   {
     "id": "express-serve-static-files",
@@ -101,7 +174,13 @@
     "answer": "`express.static(root, options)` is built-in middleware that serves files directly from a directory.\n\n- **Mounting at root** — `app.use(express.static('public'))` serves `public/logo.png` at `/logo.png`.\n- **Mounting at a prefix** — `app.use('/static', express.static('public'))` serves the same file at `/static/logo.png`. The prefix is a *virtual* path and isn't part of the filesystem path.\n\n**Best practices:**\n- Use an **absolute path** (`path.join(__dirname, 'public')`) so it works regardless of the process CWD.\n- Set `maxAge` / `Cache-Control` for cacheable assets.\n- Static middleware should generally be registered early; it short-circuits matching requests and won't call `next()` for files it serves.",
     "code": "const express = require('express');\nconst path = require('path');\nconst app = express();\n\n// served at /static/<file>\napp.use(\n  '/static',\n  express.static(path.join(__dirname, 'public'), {\n    maxAge: '7d',        // Cache-Control: max-age\n    etag: true,\n    index: false         // don't auto-serve index.html\n  })\n);\n\napp.get('/', (req, res) => res.send('home'));\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["static-files", "express.static", "caching", "routing"]
+    "tags": [
+      "static-files",
+      "express.static",
+      "caching",
+      "routing"
+    ],
+    "short": "`express.static(root, options)` serves files from a directory; mounting at root maps to `/file`, while a prefix adds a virtual `/static/file` path. Use absolute paths, set `maxAge`, and register early."
   },
   {
     "id": "express-next-route-vs-next-err",
@@ -109,7 +188,14 @@
     "answer": "`next` accepts special arguments:\n- **`next()`** — pass control to the **next matching middleware/handler** in the stack.\n- **`next('route')`** — skip the **remaining handlers of the current route** and move to the **next matching route**. Only works within `app.METHOD()` / `router.METHOD()` handler chains.\n- **`next(err)`** (any other argument) — skip all remaining non-error middleware and jump straight to the **error-handling middleware**.\n\n**For `GET /item/0`:** id is `0` (falsy after Number), so the first handler calls `next('route')`, skipping the second handler of this route and falling to the next route, which responds `fallback`.\n\n**For `GET /item/5`:** the first handler calls `next()`, so the **second handler of the same route** runs and responds `detail 5`.",
     "code": "const express = require('express');\nconst app = express();\n\napp.get('/item/:id',\n  (req, res, next) => {\n    if (Number(req.params.id) === 0) return next('route'); // skip to next route\n    next(); // go to next handler in THIS route\n  },\n  (req, res) => {\n    res.send('detail ' + req.params.id);\n  }\n);\n\napp.get('/item/:id', (req, res) => {\n  res.send('fallback');\n});\n\napp.listen(3000);\n// GET /item/0 -> 'fallback'   |   GET /item/5 -> 'detail 5'",
     "codeLang": "js",
-    "tags": ["next", "routing", "next-route", "error-handling", "output"]
+    "tags": [
+      "next",
+      "routing",
+      "next-route",
+      "error-handling",
+      "output"
+    ],
+    "short": "`next()` advances to the next handler, `next('route')` skips remaining handlers of the current route to the next matching route, and `next(err)` jumps to the error handler. `GET /item/0` returns `fallback`; `/item/5` returns `detail 5`."
   },
   {
     "id": "express-404-and-catch-all-handler",
@@ -117,7 +203,13 @@
     "answer": "Express has no explicit 'not found' event — instead, a request that matches **no route** simply falls through the entire stack. You handle it with a **catch-all middleware** placed **after all routes but before the error handler**.\n\n**Ordering rules (this exact sequence):**\n1. All real routes.\n2. A catch-all `app.use((req, res, next) => ...)` that responds 404 (or calls `next(err)` with a 404 error).\n3. The 4-arg error handler **last**.\n\nIf you put the 404 handler *above* your routes, it would intercept everything and your routes would never run. If you put the error handler before the 404, errors forwarded from the 404 wouldn't be caught properly.",
     "code": "const express = require('express');\nconst app = express();\n\napp.get('/', (req, res) => res.send('home'));\n\n// 1) 404 catch-all — after routes, before error handler\napp.use((req, res, next) => {\n  res.status(404).json({ error: `Not found: ${req.method} ${req.originalUrl}` });\n});\n\n// 2) error handler — LAST, four args\napp.use((err, req, res, next) => {\n  res.status(err.status || 500).json({ error: err.message });\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["routing", "404", "error-handling", "middleware-order"]
+    "tags": [
+      "routing",
+      "404",
+      "error-handling",
+      "middleware-order"
+    ],
+    "short": "Unmatched requests fall through, so add a catch-all `app.use()` returning 404 after all routes but before the 4-arg error handler. Wrong ordering either intercepts every route or misses forwarded errors."
   },
   {
     "id": "express-route-param-middleware",
@@ -125,7 +217,13 @@
     "answer": "`app.param(name, callback)` registers middleware that runs **once per request** whenever a route contains that named parameter, **before** the route's handlers. It's the DRY way to centralize loading/validating a resource so every `/:userId` route doesn't repeat the same lookup.\n\n**How it works:**\n- The callback signature is `(req, res, next, value)` where `value` is the matched param.\n- Typically you fetch the entity, attach it to `req` (e.g., `req.loadedUser`), and call `next()` — or call `next(err)` / respond 404 if it doesn't exist.\n- It runs **before** any handler for routes containing that param, so handlers can assume the resource is already loaded.",
     "code": "const express = require('express');\nconst app = express();\n\nconst users = { '1': { id: '1', name: 'Ada' } };\n\napp.param('userId', (req, res, next, id) => {\n  const user = users[id];\n  if (!user) return res.status(404).json({ error: 'User not found' });\n  req.loadedUser = user; // attach for downstream handlers\n  next();\n});\n\napp.get('/users/:userId', (req, res) => res.json(req.loadedUser));\napp.get('/users/:userId/profile', (req, res) =>\n  res.json({ name: req.loadedUser.name })\n);\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["routing", "app.param", "middleware", "dry"]
+    "tags": [
+      "routing",
+      "app.param",
+      "middleware",
+      "dry"
+    ],
+    "short": "`app.param(name, cb)` runs once per request when a route has that param, loading/validating the resource (e.g. `req.loadedUser`) before handlers run. It centralizes lookups so each `/:id` route doesn't repeat them."
   },
   {
     "id": "express-headers-sent-bug",
@@ -133,6 +231,12 @@
     "answer": "**The bug:** the handler calls a response-ending method (`res.json` / `res.send` / `res.redirect`) and then continues executing, reaching **another** response-ending call. Once headers are flushed, a second send throws `ERR_HTTP_HEADERS_SENT`.\n\nIn the code below, the early validation branch sends a 400 but **does not `return`**, so execution falls through and also runs `res.json(user)` — two responses for one request.\n\n**Fix:** `return` after sending the response (or use `if/else`) so only one terminal response runs per request. This is one of the most common Express bugs.",
     "code": "const express = require('express');\nconst app = express();\n\napp.get('/user/:id', (req, res) => {\n  const id = req.params.id;\n\n  if (!/^\\d+$/.test(id)) {\n    res.status(400).json({ error: 'id must be numeric' });\n    return; // <-- FIX: stop here, otherwise we send twice\n  }\n\n  const user = { id, name: 'Ada' };\n  res.json(user);\n});\n\napp.listen(3000);",
     "codeLang": "js",
-    "tags": ["bug-fix", "res", "headers-sent", "lifecycle"]
+    "tags": [
+      "bug-fix",
+      "res",
+      "headers-sent",
+      "lifecycle"
+    ],
+    "short": "The error 'Cannot set headers after they are sent' occurs because a validation branch sends a response but doesn't `return`, so execution falls through to a second send. Fix by adding `return` (or if/else) so only one terminal response runs."
   }
 ]

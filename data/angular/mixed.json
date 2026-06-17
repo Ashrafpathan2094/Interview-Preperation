@@ -5,7 +5,13 @@
     "answer": "With the **Default** strategy Angular dirty-checks every component on each change detection (CD) cycle. **OnPush** tells Angular to skip a component's subtree unless one of these happens:\n\n- An `@Input` **reference** changes (not a mutation of the same object).\n- An event fires from the component's own template (e.g. a click `(click)`).\n- An observable bound with the `async` pipe emits.\n- You explicitly call `markForCheck()` / `detectChanges()`.\n\nThe common bug: **mutating** an input object/array in place keeps the same reference, so OnPush never re-renders. The fix is **immutable updates** — produce a new reference (`{ ...obj }`, `[...arr]`). If you must update outside those triggers (e.g. a `setInterval` or a manual subscription), inject `ChangeDetectorRef` and call `markForCheck()`.\n\nUse OnPush for performance: it prunes large parts of the CD tree, which is one of the most effective Angular optimizations alongside `trackBy`.",
     "code": "import { ChangeDetectionStrategy, Component, Input } from '@angular/core';\n\ninterface User { id: number; name: string; }\n\n@Component({\n  selector: 'app-user-card',\n  standalone: true,\n  changeDetection: ChangeDetectionStrategy.OnPush,\n  template: `<p>{{ user.name }}</p>`,\n})\nexport class UserCardComponent {\n  @Input() user!: User;\n}\n\n// Parent: WRONG - mutating keeps the same reference, OnPush child won't update\n// this.user.name = 'New name';\n\n// Parent: RIGHT - new reference triggers OnPush\n// this.user = { ...this.user, name: 'New name' };",
     "codeLang": "ts",
-    "tags": ["change-detection", "onpush", "performance", "immutability"]
+    "tags": [
+      "change-detection",
+      "onpush",
+      "performance",
+      "immutability"
+    ],
+    "short": "OnPush skips a component's subtree unless an `@Input` reference changes, a template event fires, an `async` pipe emits, or you call `markForCheck()`. Fix mutation bugs with immutable updates that create new references."
   },
   {
     "id": "angular-takeuntildestroyed-leak",
@@ -13,7 +19,14 @@
     "answer": "A manual `.subscribe()` keeps a reference from the stream to your callback. If the source is long-lived (an interval, a shared service `BehaviorSubject`, a router event stream), the subscription — and the destroyed component it closes over — is never garbage collected. The callback keeps firing, causing leaks and sometimes \"running on a dead view\" errors.\n\n**Ways to fix it (preferred first):**\n\n- **`async` pipe** — Angular subscribes/unsubscribes for you; use it whenever the value only feeds the template.\n- **`takeUntilDestroyed()`** (Angular 16+) — ties the subscription to the component's `DestroyRef`; cleanest for imperative logic.\n- **`takeUntil(this.destroy$)`** — the classic pattern: emit and complete a `Subject` in `ngOnDestroy`.\n- Manually store the `Subscription` and call `.unsubscribe()` in `ngOnDestroy`.\n\nAvoid **nested subscribes** — flatten with `switchMap`/`mergeMap` so a single outer subscription manages the whole chain.",
     "code": "import { Component, inject } from '@angular/core';\nimport { takeUntilDestroyed } from '@angular/core/rxjs-interop';\nimport { DestroyRef } from '@angular/core';\nimport { interval } from 'rxjs';\n\n// LEAKS: never unsubscribed, keeps firing after destroy\n// ngOnInit() { interval(1000).subscribe(v => this.tick = v); }\n\n@Component({ selector: 'app-ticker', standalone: true, template: `{{ tick }}` })\nexport class TickerComponent {\n  tick = 0;\n  private destroyRef = inject(DestroyRef);\n\n  constructor() {\n    interval(1000)\n      .pipe(takeUntilDestroyed(this.destroyRef))\n      .subscribe(v => (this.tick = v)); // auto-unsubscribes on destroy\n  }\n}",
     "codeLang": "ts",
-    "tags": ["rxjs", "memory-leak", "takeUntilDestroyed", "async-pipe", "lifecycle"]
+    "tags": [
+      "rxjs",
+      "memory-leak",
+      "takeUntilDestroyed",
+      "async-pipe",
+      "lifecycle"
+    ],
+    "short": "Manual `.subscribe()` on a long-lived source keeps the destroyed component alive, leaking memory. Fix with the `async` pipe, `takeUntilDestroyed()`, `takeUntil(destroy$)`, or manual unsubscribe; avoid nested subscribes."
   },
   {
     "id": "angular-switchmap-vs-mergemap-typeahead",
@@ -21,7 +34,15 @@
     "answer": "All four are **higher-order mapping** operators that flatten an inner observable, but they differ in how they handle a new outer emission while a previous inner is still active:\n\n- **`switchMap`** — **cancels** the previous inner and switches to the latest. Ideal for type-ahead/search and route param lookups (you only want the newest result).\n- **`mergeMap`** (`flatMap`) — runs all inners **concurrently**, no ordering guarantee. Good for independent parallel work (e.g. firing N save requests).\n- **`concatMap`** — **queues** inners and runs them **one at a time in order**. Use when order matters and you must not drop any (sequential writes).\n- **`exhaustMap`** — **ignores** new outer emissions while an inner is running. Perfect for login/submit buttons to prevent duplicate submissions.\n\nFor type-ahead, `switchMap` is correct because it auto-cancels the in-flight request when the user keeps typing, preventing stale responses from overwriting newer ones.",
     "code": "import { Component } from '@angular/core';\nimport { FormControl, ReactiveFormsModule } from '@angular/forms';\nimport { HttpClient } from '@angular/common/http';\nimport { debounceTime, distinctUntilChanged, switchMap, filter } from 'rxjs/operators';\n\n@Component({\n  selector: 'app-search',\n  standalone: true,\n  imports: [ReactiveFormsModule],\n  template: `<input [formControl]=\"query\" />`,\n})\nexport class SearchComponent {\n  query = new FormControl('');\n\n  results$ = this.query.valueChanges.pipe(\n    debounceTime(300),                 // wait for typing to pause\n    distinctUntilChanged(),            // skip duplicate terms\n    filter((q): q is string => !!q && q.length > 1),\n    switchMap(q => this.http.get(`/api/search?q=${q}`)) // cancels stale request\n  );\n\n  constructor(private http: HttpClient) {}\n}",
     "codeLang": "ts",
-    "tags": ["rxjs", "switchMap", "mergeMap", "concatMap", "exhaustMap", "operators"]
+    "tags": [
+      "rxjs",
+      "switchMap",
+      "mergeMap",
+      "concatMap",
+      "exhaustMap",
+      "operators"
+    ],
+    "short": "`switchMap` cancels the previous inner, `mergeMap` runs concurrently, `concatMap` queues in order, `exhaustMap` ignores new emissions while busy. Use `switchMap` for type-ahead so stale HTTP requests are auto-cancelled."
   },
   {
     "id": "angular-signals-vs-observables-counter",
@@ -29,7 +50,14 @@
     "answer": "**Signals** model **synchronous reactive state** with a current value you can read directly (`count()`). They are pull-based, glitch-free, and integrate with change detection for fine-grained updates — Angular knows exactly which views read which signals, enabling zoneless CD.\n\n**Observables** model **asynchronous streams over time** (HTTP, websockets, DOM events) and bring a rich operator set (`debounceTime`, `switchMap`, retry, cancellation).\n\nRule of thumb:\n\n- Use **signals** for local/UI/derived state, template bindings, and `@Input`s (signal inputs).\n- Use **observables** for async orchestration, events, and anything needing operators.\n- Bridge them with `toSignal()` and `toObservable()`.\n\nKey primitives: `signal()` (writable), `computed()` (memoized derived, recomputes only when a dependency changes), and `effect()` (runs side effects when read signals change).",
     "code": "import { Component, signal, computed, effect } from '@angular/core';\n\n@Component({\n  selector: 'app-cart',\n  standalone: true,\n  template: `\n    <button (click)=\"add()\">Add</button>\n    <p>Items: {{ count() }} - Total: {{ total() }}</p>\n  `,\n})\nexport class CartComponent {\n  count = signal(0);\n  price = signal(10);\n\n  // computed: memoized, recomputes only when count or price change\n  total = computed(() => this.count() * this.price());\n\n  constructor() {\n    // effect: side effect that re-runs whenever read signals change\n    effect(() => console.log('Total is now', this.total()));\n  }\n\n  add() {\n    this.count.update(c => c + 1);\n  }\n}",
     "codeLang": "ts",
-    "tags": ["signals", "computed", "effect", "rxjs", "state"]
+    "tags": [
+      "signals",
+      "computed",
+      "effect",
+      "rxjs",
+      "state"
+    ],
+    "short": "Signals model synchronous, pull-based reactive state for UI/derived state and bindings; observables model async streams with operators. Use `signal()`, `computed()` for memoized derived state, and `effect()` for side effects; bridge via `toSignal`/`toObservable`."
   },
   {
     "id": "angular-di-hierarchical-resolution",
@@ -37,7 +65,14 @@
     "answer": "Angular has a **tree of injectors**. When a token is requested, Angular walks **up** from the element/component injector through parent injectors to the root (and the platform) injector until it finds a provider, else it throws `NullInjectorError`.\n\n**Resolution modifiers** control this walk:\n\n- **`@Optional()`** — return `null` instead of throwing if not found.\n- **`@Self()`** — only look in the **current** injector, don't walk up.\n- **`@SkipSelf()`** — skip the current injector, start at the parent.\n- **`@Host()`** — stop the search at the host component.\n\n**`providedIn: 'root'`** registers the service once in the root injector — a **tree-shakable application singleton** shared everywhere. Listing a service in a component's `providers` array creates a **new instance per component instance** (and its children), which is how you scope state to a feature or get a fresh service per component.",
     "code": "import { Injectable, Component, Optional, SkipSelf } from '@angular/core';\n\n@Injectable({ providedIn: 'root' }) // app-wide singleton, tree-shakable\nexport class LoggerService { log(m: string) { console.log(m); } }\n\n@Injectable()\nexport class PanelStateService { open = false; } // not root-provided\n\n@Component({\n  selector: 'app-panel',\n  standalone: true,\n  providers: [PanelStateService], // NEW instance scoped to each <app-panel>\n  template: `...`,\n})\nexport class PanelComponent {\n  constructor(\n    private logger: LoggerService,                 // shared singleton\n    private state: PanelStateService,              // local instance\n    @Optional() @SkipSelf() parent?: PanelComponent // null if no parent panel\n  ) {}\n}",
     "codeLang": "ts",
-    "tags": ["dependency-injection", "hierarchical-injector", "providedIn", "providers", "self-skipself"]
+    "tags": [
+      "dependency-injection",
+      "hierarchical-injector",
+      "providedIn",
+      "providers",
+      "self-skipself"
+    ],
+    "short": "Angular walks up the injector tree until a provider is found. `@Optional`, `@Self`, `@SkipSelf`, `@Host` control that walk. `providedIn:'root'` is a tree-shakable app singleton; a component `providers` entry creates a new instance per component."
   },
   {
     "id": "angular-custom-structural-directive-unless",
@@ -45,7 +80,14 @@
     "answer": "**Structural directives** change the **DOM layout** by adding/removing elements — `*ngIf`, `*ngFor`, `*ngSwitch`. The `*` is syntactic sugar for an `<ng-template>`; the directive uses `TemplateRef` (the template to render) and `ViewContainerRef` (where to render it) to create or clear an **embedded view**.\n\n**Attribute directives** change the **appearance or behavior** of an existing element without altering layout — e.g. `[ngClass]`, `[ngStyle]`, or a custom highlight directive using `@HostBinding`/`@HostListener`.\n\nBelow, `*appUnless` is the inverse of `*ngIf`: it renders the template only when the condition is **false**. Note the input setter named to match the `appUnless` micro-syntax, and that we guard so we don't recreate the view on every change.",
     "code": "import { Directive, Input, TemplateRef, ViewContainerRef } from '@angular/core';\n\n@Directive({ selector: '[appUnless]', standalone: true })\nexport class UnlessDirective {\n  private hasView = false;\n\n  constructor(\n    private templateRef: TemplateRef<unknown>,\n    private viewContainer: ViewContainerRef\n  ) {}\n\n  @Input() set appUnless(condition: boolean) {\n    if (!condition && !this.hasView) {\n      this.viewContainer.createEmbeddedView(this.templateRef);\n      this.hasView = true;\n    } else if (condition && this.hasView) {\n      this.viewContainer.clear();\n      this.hasView = false;\n    }\n  }\n}\n\n// Usage: <p *appUnless=\"isLoggedIn\">Please log in.</p>",
     "codeLang": "ts",
-    "tags": ["directives", "structural-directive", "attribute-directive", "templateref", "viewcontainerref"]
+    "tags": [
+      "directives",
+      "structural-directive",
+      "attribute-directive",
+      "templateref",
+      "viewcontainerref"
+    ],
+    "short": "Structural directives (`*ngIf`, `*ngFor`) add/remove DOM via `TemplateRef` and `ViewContainerRef`; attribute directives change an element's look/behavior. `*appUnless` renders the template only when its condition is false, guarding against re-creation."
   },
   {
     "id": "angular-pure-vs-impure-pipe",
@@ -53,7 +95,14 @@
     "answer": "A **pure pipe** (the default, `pure: true`) is only re-evaluated when Angular detects a **change to the input reference** (a primitive value change, or a new object/array reference). This makes it cheap because it skips work when inputs are unchanged.\n\nAn **impure pipe** (`pure: false`) runs on **every change detection cycle**, regardless of whether inputs changed. That is expensive and can hurt performance badly inside `*ngFor`.\n\n**Implication / common trap:** a pure pipe that filters an array won't update when you **mutate** the array in place (e.g. `arr.push(...)`), because the reference is unchanged. Options: (a) produce a new array reference, (b) make the pipe impure, or (c) better — do the filtering in the component/observable instead of the template. `AsyncPipe` is a notable built-in **impure** pipe because it must react to async emissions.",
     "code": "import { Pipe, PipeTransform } from '@angular/core';\n\n@Pipe({ name: 'filterBy', standalone: true, pure: true })\nexport class FilterByPipe implements PipeTransform {\n  transform<T>(items: T[], term: string, key: keyof T): T[] {\n    if (!items || !term) return items;\n    const lower = term.toLowerCase();\n    return items.filter(i => String(i[key]).toLowerCase().includes(lower));\n  }\n}\n\n// Pure: updates only when 'items' reference or 'term' changes.\n// Mutating items via push() will NOT refresh -> reassign: this.items = [...this.items, newItem];\n// Use pure:false only if you truly must react to in-place mutations (perf cost).",
     "codeLang": "ts",
-    "tags": ["pipes", "pure-pipe", "impure-pipe", "performance", "change-detection"]
+    "tags": [
+      "pipes",
+      "pure-pipe",
+      "impure-pipe",
+      "performance",
+      "change-detection"
+    ],
+    "short": "Pure pipes re-run only when the input reference changes (cheap); impure pipes run every change-detection cycle (costly). Mutating an array in place won't refresh a pure filter pipe; prefer new references or filtering in the component."
   },
   {
     "id": "angular-reactive-vs-template-forms",
@@ -61,7 +110,14 @@
     "answer": "**Template-driven forms** are declared in the template with `ngModel`; the form model is created implicitly by directives. They're simple for small forms but asynchronous to set up, harder to unit test, and validation lives in template directives.\n\n**Reactive forms** are defined in the component class with `FormControl`/`FormGroup`/`FormArray` (often via `FormBuilder`). They are **synchronous, explicit, immutable, and easy to unit test**, and scale well to dynamic and complex forms with custom validators. For 3+ years roles, reactive is the default recommendation for non-trivial forms.\n\nValidators are pure functions returning `ValidationErrors | null`. A **cross-field** validator is attached at the `FormGroup` level so it can read multiple controls — shown below comparing `password` and `confirm`.",
     "code": "import { Component } from '@angular/core';\nimport { NgIf } from '@angular/common';\nimport { FormBuilder, ReactiveFormsModule, AbstractControl, ValidationErrors, Validators } from '@angular/forms';\n\nfunction passwordsMatch(group: AbstractControl): ValidationErrors | null {\n  const pw = group.get('password')?.value;\n  const confirm = group.get('confirm')?.value;\n  return pw === confirm ? null : { mismatch: true };\n}\n\n@Component({\n  selector: 'app-signup',\n  standalone: true,\n  imports: [ReactiveFormsModule, NgIf],\n  template: `\n    <form [formGroup]=\"form\">\n      <input formControlName=\"password\" type=\"password\" />\n      <input formControlName=\"confirm\" type=\"password\" />\n      <p *ngIf=\"form.errors?.['mismatch']\">Passwords must match</p>\n    </form>\n  `,\n})\nexport class SignupComponent {\n  form = this.fb.group(\n    {\n      password: ['', [Validators.required, Validators.minLength(8)]],\n      confirm: ['', Validators.required],\n    },\n    { validators: passwordsMatch }\n  );\n\n  constructor(private fb: FormBuilder) {}\n}",
     "codeLang": "ts",
-    "tags": ["forms", "reactive-forms", "template-driven", "validators", "formbuilder"]
+    "tags": [
+      "forms",
+      "reactive-forms",
+      "template-driven",
+      "validators",
+      "formbuilder"
+    ],
+    "short": "Template-driven forms use `ngModel` with an implicit model (simple but harder to test); reactive forms use explicit `FormControl`/`FormGroup`, are synchronous and testable. Cross-field validators attach at the `FormGroup` level, e.g. password-match."
   },
   {
     "id": "angular-functional-route-guard-lazy",
@@ -69,7 +125,15 @@
     "answer": "**Route guards** are functions that decide whether navigation proceeds. The main types: `CanActivate` (enter a route), `CanActivateChild`, `CanDeactivate` (leave — e.g. unsaved-changes prompt), `CanMatch` (whether a route even matches, great for gating lazy chunks), and `resolve` (prefetch data before activation). Since Angular 15+, guards are **functional** (`CanActivateFn`) — plain functions using `inject()` — replacing the old class-based interfaces.\n\n**Lazy loading** defers loading a feature's JavaScript until its route is hit, shrinking the initial bundle. With standalone components you use `loadComponent` (single component) or `loadChildren` returning route configs. Combining a guard with `canMatch` lets you both gate access and avoid downloading the chunk for unauthorized users.",
     "code": "import { CanActivateFn, Router, Routes } from '@angular/router';\nimport { inject } from '@angular/core';\nimport { AuthService } from './auth.service';\n\nexport const authGuard: CanActivateFn = (route, state) => {\n  const auth = inject(AuthService);\n  const router = inject(Router);\n  if (auth.isLoggedIn()) return true;\n  return router.createUrlTree(['/login'], { queryParams: { redirect: state.url } });\n};\n\nexport const routes: Routes = [\n  {\n    path: 'dashboard',\n    canActivate: [authGuard],\n    loadComponent: () =>\n      import('./dashboard/dashboard.component').then(m => m.DashboardComponent),\n  },\n  {\n    path: 'admin',\n    canMatch: [authGuard], // also avoids loading the chunk when unauthorized\n    loadChildren: () => import('./admin/admin.routes').then(m => m.ADMIN_ROUTES),\n  },\n];",
     "codeLang": "ts",
-    "tags": ["routing", "guards", "canactivate", "lazy-loading", "standalone", "canmatch"]
+    "tags": [
+      "routing",
+      "guards",
+      "canactivate",
+      "lazy-loading",
+      "standalone",
+      "canmatch"
+    ],
+    "short": "Route guards (`CanActivate`, `CanDeactivate`, `CanMatch`, `resolve`) decide navigation and are now functional with `inject()`. Lazy loading defers a feature's JS via `loadComponent`/`loadChildren`; `canMatch` both gates access and skips downloading the chunk."
   },
   {
     "id": "angular-input-output-parent-child",
@@ -77,7 +141,14 @@
     "answer": "Components communicate down and up the tree:\n\n- **`@Input()`** passes data **from parent to child** via property binding `[prop]=\"value\"`.\n- **`@Output()`** exposes an `EventEmitter` so the child notifies the **parent** via event binding `(event)=\"handler($event)\"`.\n\n**Two-way binding** `[(value)]` is sugar that combines an `@Input value` with an `@Output valueChange` — the suffix **must** be `Change` for the banana-in-a-box syntax to work. So `[(value)]=\"x\"` expands to `[value]=\"x\" (valueChange)=\"x = $event\"`.\n\n(Angular 17.1+ also offers signal-based `input()` and `model()` for the same patterns; the decorator form below remains the most widely asked.)",
     "code": "import { Component, Input, Output, EventEmitter } from '@angular/core';\n\n@Component({\n  selector: 'app-counter',\n  standalone: true,\n  template: `\n    <button (click)=\"dec()\">-</button>\n    {{ value }}\n    <button (click)=\"inc()\">+</button>\n  `,\n})\nexport class CounterComponent {\n  @Input() value = 0;\n  @Output() valueChange = new EventEmitter<number>(); // name MUST be value + 'Change'\n\n  inc() { this.valueChange.emit(this.value + 1); }\n  dec() { this.valueChange.emit(this.value - 1); }\n}\n\n// Parent template: <app-counter [(value)]=\"count\"></app-counter>",
     "codeLang": "ts",
-    "tags": ["input", "output", "two-way-binding", "eventemitter", "component-communication"]
+    "tags": [
+      "input",
+      "output",
+      "two-way-binding",
+      "eventemitter",
+      "component-communication"
+    ],
+    "short": "`@Input()` passes data parent-to-child; `@Output()` emits events child-to-parent via `EventEmitter`. Two-way binding `[(value)]` combines `@Input value` with an `@Output valueChange` (the `Change` suffix is required)."
   },
   {
     "id": "angular-viewchild-lifecycle-timing",
@@ -85,7 +156,14 @@
     "answer": "**`@ViewChild`** queries a single element/directive/component from the **current component's own template** (its view). `@ViewChildren` returns a `QueryList` of matches. `@ContentChild`/`@ContentChildren` query **projected** content passed via `<ng-content>` instead.\n\n**Timing is the gotcha:**\n\n- A **static** query (`{ static: true }`) — only valid when the element is not inside `*ngIf`/`*ngFor` — is resolved by `ngOnInit`.\n- A **dynamic** query (the default, `static: false`) resolves in **`ngAfterViewInit`**; reading it earlier gives `undefined`.\n\nSo any access to the queried child's API should happen in `ngAfterViewInit` (or later). If you mutate the child from there and it changes a bound value, wrap it to avoid `ExpressionChangedAfterItHasBeenCheckedError`. Signal-based `viewChild()` queries (v17.2+) are the modern alternative.",
     "code": "import { AfterViewInit, Component, ViewChild } from '@angular/core';\n\n@Component({ selector: 'app-video', standalone: true, template: `<video #player></video>` })\nexport class VideoComponent {\n  @ViewChild('player') player!: { nativeElement: HTMLVideoElement };\n}\n\n@Component({\n  selector: 'app-page',\n  standalone: true,\n  imports: [VideoComponent],\n  template: `<app-video></app-video>`,\n})\nexport class PageComponent implements AfterViewInit {\n  @ViewChild(VideoComponent) video!: VideoComponent;\n\n  ngAfterViewInit() {\n    // Available here, NOT in the constructor or ngOnInit (dynamic query default)\n    this.video.player.nativeElement.play();\n  }\n}",
     "codeLang": "ts",
-    "tags": ["viewchild", "contentchild", "lifecycle", "ngAfterViewInit", "queries"]
+    "tags": [
+      "viewchild",
+      "contentchild",
+      "lifecycle",
+      "ngAfterViewInit",
+      "queries"
+    ],
+    "short": "`@ViewChild` queries the component's own view; static queries resolve by `ngOnInit`, but default dynamic queries resolve only in `ngAfterViewInit`. Access the child's API there to avoid `undefined` and `ExpressionChangedAfterItHasBeenChecked` errors."
   },
   {
     "id": "angular-behaviorsubject-shared-state",
@@ -93,7 +171,14 @@
     "answer": "Both `Subject` and `BehaviorSubject` are RxJS **multicast** subjects (an observable you can also push values into).\n\n- A **`Subject`** has **no initial value** and only delivers values emitted **after** a subscriber subscribes — late subscribers miss earlier emissions.\n- A **`BehaviorSubject`** requires an **initial value** and **replays the latest value** to every new subscriber immediately. It also exposes the current value synchronously via `.getValue()`.\n\nThat replay behavior makes `BehaviorSubject` the standard choice for **shared application state**: a service holds private state in a `BehaviorSubject`, exposes a read-only `state$` observable (via `.asObservable()`), and updates it through methods. Components consume `state$` with the **async pipe**, which handles subscription and cleanup automatically — no manual unsubscribe needed. (Signals are an increasingly common alternative for this exact pattern.)",
     "code": "import { Injectable } from '@angular/core';\nimport { BehaviorSubject } from 'rxjs';\n\n@Injectable({ providedIn: 'root' })\nexport class CartStore {\n  private items$ = new BehaviorSubject<string[]>([]); // seeds with []\n  readonly itemsState$ = this.items$.asObservable();   // read-only stream\n\n  add(item: string) {\n    this.items$.next([...this.items$.getValue(), item]); // immutable update\n  }\n}\n\n// Component template (async pipe = auto subscribe + unsubscribe):\n// <li *ngFor=\"let item of store.itemsState$ | async\">{{ item }}</li>",
     "codeLang": "ts",
-    "tags": ["rxjs", "behaviorsubject", "subject", "async-pipe", "state-management"]
+    "tags": [
+      "rxjs",
+      "behaviorsubject",
+      "subject",
+      "async-pipe",
+      "state-management"
+    ],
+    "short": "A `Subject` has no initial value and late subscribers miss prior emissions; a `BehaviorSubject` requires an initial value and replays the latest to new subscribers. It is the standard for shared state, exposed as `state$` and consumed via the async pipe."
   },
   {
     "id": "angular-ngfor-trackby-perf",
@@ -101,6 +186,13 @@
     "answer": "By default `*ngFor` tracks list items by **object identity (reference)**. When data is reloaded from an API or replaced with a new array, even if the items are logically the same, the references differ, so Angular **destroys and recreates every DOM node** — tearing down child components, losing input focus, and causing jank on large lists.\n\nThe fix is a **`trackBy`** function that returns a **stable identity** (usually `item.id`). Angular then reuses DOM nodes whose identity is unchanged, only adding/removing/moving the diff. This is one of the highest-impact list optimizations and pairs well with `OnPush`.\n\n(In Angular 17+ the built-in control flow `@for` makes `track` **mandatory** for the same reason: `@for (item of items; track item.id) { ... }`.)",
     "code": "import { Component } from '@angular/core';\nimport { NgFor } from '@angular/common';\n\ninterface Product { id: number; name: string; }\n\n@Component({\n  selector: 'app-list',\n  standalone: true,\n  imports: [NgFor],\n  template: `\n    <div *ngFor=\"let p of products; trackBy: trackById\">{{ p.name }}</div>\n  `,\n})\nexport class ListComponent {\n  products: Product[] = [];\n\n  // Stable identity -> Angular reuses DOM nodes instead of recreating all\n  trackById(index: number, p: Product) {\n    return p.id;\n  }\n}\n\n// Angular 17+ control flow equivalent:\n// @for (p of products; track p.id) { <div>{{ p.name }}</div> }",
     "codeLang": "ts",
-    "tags": ["ngfor", "trackby", "performance", "control-flow", "rendering"]
+    "tags": [
+      "ngfor",
+      "trackby",
+      "performance",
+      "control-flow",
+      "rendering"
+    ],
+    "short": "`*ngFor` tracks items by reference, so a replaced array destroys and recreates every DOM node, causing jank and lost focus. A `trackBy` returning a stable id (or `track` in `@for`) lets Angular reuse nodes and apply only the diff."
   }
 ]

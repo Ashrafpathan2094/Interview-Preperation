@@ -5,7 +5,14 @@
     "answer": "These three tools solve related but distinct problems:\n\n- **`React.memo`** wraps a component and skips re-rendering when its props are **shallow-equal** to the previous render.\n- **`useMemo`** caches a **computed value** between renders so an expensive calculation only re-runs when its dependencies change.\n- **`useCallback`** caches a **function identity** so a memoized child doesn't see a brand-new function prop on every parent render (it is just `useMemo(() => fn, deps)`).\n\nThe catch most candidates miss: wrapping `Child` in `React.memo` is **not enough** by itself. If the parent passes an inline `onClick` or an object literal, that prop's reference changes every render, defeating the memo. You must stabilize the reference with `useCallback`/`useMemo`. Below, toggling `text` does **not** re-render `Child` because `onClick` is stable and `count` hasn't changed.",
     "code": "import React, { useCallback, useState } from \"react\";\n\nconst Child = React.memo(function Child({\n  count,\n  onClick,\n}: {\n  count: number;\n  onClick: () => void;\n}) {\n  console.log(\"Child render\");\n  return <button onClick={onClick}>count: {count}</button>;\n});\n\nexport default function Parent() {\n  const [count, setCount] = useState(0);\n  const [text, setText] = useState(\"\");\n\n  // Stable identity -> Child is not re-created when `text` changes.\n  const onClick = useCallback(() => setCount((c) => c + 1), []);\n\n  return (\n    <>\n      <input value={text} onChange={(e) => setText(e.target.value)} />\n      <Child count={count} onClick={onClick} />\n    </>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["memoization", "React.memo", "useCallback", "useMemo", "re-renders"]
+    "tags": [
+      "memoization",
+      "React.memo",
+      "useCallback",
+      "useMemo",
+      "re-renders"
+    ],
+    "short": "`React.memo` skips re-renders on shallow-equal props, `useMemo` caches a computed value, and `useCallback` caches a function identity. Memoizing the child isn't enough; stabilize prop references with `useCallback`/`useMemo` or inline props defeat it."
   },
   {
     "id": "react-custom-usefetch-hook",
@@ -13,7 +20,14 @@
     "answer": "A **custom hook** is a function whose name starts with `use` that composes built-in hooks to share **stateful logic** (not markup) between components. It must obey the **Rules of Hooks**: only call hooks at the **top level** (never in conditions, loops, or nested functions) and only from React functions or other hooks, so React can match each hook to the same slot across renders.\n\nThe production-quality detail interviewers look for is **cancellation**: when `url` changes or the component unmounts, the previous request must be aborted so a late response can't overwrite newer state (a classic race condition). We use `AbortController` and an `ignore` flag in the effect cleanup.",
     "code": "import { useEffect, useState } from \"react\";\n\ninterface State<T> {\n  data: T | null;\n  loading: boolean;\n  error: Error | null;\n}\n\nexport function useFetch<T>(url: string): State<T> {\n  const [state, setState] = useState<State<T>>({\n    data: null,\n    loading: true,\n    error: null,\n  });\n\n  useEffect(() => {\n    const controller = new AbortController();\n    let ignore = false;\n    setState({ data: null, loading: true, error: null });\n\n    fetch(url, { signal: controller.signal })\n      .then((res) => {\n        if (!res.ok) throw new Error(`HTTP ${res.status}`);\n        return res.json();\n      })\n      .then((data: T) => {\n        if (!ignore) setState({ data, loading: false, error: null });\n      })\n      .catch((error: Error) => {\n        if (!ignore && error.name !== \"AbortError\") {\n          setState({ data: null, loading: false, error });\n        }\n      });\n\n    return () => {\n      ignore = true;\n      controller.abort();\n    };\n  }, [url]);\n\n  return state;\n}",
     "codeLang": "ts",
-    "tags": ["custom-hooks", "useEffect", "rules-of-hooks", "cleanup", "data-fetching"]
+    "tags": [
+      "custom-hooks",
+      "useEffect",
+      "rules-of-hooks",
+      "cleanup",
+      "data-fetching"
+    ],
+    "short": "A custom hook is a `use`-prefixed function composing built-in hooks to share stateful logic, obeying the Rules of Hooks (top-level only). A production `useFetch` uses `AbortController` plus an `ignore` flag in cleanup to cancel stale requests and avoid races."
   },
   {
     "id": "react-useeffect-cleanup-deps",
@@ -21,7 +35,14 @@
     "answer": "`useEffect` runs **after** render. The **dependency array** tells React when to re-run it: omit it and it runs every render; pass `[]` and it runs once after mount; list values and it re-runs only when one of them changes. The **cleanup function** (the returned function) runs before the next effect run and on unmount, and is where you must tear down subscriptions, timers, and listeners.\n\nTwo bugs are extremely common:\n1. **Leaked subscriptions** — adding a listener/interval but never removing it, so they pile up on every re-run.\n2. **Stale closures** — reading state directly inside the effect with an empty deps array, capturing the value from the first render. Fix it with the **functional updater** `setCount(c => c + 1)` so you don't need `count` as a dependency.",
     "code": "import { useEffect, useState } from \"react\";\n\nexport default function Timer() {\n  const [count, setCount] = useState(0);\n\n  useEffect(() => {\n    // Functional updater avoids needing `count` in deps (no stale closure).\n    const id = setInterval(() => setCount((c) => c + 1), 1000);\n    // Cleanup clears the interval before re-run / on unmount -> no leak.\n    return () => clearInterval(id);\n  }, []);\n\n  return <p>Seconds: {count}</p>;\n}",
     "codeLang": "tsx",
-    "tags": ["useEffect", "cleanup", "dependency-array", "stale-closure", "memory-leak"]
+    "tags": [
+      "useEffect",
+      "cleanup",
+      "dependency-array",
+      "stale-closure",
+      "memory-leak"
+    ],
+    "short": "`useEffect` runs after render; the deps array controls re-runs and the returned cleanup tears down subscriptions/timers before re-run and on unmount. Common bugs are leaked listeners and stale closures, fixed with cleanup and functional updaters like `setCount(c => c + 1)`."
   },
   {
     "id": "react-usestate-vs-usereducer",
@@ -29,7 +50,13 @@
     "answer": "Reach for **`useReducer`** when:\n\n- The next state **depends on the previous state** in non-trivial ways.\n- Multiple values **change together** or are interdependent (e.g. a form's data, status, and error).\n- The update logic is complex enough that you want it **centralized and testable** (a reducer is a pure function you can unit test in isolation).\n- You want to **pass `dispatch` down** instead of many callbacks (dispatch is stable, which helps avoid re-renders).\n\n`useState` is better for a few independent primitive values. Below, the reducer keeps related transitions in one place and guarantees consistent state shape.",
     "code": "import { useReducer } from \"react\";\n\ntype State = { name: string; email: string; submitting: boolean; error: string | null };\ntype Action =\n  | { type: \"field\"; field: \"name\" | \"email\"; value: string }\n  | { type: \"submit\" }\n  | { type: \"error\"; message: string };\n\nconst initial: State = { name: \"\", email: \"\", submitting: false, error: null };\n\nfunction reducer(state: State, action: Action): State {\n  switch (action.type) {\n    case \"field\":\n      return { ...state, [action.field]: action.value, error: null };\n    case \"submit\":\n      return { ...state, submitting: true, error: null };\n    case \"error\":\n      return { ...state, submitting: false, error: action.message };\n    default:\n      return state;\n  }\n}\n\nexport default function SignupForm() {\n  const [state, dispatch] = useReducer(reducer, initial);\n  return (\n    <form\n      onSubmit={(e) => {\n        e.preventDefault();\n        dispatch({ type: \"submit\" });\n      }}\n    >\n      <input\n        value={state.name}\n        onChange={(e) => dispatch({ type: \"field\", field: \"name\", value: e.target.value })}\n      />\n      <input\n        value={state.email}\n        onChange={(e) => dispatch({ type: \"field\", field: \"email\", value: e.target.value })}\n      />\n      <button disabled={state.submitting}>Sign up</button>\n      {state.error && <p>{state.error}</p>}\n    </form>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["useReducer", "useState", "state-management", "forms"]
+    "tags": [
+      "useReducer",
+      "useState",
+      "state-management",
+      "forms"
+    ],
+    "short": "Choose `useReducer` when next state depends on previous state, multiple values change together, or logic is complex and worth centralizing/testing; dispatch is also stable. `useState` suits a few independent primitives."
   },
   {
     "id": "react-controlled-vs-uncontrolled",
@@ -37,7 +64,13 @@
     "answer": "In a **controlled** component, React state is the single source of truth: the input's `value` is driven by state and every keystroke flows through `onChange`. This gives you instant validation, conditional disabling, and formatting, at the cost of a re-render per keystroke.\n\nIn an **uncontrolled** component, the DOM holds the value and you read it on demand via a **ref** (often with `defaultValue` for the initial value). It's less code and fewer renders, and it's the natural fit when integrating non-React widgets or reading a value only on submit.\n\nRule of thumb: prefer **controlled** when you need to react to the value as it changes; **uncontrolled** for simple, write-once-read-on-submit forms or file inputs (`<input type=\"file\">` is always uncontrolled).",
     "code": "import { useRef, useState } from \"react\";\n\nexport function ControlledInput() {\n  const [value, setValue] = useState(\"\");\n  return (\n    <input value={value} onChange={(e) => setValue(e.target.value)} />\n  );\n}\n\nexport function UncontrolledInput() {\n  const ref = useRef<HTMLInputElement>(null);\n  const handleSubmit = () => alert(ref.current?.value);\n  return (\n    <>\n      <input ref={ref} defaultValue=\"\" />\n      <button onClick={handleSubmit}>Submit</button>\n    </>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["controlled", "uncontrolled", "forms", "useRef"]
+    "tags": [
+      "controlled",
+      "uncontrolled",
+      "forms",
+      "useRef"
+    ],
+    "short": "Controlled inputs are driven by state via `value`/`onChange` (re-render per keystroke, instant validation); uncontrolled inputs keep the value in the DOM, read via a ref. Prefer controlled when reacting to changes, uncontrolled for write-once/submit-only or file inputs."
   },
   {
     "id": "react-context-vs-state-library",
@@ -45,7 +78,14 @@
     "answer": "**Context** is a **dependency-injection** mechanism, not a state manager. It's ideal for low-frequency, app-wide values: theme, locale, current user, auth. The key pitfall: **every consumer re-renders whenever the context value's reference changes**, even consumers that only use part of it. So passing a fresh object literal as `value` on each render re-renders the whole subtree — memoize the value with `useMemo`, and split frequently-changing state into separate contexts.\n\nReach for a **library (Redux Toolkit, Zustand, Jotai)** when you have high-frequency updates, need selector-based subscriptions to avoid over-rendering, want devtools/time-travel/middleware, or share complex normalized state across many distant components. Below the value is memoized so consumers only re-render when `theme` actually changes.",
     "code": "import { createContext, useContext, useMemo, useState, type ReactNode } from \"react\";\n\ntype Theme = \"light\" | \"dark\";\ntype ThemeCtx = { theme: Theme; toggle: () => void };\n\nconst ThemeContext = createContext<ThemeCtx | null>(null);\n\nexport function ThemeProvider({ children }: { children: ReactNode }) {\n  const [theme, setTheme] = useState<Theme>(\"light\");\n  // Memoize so consumers don't re-render from a new object each render.\n  const value = useMemo<ThemeCtx>(\n    () => ({ theme, toggle: () => setTheme((t) => (t === \"light\" ? \"dark\" : \"light\")) }),\n    [theme]\n  );\n  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;\n}\n\nexport function useTheme() {\n  const ctx = useContext(ThemeContext);\n  if (!ctx) throw new Error(\"useTheme must be used within ThemeProvider\");\n  return ctx;\n}",
     "codeLang": "tsx",
-    "tags": ["context", "redux", "state-management", "useMemo", "re-renders"]
+    "tags": [
+      "context",
+      "redux",
+      "state-management",
+      "useMemo",
+      "re-renders"
+    ],
+    "short": "Context is dependency injection for low-frequency app-wide values (theme, auth); every consumer re-renders when the value reference changes, so memoize the value and split contexts. Reach for Redux/Zustand/Jotai for high-frequency updates, selector subscriptions, or complex shared state."
   },
   {
     "id": "react-keys-index-bug",
@@ -53,7 +93,13 @@
     "answer": "Keys give list items a **stable identity** so reconciliation can match each rendered element to the same component instance across renders, preserving its state and DOM. With the **array index** as the key, the identity is tied to **position**, not the item. When you reorder, insert at the top, or delete, React maps the wrong previous instance onto the new position — so component state (like uncontrolled input text or focus) **sticks to the slot instead of the item**.\n\nIn the example, with index keys, deleting or prepending a row leaves the typed-in text attached to the wrong row. Using a **stable unique id** fixes it.",
     "code": "import { useState } from \"react\";\n\ntype Row = { id: string; label: string };\n\nexport default function List() {\n  const [rows, setRows] = useState<Row[]>([\n    { id: \"a\", label: \"Alpha\" },\n    { id: \"b\", label: \"Bravo\" },\n  ]);\n\n  const prepend = () =>\n    setRows((r) => [{ id: crypto.randomUUID(), label: \"New\" }, ...r]);\n\n  return (\n    <>\n      <button onClick={prepend}>Prepend</button>\n      <ul>\n        {rows.map((row) => (\n          // Correct: stable id, not the index.\n          <li key={row.id}>\n            {row.label} <input defaultValue=\"\" />\n          </li>\n        ))}\n      </ul>\n    </>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["keys", "lists", "reconciliation", "bug"]
+    "tags": [
+      "keys",
+      "lists",
+      "reconciliation",
+      "bug"
+    ],
+    "short": "Keys give list items stable identity so reconciliation matches instances across renders, preserving state. Using the array index ties identity to position, so reordering/inserting/deleting attaches state (input text, focus) to the wrong item; use a stable unique id."
   },
   {
     "id": "react-error-boundary",
@@ -61,7 +107,13 @@
     "answer": "An **error boundary** is a component that catches JavaScript errors thrown **during rendering, in lifecycle methods, and in constructors of its child tree**, logs them, and shows a fallback UI instead of unmounting the whole app. It must currently be a **class** because the boundary behavior relies on `static getDerivedStateFromError` (render a fallback) and `componentDidCatch` (side-effect logging) — there is no hook equivalent yet.\n\nIt does **not** catch errors in: event handlers (use try/catch there), asynchronous code (`setTimeout`, promises), server-side rendering, or errors thrown in the boundary itself. In practice teams wrap this once in a library like `react-error-boundary` and place boundaries around routes/widgets so one failing section doesn't take down the page.",
     "code": "import { Component, type ErrorInfo, type ReactNode } from \"react\";\n\ninterface Props { children: ReactNode; fallback: ReactNode }\ninterface State { hasError: boolean }\n\nexport class ErrorBoundary extends Component<Props, State> {\n  state: State = { hasError: false };\n\n  static getDerivedStateFromError(): State {\n    return { hasError: true };\n  }\n\n  componentDidCatch(error: Error, info: ErrorInfo) {\n    console.error(\"Caught by boundary:\", error, info.componentStack);\n  }\n\n  render() {\n    if (this.state.hasError) {\n      return (\n        <div role=\"alert\">\n          {this.props.fallback}\n          <button onClick={() => this.setState({ hasError: false })}>Retry</button>\n        </div>\n      );\n    }\n    return this.props.children;\n  }\n}",
     "codeLang": "tsx",
-    "tags": ["error-boundary", "class-component", "getDerivedStateFromError", "componentDidCatch"]
+    "tags": [
+      "error-boundary",
+      "class-component",
+      "getDerivedStateFromError",
+      "componentDidCatch"
+    ],
+    "short": "An error boundary catches errors during child rendering, lifecycle methods, and constructors, showing a fallback. It must be a class (uses `getDerivedStateFromError` and `componentDidCatch`) and cannot catch errors in event handlers, async code, SSR, or itself."
   },
   {
     "id": "react-suspense-lazy-code-split",
@@ -69,7 +121,13 @@
     "answer": "**Code splitting** breaks your bundle into chunks loaded **on demand** so the initial download is smaller and the app becomes interactive sooner. `React.lazy(() => import('...'))` returns a component whose code is fetched the first time it renders; `<Suspense fallback={...}>` shows a placeholder while that chunk (or any suspending data) loads.\n\nIt helps most for **route-level** splitting and heavy, rarely-used components (charts, editors, modals). Caveats: the lazy import must be a **default export**, you should wrap it in an **error boundary** to handle chunk-load failures, and don't over-split tiny components or you trade fewer bytes for more network round-trips.",
     "code": "import { lazy, Suspense } from \"react\";\n\nconst Dashboard = lazy(() => import(\"./Dashboard\"));\n\nexport default function App() {\n  return (\n    <Suspense fallback={<p>Loading dashboard…</p>}>\n      <Dashboard />\n    </Suspense>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["Suspense", "React.lazy", "code-splitting", "performance"]
+    "tags": [
+      "Suspense",
+      "React.lazy",
+      "code-splitting",
+      "performance"
+    ],
+    "short": "Code splitting loads bundle chunks on demand for a smaller initial download; `React.lazy(() => import(...))` fetches a component on first render and `<Suspense>` shows a fallback. Best for route-level and heavy components; requires default exports and an error boundary for chunk failures."
   },
   {
     "id": "react-forwardref-imperative-handle",
@@ -77,7 +135,13 @@
     "answer": "A **ref** is a mutable container (`{ current }`) that persists across renders **without** triggering a re-render — used for DOM nodes or any mutable instance value. By default a function component can't receive a `ref`; **`forwardRef`** lets a parent attach a ref that the child forwards to a DOM node or exposes selectively.\n\n**`useImperativeHandle`** customizes what the forwarded ref exposes, so instead of leaking the whole DOM node you publish a small **imperative API** (e.g. `focus`, `scrollIntoView`, `reset`). This is the idiomatic way to let a parent imperatively command a child while keeping encapsulation. (In React 19 you can also accept `ref` as a regular prop, but `forwardRef` is what most interviewers expect.)",
     "code": "import { forwardRef, useImperativeHandle, useRef } from \"react\";\n\nexport interface FancyInputHandle {\n  focus: () => void;\n  clear: () => void;\n}\n\nexport const FancyInput = forwardRef<FancyInputHandle, { placeholder?: string }>(\n  function FancyInput({ placeholder }, ref) {\n    const inputRef = useRef<HTMLInputElement>(null);\n    useImperativeHandle(ref, () => ({\n      focus: () => inputRef.current?.focus(),\n      clear: () => {\n        if (inputRef.current) inputRef.current.value = \"\";\n      },\n    }));\n    return <input ref={inputRef} placeholder={placeholder} />;\n  }\n);\n\n// Usage:\n// const ref = useRef<FancyInputHandle>(null);\n// <FancyInput ref={ref} />; ref.current?.focus();",
     "codeLang": "tsx",
-    "tags": ["refs", "forwardRef", "useImperativeHandle", "useRef"]
+    "tags": [
+      "refs",
+      "forwardRef",
+      "useImperativeHandle",
+      "useRef"
+    ],
+    "short": "A ref is a mutable `{ current }` container that persists without re-rendering; `forwardRef` lets a parent attach a ref to a function component's node. `useImperativeHandle` exposes a small imperative API (e.g. `focus`, `clear`) instead of the raw DOM node."
   },
   {
     "id": "react-usetransition-deferred",
@@ -85,7 +149,14 @@
     "answer": "React 18's concurrent rendering lets React **interrupt and prioritize** work:\n\n- **`useTransition`** marks a state update as a **non-urgent transition**. The urgent update (the input value) commits immediately; the expensive update (filtering 10k rows) is rendered in the background and can be interrupted, so typing never stutters. It also gives you an `isPending` flag.\n- **`useDeferredValue`** is the prop-side equivalent: it returns a **deferred copy** of a value that lags behind during heavy renders — useful when you receive the value as a prop and can't wrap the setter.\n- **Automatic batching** means multiple `setState` calls in the same tick — now including those inside promises, timeouts, and native event handlers — are batched into **one** re-render (in React 17 only React event handlers batched).",
     "code": "import { useMemo, useState, useTransition } from \"react\";\n\nexport default function Search({ items }: { items: string[] }) {\n  const [query, setQuery] = useState(\"\");\n  const [deferredQuery, setDeferredQuery] = useState(\"\");\n  const [isPending, startTransition] = useTransition();\n\n  const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setQuery(e.target.value); // urgent: keeps input snappy\n    startTransition(() => setDeferredQuery(e.target.value)); // non-urgent\n  };\n\n  const filtered = useMemo(\n    () => items.filter((i) => i.includes(deferredQuery)),\n    [items, deferredQuery]\n  );\n\n  return (\n    <>\n      <input value={query} onChange={onChange} />\n      {isPending && <span>Updating…</span>}\n      <ul>{filtered.map((i) => <li key={i}>{i}</li>)}</ul>\n    </>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["react-18", "useTransition", "useDeferredValue", "batching", "concurrent"]
+    "tags": [
+      "react-18",
+      "useTransition",
+      "useDeferredValue",
+      "batching",
+      "concurrent"
+    ],
+    "short": "React 18 concurrent features prioritize work: `useTransition` marks updates non-urgent (with `isPending`) so typing stays snappy while heavy renders are interruptible, `useDeferredValue` is the prop-side equivalent, and automatic batching now batches setStates in promises/timeouts/native handlers too."
   },
   {
     "id": "react-portal-modal",
@@ -93,7 +164,13 @@
     "answer": "A **portal** renders children into a **different part of the DOM tree** (e.g. `document.body`) while keeping them in the same React tree for state, context, and event bubbling. This solves the classic **CSS clipping/stacking problem**: modals, tooltips, dropdowns, and toasts can otherwise be clipped by a parent's `overflow: hidden` or trapped under a low `z-index`. Rendering them at the body level escapes that.\n\nA subtle but important point: even though the modal lives elsewhere in the DOM, **React events still bubble through the React tree**, so an `onClick` on an ancestor component still fires — handy, but watch for it when stopping propagation.",
     "code": "import { useEffect } from \"react\";\nimport { createPortal } from \"react-dom\";\n\nexport function Modal({\n  onClose,\n  children,\n}: {\n  onClose: () => void;\n  children: React.ReactNode;\n}) {\n  useEffect(() => {\n    const onKey = (e: KeyboardEvent) => e.key === \"Escape\" && onClose();\n    document.addEventListener(\"keydown\", onKey);\n    return () => document.removeEventListener(\"keydown\", onKey);\n  }, [onClose]);\n\n  return createPortal(\n    <div role=\"dialog\" aria-modal=\"true\" onClick={onClose} style={{ position: \"fixed\", inset: 0 }}>\n      <div onClick={(e) => e.stopPropagation()}>{children}</div>\n    </div>,\n    document.body\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["portals", "createPortal", "modal", "accessibility"]
+    "tags": [
+      "portals",
+      "createPortal",
+      "modal",
+      "accessibility"
+    ],
+    "short": "A portal renders children into a different DOM location (like `document.body`) while keeping them in the React tree for state, context, and event bubbling. It solves CSS clipping/stacking issues for modals and tooltips; note React events still bubble through the React tree."
   },
   {
     "id": "react-prop-drilling-lifting-state",
@@ -101,7 +178,13 @@
     "answer": "**Lifting state up** means moving shared state to the closest common ancestor so multiple children stay in sync from a single source of truth. The downside is **prop drilling**: that state and its setters get threaded through many intermediate components that don't use them, which is noisy and brittle.\n\nThree common fixes, in order of preference:\n1. **Component composition** — pass JSX as `children`/render props so the data-owning parent renders the consumer directly, skipping the middle layers. Often the cleanest and avoids extra machinery.\n2. **Context** — for genuinely app-wide values (theme, auth) read by many distant components.\n3. **A state library** — for high-frequency or complex shared state with selector subscriptions.\n\nBelow, instead of drilling `user` through `Layout`, `Layout` accepts `children`, so `App` lifts the state once and composes the consumer without intermediate props.",
     "code": "import { useState, type ReactNode } from \"react\";\n\n// Layout no longer needs to know about `user`; it just renders children.\nfunction Layout({ children }: { children: ReactNode }) {\n  return <main className=\"layout\">{children}</main>;\n}\n\nfunction Profile({ name }: { name: string }) {\n  return <p>Signed in as {name}</p>;\n}\n\nexport default function App() {\n  const [user] = useState({ name: \"Ada\" });\n  // State lifted to App, consumer composed in directly — no drilling through Layout.\n  return (\n    <Layout>\n      <Profile name={user.name} />\n    </Layout>\n  );\n}",
     "codeLang": "tsx",
-    "tags": ["prop-drilling", "lifting-state-up", "composition", "context"]
+    "tags": [
+      "prop-drilling",
+      "lifting-state-up",
+      "composition",
+      "context"
+    ],
+    "short": "Lifting state to a common ancestor keeps children in sync but causes prop drilling through uninvolved intermediates. Fix it with component composition (pass `children`), then Context for app-wide values, then a state library for high-frequency/complex shared state."
   },
   {
     "id": "react-ssr-vs-csr",
@@ -109,6 +192,13 @@
     "answer": "**CSR (client-side rendering)** ships a near-empty HTML shell plus JS; the browser builds the DOM after download. Fast subsequent navigations, but slower **first contentful paint** and weaker SEO for crawlers that don't run JS.\n\n**SSR (server-side rendering)** renders HTML on the server so users see content immediately and crawlers get real markup. The catch is **hydration**: the client downloads the same JS and **attaches event listeners** to the already-rendered HTML to make it interactive. The server and client must render the **same output** or you get hydration mismatch warnings.\n\nChoose **SSR** (or SSG/streaming via Next.js, etc.) for content/marketing pages, SEO, and slow devices; **CSR** for highly interactive, auth-gated app shells where SEO and first paint matter less. React 18 adds **streaming SSR** (`renderToPipeableStream`) plus selective hydration so the page becomes interactive piece by piece.",
     "code": "// server.tsx\nimport { renderToString } from \"react-dom/server\";\nimport App from \"./App\";\n\nexport function render() {\n  const html = renderToString(<App />);\n  return `<!doctype html><div id=\"root\">${html}</div><script src=\"/client.js\"></script>`;\n}\n\n// client.tsx\nimport { hydrateRoot } from \"react-dom/client\";\nimport App from \"./App\";\n\n// Attaches listeners to server-rendered markup (must match the server output).\nhydrateRoot(document.getElementById(\"root\")!, <App />);",
     "codeLang": "tsx",
-    "tags": ["ssr", "csr", "hydration", "performance", "seo"]
+    "tags": [
+      "ssr",
+      "csr",
+      "hydration",
+      "performance",
+      "seo"
+    ],
+    "short": "CSR ships a JS shell the browser renders (fast navigations, weaker SEO/first paint); SSR renders HTML on the server then hydrates by attaching listeners, requiring matching server/client output. Use SSR for content/SEO/slow devices, CSR for interactive auth-gated shells; React 18 adds streaming SSR."
   }
 ]

@@ -1,0 +1,189 @@
+[
+  {
+    "id": "html-semantic-elements-why",
+    "question": "What are semantic HTML elements and why do they matter?",
+    "short": "Semantic elements (`<header>`, `<nav>`, `<main>`, `<article>`, `<section>`, `<aside>`, `<footer>`) describe the meaning of content rather than its appearance, improving accessibility, SEO, and maintainability.",
+    "answer": "**Semantic elements** convey the *meaning and role* of their content to browsers, assistive technologies, and search engines, unlike generic containers like `<div>`/`<span>` which carry no meaning.\n\n**Why they matter:**\n- **Accessibility** - Many map to ARIA *landmarks* (`<nav>` -> `navigation`, `<main>` -> `main`, `<aside>` -> `complementary`), letting screen-reader users jump directly between regions.\n- **SEO** - Search engines infer content hierarchy and importance from structure.\n- **Maintainability** - Self-documenting markup is easier to read than a sea of `<div>`s.\n\n**Common landmarks:**\n- `<header>` - introductory content / banner.\n- `<nav>` - major navigation block.\n- `<main>` - the single primary content region (one per page).\n- `<article>` - self-contained, independently distributable content (a blog post, comment, card).\n- `<section>` - a thematic grouping, usually with a heading.\n- `<aside>` - tangential content (sidebars, pull quotes).\n- `<footer>` - footer for its nearest sectioning ancestor.\n\n**Rule of thumb:** use `<article>` when the content would make sense on its own (e.g. in an RSS feed); use `<section>` to group related content under a heading.",
+    "code": "<body>\n  <header>...</header>\n  <nav aria-label=\"Primary\">...</nav>\n  <main>\n    <article>\n      <h1>Post title</h1>\n      <section><h2>Intro</h2>...</section>\n    </article>\n    <aside>Related links</aside>\n  </main>\n  <footer>...</footer>\n</body>",
+    "codeLang": "html",
+    "tags": ["semantic", "accessibility", "seo", "structure"]
+  },
+  {
+    "id": "html-section-vs-article-vs-div",
+    "question": "What is the difference between <section>, <article>, and <div>?",
+    "short": "`<article>` is self-contained, reusable content; `<section>` is a thematic group of related content (usually with a heading); `<div>` is a meaningless generic container used only for styling or scripting hooks.",
+    "answer": "These three are frequently confused:\n\n- **`<article>`** - independently distributable, self-contained content that still makes sense out of context (a news story, forum post, product card, comment). You can nest articles (e.g. comments inside a post article).\n- **`<section>`** - a thematic grouping of content, typically introduced by a heading. Use it when content belongs together but is *not* independently meaningful. If the only reason is styling, it should not be a `<section>`.\n- **`<div>`** - a *non-semantic* generic block container. It has no meaning and exposes no landmark; use it purely as a styling/layout/JS hook.\n\n**Decision guide:** Does the content stand alone and could be syndicated? -> `<article>`. Is it a meaningful thematic chunk with a heading? -> `<section>`. Neither, just need a box? -> `<div>`.",
+    "codeLang": "html",
+    "tags": ["semantic", "structure", "article", "section"]
+  },
+  {
+    "id": "html-doctype-quirks-mode",
+    "question": "What is the DOCTYPE and what is quirks mode?",
+    "short": "`<!DOCTYPE html>` tells the browser to use standards mode for consistent, spec-compliant rendering. Omitting or using an invalid doctype triggers quirks mode, which emulates legacy 1990s browser bugs.",
+    "answer": "The **DOCTYPE** is the first line of an HTML document. The modern `<!DOCTYPE html>` is not a tag and contains no version - it simply switches the browser into **standards mode**.\n\n**The three rendering modes:**\n- **Standards (no-quirks) mode** - the browser follows the current HTML/CSS specs. This is what you want.\n- **Quirks mode** - triggered by a missing/invalid doctype; the browser mimics non-standard behavior of old browsers for backward compatibility.\n- **Limited-quirks (almost standards) mode** - mostly standards, with a few legacy quirks (notably around inline image box height in table cells).\n\n**Classic quirks-mode differences:**\n- The **box model** reverts to the old IE model (padding/border counted inside `width`).\n- Different handling of `line-height`, percentages, and image spacing.\n\n**Takeaway:** Always include `<!DOCTYPE html>` to guarantee standards mode and avoid subtle cross-browser layout bugs.",
+    "code": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head><meta charset=\"utf-8\"></head>\n  <body>...</body>\n</html>",
+    "codeLang": "html",
+    "tags": ["doctype", "quirks-mode", "rendering", "structure"]
+  },
+  {
+    "id": "html-async-vs-defer",
+    "question": "What is the difference between the async and defer attributes on a <script>?",
+    "short": "Both download the script without blocking HTML parsing. `async` runs as soon as it loads (order not guaranteed); `defer` waits until parsing finishes and preserves source order, running just before `DOMContentLoaded`.",
+    "answer": "By default a `<script>` is **parser-blocking**: HTML parsing pauses while the script downloads and executes. `async` and `defer` (valid only on external scripts with `src`) avoid blocking the download.\n\n| Attribute | Download | Execution | Order preserved? |\n|-----------|----------|-----------|------------------|\n| (none) | blocks parsing | immediately, blocks parsing | yes |\n| `async` | parallel, non-blocking | **as soon as downloaded**, may interrupt parsing | **no** |\n| `defer` | parallel, non-blocking | **after parsing completes**, before `DOMContentLoaded` | **yes** |\n\n**When to use which:**\n- **`defer`** - for scripts that depend on the DOM or on each other (most app/bundle code). Safe default.\n- **`async`** - for independent, order-agnostic scripts like analytics or ad tags.\n- **Modules** (`<script type=\"module\">`) are deferred by default.\n\nNote: `async` execution timing is unpredictable relative to DOM readiness, which is why ordered dependencies should use `defer`.",
+    "code": "<!-- Runs after HTML is parsed, in order -->\n<script src=\"app.js\" defer></script>\n\n<!-- Independent, runs whenever it arrives -->\n<script src=\"analytics.js\" async></script>",
+    "codeLang": "html",
+    "tags": ["scripts", "performance", "async", "defer"]
+  },
+  {
+    "id": "html-block-inline-inline-block",
+    "question": "What is the difference between block, inline, and inline-block elements?",
+    "short": "Block elements start on a new line and take full width (`<div>`, `<p>`). Inline elements flow within text and ignore width/height (`<span>`, `<a>`). Inline-block flows inline but respects width/height and vertical padding/margin.",
+    "answer": "This refers to the **CSS display type**, with sensible defaults set by the HTML element type.\n\n- **Block** (`display: block`) - begins on a new line, stretches to fill the available width, and honors `width`, `height`, and all margins/padding. Examples: `<div>`, `<p>`, `<section>`, `<h1>`.\n- **Inline** (`display: inline`) - flows along with surrounding text on the same line; **ignores `width`/`height`** and top/bottom margins (horizontal padding/margin apply but don't affect line layout cleanly). Examples: `<span>`, `<a>`, `<strong>`, `<em>`.\n- **Inline-block** (`display: inline-block`) - sits inline like text (no forced line break) **but behaves like a block internally**, so `width`, `height`, and vertical padding/margin all work. Great for buttons/badges laid out in a row.\n\n**Note:** these are CSS concepts; any element's display can be overridden in CSS, and modern layouts more often use `flex`/`grid`.",
+    "code": ".badge {\n  display: inline-block;\n  width: 80px;      /* respected (would be ignored if inline) */\n  padding: 4px 8px; /* vertical padding now affects layout */\n}",
+    "codeLang": "css",
+    "tags": ["display", "block", "inline", "layout"]
+  },
+  {
+    "id": "html-data-attributes",
+    "question": "What are data-* attributes and when should you use them?",
+    "short": "`data-*` attributes store custom private data on an element. They are read/written via `element.dataset` (or `getAttribute`) and are meant for app data, not styling hooks or accessibility info.",
+    "answer": "**`data-*` attributes** are a standard way to attach custom, application-specific data to HTML elements without abusing non-standard attributes or class names.\n\n**Access from JavaScript** via the `dataset` property, where `data-user-id` becomes `dataset.userId` (kebab-case maps to camelCase). You can also use `getAttribute('data-user-id')`.\n\n**Good uses:**\n- Passing IDs/config from server-rendered HTML to JS (e.g. `data-product-id`).\n- State flags for JS behavior or CSS via attribute selectors (`[data-state=\"open\"]`).\n\n**Avoid using them for:**\n- Data that has a proper attribute (use `value`, `href`, `title`, etc. instead).\n- **Accessibility** - assistive tech does not read `data-*`; use ARIA/visible text.\n- Large datasets or as a database substitute.",
+    "code": "<button data-product-id=\"42\" data-in-stock=\"true\">Buy</button>\n\n<script>\n  const btn = document.querySelector('button');\n  btn.dataset.productId; // \"42\"\n  btn.dataset.inStock;   // \"true\" (always a string)\n</script>",
+    "codeLang": "html",
+    "tags": ["data-attributes", "dataset", "javascript"]
+  },
+  {
+    "id": "html-localstorage-vs-sessionstorage-vs-cookies",
+    "question": "What is the difference between localStorage, sessionStorage, and cookies?",
+    "short": "All store data on the client. localStorage persists indefinitely; sessionStorage lasts for one tab session. Both are JS-only (~5-10MB). Cookies are smaller (~4KB) and sent with every HTTP request, making them suited to server-side session state.",
+    "answer": "| Feature | localStorage | sessionStorage | Cookies |\n|---------|--------------|----------------|---------|\n| Capacity | ~5-10 MB | ~5-10 MB | ~4 KB |\n| Lifetime | until cleared | until tab closes | `Expires`/`Max-Age` |\n| Scope | per origin | per origin + per tab | per domain/path |\n| Sent to server | no | no | **yes, every request** |\n| API | `localStorage` | `sessionStorage` | `document.cookie` / headers |\n\n**When to use each:**\n- **localStorage** - persistent client-only data: theme, UI preferences, non-sensitive caches.\n- **sessionStorage** - data scoped to a single tab/visit: multi-step form progress, scroll state.\n- **Cookies** - data the **server** needs on each request, especially auth/session tokens. Secure them with `HttpOnly` (blocks JS access, mitigates XSS), `Secure` (HTTPS only), and `SameSite` (mitigates CSRF).\n\n**Security:** Web Storage is always accessible to JS, so it is vulnerable to XSS; never store secrets there. `HttpOnly` cookies are the safer place for session tokens.",
+    "code": "localStorage.setItem('theme', 'dark');\nsessionStorage.setItem('step', '2');\n// Cookie set by server:\n// Set-Cookie: sid=abc; HttpOnly; Secure; SameSite=Lax; Max-Age=3600",
+    "codeLang": "js",
+    "tags": ["web-storage", "cookies", "localstorage", "security"]
+  },
+  {
+    "id": "html-meta-tags-seo",
+    "question": "What are meta tags and which ones matter for SEO and rendering?",
+    "short": "`<meta>` tags supply metadata about the document (charset, viewport, description) in the `<head>`. Key ones include charset, viewport for responsiveness, description for search snippets, and robots for crawler control.",
+    "answer": "**`<meta>`** elements provide machine-readable metadata that doesn't appear on the page itself but influences rendering, indexing, and how the page is shared.\n\n**Critical for rendering:**\n- `<meta charset=\"utf-8\">` - declares character encoding; should be first in `<head>`.\n- `<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">` - essential for responsive/mobile layout.\n\n**Important for SEO/sharing:**\n- `<meta name=\"description\">` - the snippet search engines often show (does not directly affect ranking but affects click-through).\n- `<meta name=\"robots\" content=\"index, follow\">` - controls crawling/indexing (`noindex`, `nofollow`).\n- `<title>` - not a meta tag, but the single most important on-page SEO/UX signal.\n- `<link rel=\"canonical\">` - declares the preferred URL to avoid duplicate-content issues.\n\n**Note:** The `keywords` meta tag is obsolete - major search engines ignore it.",
+    "code": "<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>Concise, Unique Page Title</title>\n  <meta name=\"description\" content=\"A 150-160 char summary for search results.\">\n  <link rel=\"canonical\" href=\"https://example.com/page\">\n</head>",
+    "codeLang": "html",
+    "tags": ["meta", "seo", "head", "viewport"]
+  },
+  {
+    "id": "html-open-graph",
+    "question": "What is Open Graph and why is it used?",
+    "short": "Open Graph (`og:`) meta tags let you control how a page appears when shared on social platforms - the title, description, and preview image - producing rich link previews instead of bare URLs.",
+    "answer": "**Open Graph Protocol** is a set of `<meta property=\"og:*\">` tags (originally from Facebook) that social networks and chat apps read to build a **rich preview card** when your link is shared.\n\n**Core tags:**\n- `og:title` - title shown on the card (can differ from `<title>`).\n- `og:description` - the preview blurb.\n- `og:image` - the preview thumbnail (specify an absolute URL; recommend ~1200x630).\n- `og:url` - the canonical URL of the page.\n- `og:type` - e.g. `website`, `article`.\n\n**Twitter/X** has a parallel set (`twitter:card`, `twitter:image`) but falls back to Open Graph when those are absent.\n\n**Why it matters:** Without these tags, shared links render as plain text/URLs; with them, links get attractive cards that improve click-through and brand presentation. They have no effect on the page's own rendering.",
+    "code": "<meta property=\"og:title\" content=\"My Article\">\n<meta property=\"og:description\" content=\"Short, compelling summary.\">\n<meta property=\"og:image\" content=\"https://example.com/cover.png\">\n<meta property=\"og:url\" content=\"https://example.com/article\">\n<meta property=\"og:type\" content=\"article\">",
+    "codeLang": "html",
+    "tags": ["open-graph", "seo", "social", "meta"]
+  },
+  {
+    "id": "html-accessibility-basics",
+    "question": "What are the core principles of building accessible HTML?",
+    "short": "Use native semantic elements, provide text alternatives (alt, labels), ensure full keyboard operability, maintain a logical heading order, and add ARIA only to supplement - never to patch - inaccessible markup.",
+    "answer": "Accessibility (a11y) means content is usable by people relying on screen readers, keyboards, magnifiers, etc. Core principles:\n\n- **Prefer native HTML** - a real `<button>`, `<a>`, `<input>` is focusable, keyboard-operable, and announced correctly out of the box. Don't rebuild these with `<div>`s.\n- **Text alternatives** - meaningful `alt` on `<img>`; `<label>`s tied to form fields; accessible names for icon buttons.\n- **Keyboard operability** - every interactive control must be reachable and operable with Tab/Enter/Space; preserve a logical focus order; provide visible focus styles.\n- **Logical structure** - one `<h1>`, no skipped heading levels, and proper landmarks (`<nav>`, `<main>`, etc.).\n- **Color & contrast** - sufficient contrast; never use color alone to convey meaning.\n- **ARIA last** - the first rule of ARIA is *don't use ARIA if a native element will do*; **no ARIA is better than bad ARIA**.\n\nAccessibility overlaps heavily with SEO and general code quality, so it's expected knowledge for experienced roles.",
+    "codeLang": "html",
+    "tags": ["accessibility", "a11y", "aria", "keyboard"]
+  },
+  {
+    "id": "html-aria-roles-when",
+    "question": "What is ARIA and when should you use it?",
+    "short": "ARIA (Accessible Rich Internet Applications) adds roles, states, and properties to convey semantics to assistive tech when native HTML can't. Use it only to fill genuine gaps - native elements are always preferred.",
+    "answer": "**ARIA** is a set of attributes that describe the **role**, **state**, and **properties** of UI to assistive technologies, mainly for custom or dynamic widgets where native HTML falls short.\n\n**Three categories:**\n- **Roles** - what an element *is*: `role=\"tab\"`, `role=\"dialog\"`, `role=\"alert\"`.\n- **States** - dynamic conditions: `aria-expanded`, `aria-checked`, `aria-disabled`.\n- **Properties** - relationships/labels: `aria-label`, `aria-labelledby`, `aria-describedby`, `aria-controls`.\n\n**The rules of ARIA:**\n1. **Don't use ARIA if a native element/attribute provides the semantics** (use `<button>`, not `<div role=\"button\">`).\n2. **Don't change native semantics** unless you must.\n3. All interactive ARIA controls must be **keyboard usable**.\n4. **Don't use `role=\"presentation\"` or `aria-hidden=\"true\"` on focusable elements.**\n\n**Key point:** ARIA changes only *how things are announced* - it adds **no behavior**. You must wire up keyboard handling and state updates yourself. Hence: *no ARIA is better than bad ARIA.*\n\nUseful live-region attributes: `aria-live=\"polite\"`/`\"assertive\"` announce dynamic content changes (toasts, validation messages).",
+    "code": "<!-- Custom toggle: native button + ARIA state you must update in JS -->\n<button aria-expanded=\"false\" aria-controls=\"menu\">Menu</button>\n<ul id=\"menu\" hidden>...</ul>",
+    "codeLang": "html",
+    "tags": ["aria", "accessibility", "roles", "a11y"]
+  },
+  {
+    "id": "html-img-alt-text",
+    "question": "Why is the alt attribute important and how should you write it?",
+    "short": "`alt` provides a text alternative for images: read by screen readers, shown if the image fails to load, and used by search engines. Describe the image's purpose; use empty `alt=\"\"` for purely decorative images.",
+    "answer": "The **`alt`** attribute on `<img>` is the image's text alternative and is required for accessible, robust pages.\n\n**It serves three roles:**\n1. **Accessibility** - screen readers announce it; without it they may read the filename or skip the image.\n2. **Fallback** - displayed if the image fails to load.\n3. **SEO** - search engines use it to understand and index images.\n\n**How to write good alt text:**\n- Describe the **purpose/meaning** in context, not every pixel. For a logo link: `alt=\"Acme - home\"`.\n- Keep it concise; don't start with \"image of\" (the role is already known).\n- **Decorative images** that add no information should use **empty alt** (`alt=\"\"`) so screen readers skip them. Omitting `alt` entirely is *not* the same - that can cause the filename to be read.\n- For images conveying complex data (charts), provide a longer description nearby or via `aria-describedby`.",
+    "code": "<!-- Informative -->\n<img src=\"chart.png\" alt=\"Q3 revenue up 12% over Q2\">\n\n<!-- Decorative: skipped by screen readers -->\n<img src=\"divider.svg\" alt=\"\">",
+    "codeLang": "html",
+    "tags": ["accessibility", "images", "alt", "seo"]
+  },
+  {
+    "id": "html-label-form-association",
+    "question": "Why are <label> elements important and how do you associate them with inputs?",
+    "short": "A `<label>` gives a form control an accessible name and a larger click target. Associate it via `for`/`id` matching, or by wrapping the input inside the label.",
+    "answer": "A **`<label>`** ties human-readable text to a form control, which is essential for usability and accessibility.\n\n**Benefits:**\n- Screen readers announce the label when the control is focused (provides its *accessible name*).\n- Clicking/tapping the label focuses or toggles the control - a bigger hit area, important for checkboxes/radios and touch.\n\n**Two ways to associate:**\n1. **Explicit** - `<label for=\"email\">` matches `<input id=\"email\">`. Preferred; works even when not adjacent.\n2. **Implicit** - wrap the input inside the label.\n\n**Related grouping:** wrap a set of related controls (e.g. radio options) in a **`<fieldset>`** with a **`<legend>`** to give the group an accessible name. Placeholder text is *not* a substitute for a label - it disappears on input and has poor contrast/AT support.",
+    "code": "<!-- Explicit (preferred) -->\n<label for=\"email\">Email</label>\n<input id=\"email\" type=\"email\" name=\"email\">\n\n<!-- Grouped controls -->\n<fieldset>\n  <legend>Shipping speed</legend>\n  <label><input type=\"radio\" name=\"speed\" value=\"std\"> Standard</label>\n  <label><input type=\"radio\" name=\"speed\" value=\"exp\"> Express</label>\n</fieldset>",
+    "codeLang": "html",
+    "tags": ["forms", "accessibility", "label", "fieldset"]
+  },
+  {
+    "id": "html-input-types-native-validation",
+    "question": "What HTML5 input types and native validation features exist, and why use them?",
+    "short": "HTML5 added input types like email, url, number, date, tel, and color, plus validation attributes (required, pattern, min/max, type). They give appropriate keyboards, built-in validation, and accessible error messaging for free.",
+    "answer": "HTML5 expanded `<input type>` well beyond `text`, and added **native (constraint) validation** so common checks need no JavaScript.\n\n**Useful input types:** `email`, `url`, `tel`, `number`, `range`, `date`/`time`/`datetime-local`, `color`, `search`, `password`, `file`. On mobile these trigger the **appropriate on-screen keyboard** and pickers.\n\n**Validation attributes:**\n- `required` - field must be filled.\n- `type=\"email\"`/`\"url\"` - format checking.\n- `pattern=\"...\"` - regex constraint.\n- `min`, `max`, `step` - numeric/date bounds.\n- `minlength`, `maxlength` - length bounds.\n\n**Why use it:**\n- **Free, accessible** validation UI and messages, before any JS loads.\n- Style states with CSS pseudo-classes `:valid`, `:invalid`, `:required`.\n- Hook into the **Constraint Validation API** (`checkValidity()`, `setCustomValidity()`) for custom messages.\n\n**Caveat:** client-side validation is for UX only - **always re-validate on the server**, since it can be bypassed.",
+    "code": "<form>\n  <input type=\"email\" required placeholder=\"you@site.com\">\n  <input type=\"number\" min=\"1\" max=\"10\" step=\"1\" required>\n  <input type=\"text\" pattern=\"[A-Za-z]{3,}\" title=\"Letters only, 3+\">\n  <button>Submit</button>\n</form>",
+    "codeLang": "html",
+    "tags": ["forms", "validation", "input-types", "html5"]
+  },
+  {
+    "id": "html-get-vs-post-form",
+    "question": "What is the difference between GET and POST methods on a form?",
+    "short": "GET appends form data to the URL as a query string - good for idempotent, bookmarkable, non-sensitive reads. POST sends data in the request body - used for changes, large payloads, or sensitive data.",
+    "answer": "The form `method` attribute controls how submitted data is sent.\n\n**GET:**\n- Data is appended to the URL as a **query string** (`?q=...&page=2`).\n- **Bookmarkable / shareable**, cached, and shown in browser history.\n- Limited length; **never** for passwords or sensitive data (it leaks into URLs, logs, history).\n- Semantically for **safe, idempotent reads** (search, filters).\n\n**POST:**\n- Data is sent in the **request body**, not the URL.\n- No practical size limit; supports file uploads (`enctype=\"multipart/form-data\"`).\n- Not cached or bookmarked; re-submitting may prompt the user.\n- Semantically for actions that **change state** (create, update, delete) and for sensitive data.\n\n**Note:** POST is not encryption - only **HTTPS** protects data in transit. The choice is about semantics and where data travels, not security by itself.",
+    "code": "<form action=\"/search\" method=\"get\">...</form>   <!-- read -->\n<form action=\"/users\" method=\"post\">...</form>   <!-- create -->",
+    "codeLang": "html",
+    "tags": ["forms", "http", "get", "post"]
+  },
+  {
+    "id": "html-responsive-images-srcset-picture",
+    "question": "How do srcset/sizes and the <picture> element enable responsive images?",
+    "short": "`srcset`+`sizes` let the browser pick the best-resolution image for the viewport/DPR (resolution switching). `<picture>` with `<source media>` lets you swap entirely different images or formats (art direction).",
+    "answer": "Two complementary mechanisms serve the right image to each device, saving bandwidth and improving performance.\n\n**1. `srcset` + `sizes` (resolution switching)** - same image, different sizes; the **browser chooses**.\n- `srcset` lists candidate files with width descriptors (`480w`, `800w`).\n- `sizes` tells the browser how wide the image will *render* at various breakpoints, so it can pick the smallest sufficient file (also accounts for device pixel ratio).\n\n**2. `<picture>` + `<source>` (art direction & format negotiation)** - *you* control which image is used.\n- Use `media` queries to serve a cropped/different image at different breakpoints.\n- Use `type` to offer modern formats (AVIF/WebP) with a fallback `<img>` for older browsers.\n- The `<img>` inside `<picture>` is required - it's the fallback and carries `alt`.\n\n**Key distinction:** `srcset`/`sizes` = browser optimizes the *same* image; `<picture>` = developer dictates *different* images/formats.",
+    "code": "<!-- Resolution switching -->\n<img src=\"m.jpg\"\n     srcset=\"s.jpg 480w, m.jpg 800w, l.jpg 1200w\"\n     sizes=\"(max-width: 600px) 100vw, 50vw\"\n     alt=\"...\">\n\n<!-- Art direction + modern format -->\n<picture>\n  <source type=\"image/avif\" srcset=\"hero.avif\">\n  <source media=\"(max-width: 600px)\" srcset=\"hero-mobile.jpg\">\n  <img src=\"hero.jpg\" alt=\"...\">\n</picture>",
+    "codeLang": "html",
+    "tags": ["images", "responsive", "srcset", "picture", "performance"]
+  },
+  {
+    "id": "html-lazy-loading",
+    "question": "What is lazy loading and how do you enable it natively?",
+    "short": "Lazy loading defers loading off-screen images/iframes until the user scrolls near them, improving initial load and saving bandwidth. Enable it natively with `loading=\"lazy\"`.",
+    "answer": "**Lazy loading** delays fetching resources that aren't yet visible, so the browser prioritizes above-the-fold content - improving **initial load time, LCP, and data usage**.\n\n**Native support** via the `loading` attribute on `<img>` and `<iframe>`:\n- `loading=\"lazy\"` - defer until the element nears the viewport.\n- `loading=\"eager\"` - load immediately (the default).\n\n**Best practices:**\n- **Do NOT lazy-load above-the-fold / LCP images** (e.g. the hero) - it delays the most important paint. Mark those `loading=\"eager\"` and consider `fetchpriority=\"high\"`.\n- Always set explicit `width`/`height` (or `aspect-ratio`) to reserve space and avoid **layout shift (CLS)**.\n- For finer control or older browsers, use the **Intersection Observer API** in JS.\n\nNative lazy loading is the simplest approach and is broadly supported in modern browsers.",
+    "code": "<!-- Below-the-fold image -->\n<img src=\"photo.jpg\" alt=\"...\" width=\"800\" height=\"600\" loading=\"lazy\">\n\n<!-- Hero / LCP image: load eagerly with high priority -->\n<img src=\"hero.jpg\" alt=\"...\" loading=\"eager\" fetchpriority=\"high\">",
+    "codeLang": "html",
+    "tags": ["performance", "images", "lazy-loading", "core-web-vitals"]
+  },
+  {
+    "id": "html-iframe-sandbox",
+    "question": "What is an <iframe> and how does the sandbox attribute secure it?",
+    "short": "An `<iframe>` embeds another HTML document inside the current page. The `sandbox` attribute restricts the embedded content (scripts, forms, popups, same-origin access), re-granting capabilities only via explicit tokens.",
+    "answer": "An **`<iframe>`** embeds an independent browsing context (another document) within the page - used for third-party widgets, maps, videos, payment forms, etc.\n\n**Risks:** embedded content can run scripts, submit forms, trigger navigation, or open popups. The **`sandbox`** attribute applies a strict default-deny policy.\n\n- **`sandbox` with no value** - maximum restriction: no scripts, no forms, no popups, treated as a unique opaque origin (no same-origin access), no top-level navigation.\n- **Re-enable selectively** with space-separated tokens:\n  - `allow-scripts` - permit JavaScript.\n  - `allow-forms` - permit form submission.\n  - `allow-same-origin` - keep its real origin.\n  - `allow-popups`, `allow-top-navigation`, etc.\n\n**Caution:** combining `allow-scripts` **and** `allow-same-origin` lets the frame remove its own sandboxing, so avoid that pairing for untrusted content.\n\n**Related security attributes:** `referrerpolicy`, `loading=\"lazy\"`, and `allow` (Permissions Policy) for features like camera/fullscreen. Server-side, `X-Frame-Options`/`frame-ancestors` (CSP) control whether *your* page can be framed by others (clickjacking defense).",
+    "code": "<iframe src=\"https://widget.example.com\"\n        sandbox=\"allow-scripts allow-forms\"\n        loading=\"lazy\"\n        title=\"Embedded widget\"></iframe>",
+    "codeLang": "html",
+    "tags": ["iframe", "security", "sandbox", "embedding"]
+  },
+  {
+    "id": "html-canvas-vs-svg",
+    "question": "What is the difference between <canvas> and SVG?",
+    "short": "Canvas is a raster, pixel-based bitmap drawn imperatively via JS (no DOM for shapes) - great for many objects and pixel manipulation. SVG is vector, resolution-independent, and DOM-based - great for scalable, interactive, accessible graphics.",
+    "answer": "Both render graphics in the browser but differ fundamentally.\n\n**`<canvas>` (raster / immediate mode):**\n- A pixel bitmap you draw onto with the **2D/WebGL JavaScript API**.\n- Shapes are **not** in the DOM - once drawn, they're just pixels (no per-shape events, must redraw to change).\n- **Resolution-dependent** - scaling up blurs/pixelates.\n- Best for: games, charts with thousands of points, image/video processing, real-time pixel work.\n\n**SVG (vector / retained mode):**\n- XML markup; each shape is a **DOM element** you can style with CSS and attach event listeners to.\n- **Resolution-independent** - scales crisply at any size/DPI.\n- **Accessible** (can include `<title>`/`<desc>`, ARIA) and easily animated/styled.\n- Best for: icons, logos, diagrams, interactive charts, anything that must scale or be styled.\n\n**Rule of thumb:** few, interactive, scalable elements -> **SVG**; many objects or pixel-level/high-frequency rendering -> **canvas** (DOM overhead would make SVG slow).",
+    "code": "<!-- SVG: vector, in the DOM, styleable -->\n<svg viewBox=\"0 0 100 100\" role=\"img\" aria-label=\"Circle\">\n  <circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"tomato\"/>\n</svg>\n\n<!-- Canvas: pixels drawn via JS -->\n<canvas id=\"c\" width=\"100\" height=\"100\"></canvas>\n<script>\n  const ctx = document.getElementById('c').getContext('2d');\n  ctx.fillStyle = 'tomato';\n  ctx.beginPath(); ctx.arc(50, 50, 40, 0, Math.PI*2); ctx.fill();\n</script>",
+    "codeLang": "html",
+    "tags": ["canvas", "svg", "graphics", "performance"]
+  },
+  {
+    "id": "html-what-is-the-dom",
+    "question": "What is the DOM and how does it relate to HTML?",
+    "short": "The DOM (Document Object Model) is the browser's live, in-memory tree representation of a parsed HTML document. HTML is the static source text; the DOM is the dynamic object model that JS reads and mutates.",
+    "answer": "The **DOM (Document Object Model)** is a **language-neutral, tree-structured object representation** of a document that the browser builds while parsing the HTML. Each element, attribute, and text node becomes an object (a node) that scripts can query and manipulate.\n\n**HTML vs DOM:**\n- **HTML** is the *static source* - the markup you write/send.\n- The browser *parses* it into the **DOM tree** - a live structure in memory.\n- They can diverge: the browser **fixes invalid markup**, injects implied elements (e.g. `<tbody>`), and JS can add/remove/modify nodes after load. So \"View Source\" (original HTML) can differ from \"Inspect\" (current DOM).\n\n**Why it matters:**\n- JS uses DOM APIs (`getElementById`, `querySelector`, `createElement`, `addEventListener`) to read and change the page dynamically.\n- DOM manipulation can be expensive; reflows/repaints are why frameworks (React's virtual DOM, etc.) batch updates.\n- The **CSSOM** (styles) combines with the DOM into the **render tree** the browser paints.",
+    "code": "// HTML source: <p id=\"x\">Hi</p>\nconst p = document.getElementById('x'); // a DOM node\np.textContent = 'Updated';               // mutates the live DOM\ndocument.body.appendChild(document.createElement('div'));",
+    "codeLang": "js",
+    "tags": ["dom", "javascript", "rendering", "parsing"]
+  },
+  {
+    "id": "html-head-vs-body",
+    "question": "What belongs in <head> versus <body>?",
+    "short": "`<head>` holds metadata not rendered in the page - title, charset, viewport, links to CSS, scripts, SEO/social tags. `<body>` holds the visible, rendered content the user sees and interacts with.",
+    "answer": "Every HTML document splits into two top-level sections inside `<html>`:\n\n**`<head>` - metadata and resources (not rendered as content):**\n- `<title>` - tab/bookmark/SEO title.\n- `<meta>` - charset, viewport, description, robots, Open Graph.\n- `<link>` - stylesheets, `canonical`, `preconnect`/`preload`, favicons.\n- `<script>` - though often deferred or placed at the end of `<body>`.\n- `<style>` - inline CSS.\n\n**`<body>` - the visible document:**\n- All structural/semantic content: headings, text, images, forms, links, etc.\n\n**Why the split matters:**\n- `<meta charset>` must appear early in `<head>` so the browser decodes text correctly.\n- Render-blocking CSS in `<head>` avoids a flash of unstyled content; scripts are commonly deferred so they don't block parsing.\n- Resource hints (`preconnect`, `preload`, `dns-prefetch`) in `<head>` improve load performance.",
+    "code": "<html lang=\"en\">\n  <head>\n    <meta charset=\"utf-8\">\n    <title>Page</title>\n    <link rel=\"stylesheet\" href=\"styles.css\">\n  </head>\n  <body>\n    <h1>Visible content</h1>\n  </body>\n</html>",
+    "codeLang": "html",
+    "tags": ["structure", "head", "body", "metadata"]
+  }
+]

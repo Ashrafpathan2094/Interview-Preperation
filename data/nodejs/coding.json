@@ -9,7 +9,8 @@
       "fs",
       "async-await",
       "error-handling"
-    ]
+    ],
+    "short": "Use `fs/promises` with `async/await` in a `try/catch`; treat `ENOENT` as an empty/default config and re-throw any other error."
   },
   {
     "id": "nodejs-http-server",
@@ -20,7 +21,8 @@
     "tags": [
       "http",
       "server"
-    ]
+    ],
+    "short": "Use the core `http` module: check `req.method`/`req.url`, set `Content-Type`, and `res.end()` the JSON for GET /health, returning 404 otherwise."
   },
   {
     "id": "nodejs-promisify",
@@ -32,7 +34,8 @@
       "promises",
       "callbacks",
       "util"
-    ]
+    ],
+    "short": "Return a wrapper that produces a `new Promise`, invoking the original with the args plus an `(err, result)` callback that rejects on error else resolves; preserve `this` via `fn.call`."
   },
   {
     "id": "nodejs-read-large-file-lines",
@@ -44,7 +47,8 @@
       "streams",
       "readline",
       "memory"
-    ]
+    ],
+    "short": "Stream it: pipe a read stream into `readline` and iterate with `for await...of` so memory stays flat. Use `crlfDelay: Infinity` for Windows line endings."
   },
   {
     "id": "nodejs-event-loop-output",
@@ -56,7 +60,8 @@
       "event-loop",
       "microtasks",
       "output"
-    ]
+    ],
+    "short": "Prints 1, 6 (sync), then 5 (`nextTick`) before 4 (Promise microtask), then 2 and 3 (timer/immediate, order not guaranteed). Priority: nextTick > microtasks > timers/immediate."
   },
   {
     "id": "nodejs-concurrency-limit",
@@ -67,7 +72,8 @@
     "tags": [
       "promises",
       "concurrency"
-    ]
+    ],
+    "short": "Instead of `Promise.all` firing all at once, spawn N worker loops that pull from a shared index until done, capping in-flight tasks while keeping the pipeline full."
   },
   {
     "id": "nodejs-retry-backoff",
@@ -79,7 +85,8 @@
       "async",
       "resilience",
       "retry"
-    ]
+    ],
+    "short": "Loop up to `retries` times; on failure wait `base * 2**attempt` ms before retrying, re-throwing once exhausted. Exponential backoff avoids hammering a struggling dependency."
   },
   {
     "id": "nodejs-transform-stream-pipeline",
@@ -91,7 +98,8 @@
       "streams",
       "transform",
       "pipeline"
-    ]
+    ],
+    "short": "A `Transform` stream maps each chunk and pushes the result; use `stream.pipeline()` over `.pipe()` because it propagates errors and cleans up all streams on failure."
   },
   {
     "id": "nodejs-graceful-shutdown",
@@ -103,7 +111,8 @@
       "process",
       "signals",
       "shutdown"
-    ]
+    ],
+    "short": "On SIGTERM/SIGINT call `server.close()` to stop new connections and let in-flight requests finish, then exit; add an `unref()`'d timeout as a hard backstop against stuck connections."
   },
   {
     "id": "nodejs-custom-event-emitter",
@@ -115,7 +124,8 @@
       "events",
       "EventEmitter",
       "oop"
-    ]
+    ],
+    "short": "Extend `EventEmitter` and `this.emit(name, payload)`; consumers use `.on()` (repeatable) or `.once()` (auto-removed). Emit via `setImmediate` so listeners can attach first."
   },
   {
     "id": "nodejs-middleware-pipeline",
@@ -127,7 +137,8 @@
       "middleware",
       "design",
       "express-internals"
-    ]
+    ],
+    "short": "Keep an array of `(req, res, next)` functions where `next(err)` advances the chain and an error short-circuits it — the core pattern behind Express/Koa pipelines."
   },
   {
     "id": "nodejs-memoize-async-inflight",
@@ -139,7 +150,8 @@
       "caching",
       "promises",
       "performance"
-    ]
+    ],
+    "short": "Cache the promise (not the resolved value) so concurrent callers for a key await the same in-flight call; add a TTL and delete on rejection so failures aren't cached."
   },
   {
     "id": "nodejs-worker-thread-cpu",
@@ -151,7 +163,8 @@
       "worker_threads",
       "cpu",
       "performance"
-    ]
+    ],
+    "short": "Move CPU-bound work off the blocking main thread into a `Worker`, passing input via `workerData` and results via `postMessage`; wrap it in a Promise for easy `await`."
   },
   {
     "id": "nodejs-parse-json-body",
@@ -163,7 +176,8 @@
       "http",
       "streams",
       "parsing"
-    ]
+    ],
+    "short": "Treat the request as a readable stream: accumulate `data` chunks, guard against oversized payloads, then `JSON.parse` on `end`; reject on parse failure or stream error."
   },
   {
     "id": "nodejs-global-error-handlers",
@@ -175,7 +189,8 @@
       "process",
       "error-handling",
       "reliability"
-    ]
+    ],
+    "short": "Register `unhandledRejection` and `uncaughtException` handlers. After an uncaughtException the process state is undefined, so log, do minimal cleanup, then exit and let a supervisor restart it."
   },
   {
     "id": "nodejs-parallel-vs-sequential",
@@ -187,6 +202,7 @@
       "async-await",
       "Promise.all",
       "performance"
-    ]
+    ],
+    "short": "`await` inside a loop serializes calls; instead start them all (e.g. via `.map`) and await with `Promise.all` — or `Promise.allSettled` if one failure shouldn't reject the batch."
   }
 ]

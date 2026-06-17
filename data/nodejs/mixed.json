@@ -5,7 +5,15 @@
     "answer": "Node's event loop (driven by **libuv**) runs in repeating phases, each with its own callback queue:\n\n1. **timers** – `setTimeout` / `setInterval` callbacks whose threshold elapsed.\n2. **pending callbacks** – some deferred system/TCP error callbacks.\n3. **idle, prepare** – internal only.\n4. **poll** – retrieves new I/O events and runs their callbacks (this is where most I/O lands).\n5. **check** – `setImmediate` callbacks.\n6. **close callbacks** – e.g. `socket.on('close')`.\n\nThe critical detail interviewers probe is the **microtask vs macrotask** ordering. Between *each* phase (and after the main script), Node drains two microtask queues in this priority: **`process.nextTick` queue first, then the Promise/`queueMicrotask` queue**. Only then does it move to the next macrotask.\n\nSo for the synchronous script below: sync logs run first; then all `nextTick` callbacks; then all resolved-Promise callbacks; then macrotasks. `setTimeout(0)` vs `setImmediate` ordering from the *main module* is **non-deterministic** (depends on event-loop start latency), but inside an I/O callback `setImmediate` always wins because you are already past the poll phase entering **check**.",
     "code": "console.log('1: sync start');\n\nsetTimeout(() => console.log('5: setTimeout'), 0);\nsetImmediate(() => console.log('6: setImmediate'));\n\nPromise.resolve().then(() => console.log('4: promise microtask'));\nprocess.nextTick(() => console.log('3: nextTick'));\n\nconsole.log('2: sync end');\n\n// Deterministic output:\n// 1: sync start\n// 2: sync end\n// 3: nextTick           (nextTick queue drains before promises)\n// 4: promise microtask  (then the promise microtask queue)\n// 5/6: setTimeout vs setImmediate order is NOT guaranteed from main module",
     "codeLang": "js",
-    "tags": ["event-loop", "libuv", "nextTick", "microtasks", "setImmediate", "timers"]
+    "tags": [
+      "event-loop",
+      "libuv",
+      "nextTick",
+      "microtasks",
+      "setImmediate",
+      "timers"
+    ],
+    "short": "The libuv event loop cycles through timers, pending, poll, check, and close phases; between phases it drains microtasks with `process.nextTick` first, then Promises, before any macrotask. `setTimeout(0)` vs `setImmediate` order is non-deterministic from the main module."
   },
   {
     "id": "nodejs-callback-hell-to-async-await",
@@ -13,7 +21,14 @@
     "answer": "**Callbacks** were Node's original async model (error-first: `(err, data) => {}`). Nesting them produces **callback hell**: rightward drift, duplicated error handling, and no composability.\n\n**Promises** flatten the nesting into a chain and unify error propagation through a single `.catch`. They are composable (`Promise.all`, `race`, `allSettled`).\n\n**async/await** is syntactic sugar over Promises that lets asynchronous code read top-to-bottom and use ordinary `try/catch`, so the control flow matches synchronous code. The key gotcha: an async function always returns a Promise, and an *unhandled* rejection inside it propagates to the caller – you must `await` it under a `try/catch` (or attach `.catch`).\n\nBelow, three dependent steps that were deeply nested callbacks become a linear async function with one `try/catch`. `util.promisify` adapts an error-first API into a Promise.",
     "code": "const fs = require('fs');\nconst { promisify } = require('util');\nconst readFile = promisify(fs.readFile);\n\n// BEFORE (callback hell):\n// fs.readFile('a.json', (e, a) => {\n//   if (e) return done(e);\n//   fs.readFile('b.json', (e2, b) => {\n//     if (e2) return done(e2);\n//     fs.writeFile('out.json', a + b, (e3) => done(e3));\n//   });\n// });\n\n// AFTER: linear, single error path.\nasync function merge() {\n  try {\n    const [a, b] = await Promise.all([\n      readFile('a.json', 'utf8'),\n      readFile('b.json', 'utf8'),\n    ]);\n    await promisify(fs.writeFile)('out.json', a + b);\n    return 'done';\n  } catch (err) {\n    // One place catches errors from any step.\n    throw new Error(`merge failed: ${err.message}`);\n  }\n}\n\nmerge().then(console.log).catch((e) => console.error(e.message));",
     "codeLang": "js",
-    "tags": ["async-await", "promises", "callbacks", "promisify", "error-handling"]
+    "tags": [
+      "async-await",
+      "promises",
+      "callbacks",
+      "promisify",
+      "error-handling"
+    ],
+    "short": "Callbacks caused nesting/duplicated error handling; Promises flatten chains with unified `.catch`; async/await reads top-to-bottom with ordinary `try/catch`. Use `util.promisify` to adapt error-first APIs and a single try/catch for one error path."
   },
   {
     "id": "nodejs-streams-backpressure-pipeline",
@@ -21,7 +36,14 @@
     "answer": "**Streams** process data in chunks instead of loading everything into memory, which is essential for large files, HTTP bodies, and any sized-unknown source. The four types are **Readable, Writable, Duplex, Transform**.\n\n**Backpressure** is the mechanism that keeps a fast producer from overwhelming a slow consumer. When you write to a Writable and its internal buffer exceeds `highWaterMark`, `write()` returns `false`; a well-behaved producer then pauses until the `'drain'` event. `.pipe()` and `pipeline()` wire this up automatically – if you instead read everything into a string/Buffer you lose backpressure and can blow up memory (and crash with an OOM on a big file).\n\nPrefer **`stream.pipeline`** over `readable.pipe(writable)` because `pipe` does **not** forward errors or clean up the source stream on failure (leaking file descriptors). `pipeline` propagates errors to a single callback (or Promise) and destroys every stream in the chain on error, preventing leaks.",
     "code": "const fs = require('fs');\nconst zlib = require('zlib');\nconst { pipeline } = require('stream/promises');\n\nasync function gzipFile(src, dest) {\n  // Each chunk flows src -> gzip -> dest with automatic backpressure.\n  // pipeline destroys all streams and rejects on ANY error in the chain.\n  await pipeline(\n    fs.createReadStream(src),\n    zlib.createGzip(),\n    fs.createWriteStream(dest)\n  );\n  console.log('compressed without buffering the whole file');\n}\n\ngzipFile('big.log', 'big.log.gz').catch((err) =>\n  console.error('stream failed:', err.message)\n);",
     "codeLang": "js",
-    "tags": ["streams", "backpressure", "pipeline", "highWaterMark", "memory"]
+    "tags": [
+      "streams",
+      "backpressure",
+      "pipeline",
+      "highWaterMark",
+      "memory"
+    ],
+    "short": "Streams process data in chunks to stay memory-safe; backpressure pauses a fast producer when a writable's buffer exceeds `highWaterMark`. Prefer `stream.pipeline` over `.pipe()` because it forwards errors and destroys all streams on failure, avoiding leaks."
   },
   {
     "id": "nodejs-transform-stream-implementation",
@@ -29,7 +51,14 @@
     "answer": "Build a **Transform stream** when you need to process a potentially large or unbounded data flow incrementally – parsing CSV, encrypting/compressing, redacting logs – without holding the entire payload in memory. Buffering (collect all, then transform) is simpler but only safe for small, bounded inputs.\n\nA Transform is a Duplex where each input chunk is mapped to output via `_transform(chunk, encoding, callback)`. You **must** call the `callback` (or `push` then `callback`) exactly once per chunk; that callback signaling is what propagates backpressure back upstream. Use `_flush` to emit any trailing buffered remainder when the input ends.\n\nThe subtle part below: chunk boundaries don't align with line boundaries, so we keep a `leftover` buffer and only emit complete lines, flushing the tail in `_flush`.",
     "code": "const { Transform } = require('stream');\n\nclass UppercaseLines extends Transform {\n  constructor(opts) {\n    super(opts);\n    this.leftover = '';\n  }\n\n  _transform(chunk, _enc, callback) {\n    const data = this.leftover + chunk.toString();\n    const lines = data.split('\\n');\n    this.leftover = lines.pop(); // last item may be a partial line\n    for (const line of lines) this.push(line.toUpperCase() + '\\n');\n    callback(); // signals readiness for the next chunk (backpressure)\n  }\n\n  _flush(callback) {\n    if (this.leftover) this.push(this.leftover.toUpperCase());\n    callback();\n  }\n}\n\nprocess.stdin.pipe(new UppercaseLines()).pipe(process.stdout);",
     "codeLang": "js",
-    "tags": ["streams", "transform", "backpressure", "_flush", "buffering"]
+    "tags": [
+      "streams",
+      "transform",
+      "backpressure",
+      "_flush",
+      "buffering"
+    ],
+    "short": "Use a custom Transform for incremental processing of large/unbounded data; buffering is only safe for small inputs. Implement `_transform` (call callback once per chunk for backpressure) and `_flush` for trailing data, keeping a leftover buffer for split lines."
   },
   {
     "id": "nodejs-eventemitter-custom-memory-leak",
@@ -37,7 +66,14 @@
     "answer": "**EventEmitter** is Node's core implementation of the observer pattern: objects emit named events and any number of listeners react. `on`/`addListener` registers, `emit` fires synchronously in registration order, `once` auto-removes after the first call, and `removeListener`/`off` detaches.\n\nThe **`MaxListenersExceededWarning`** fires when more than **10** (default) listeners are added for a single event on one emitter. It is not a hard limit – it's a leak detector. The usual cause is adding a listener inside a frequently-called function (e.g. per request) without ever removing it, so listeners accumulate forever.\n\nFixes: remove listeners when done (`off`), use `once` for one-shot handlers, register listeners once outside the hot path, or deliberately raise the cap with `emitter.setMaxListeners(n)` when many listeners are legitimately expected. Note `emit` is **synchronous**, and an `'error'` event with no listener will **throw** and crash the process – always attach an `error` handler.",
     "code": "const { EventEmitter } = require('events');\n\nclass Bus extends EventEmitter {}\nconst bus = new Bus();\nbus.on('error', (e) => console.error('bus error:', e.message)); // avoid crash\n\n// BUG: adds a NEW listener on every call -> MaxListenersExceededWarning + leak\nfunction handleRequestBad() {\n  bus.on('data', (d) => console.log(d));\n}\n\n// FIX: one-shot listener that detaches itself, no accumulation.\nfunction handleRequestGood() {\n  bus.once('data', (d) => console.log(d));\n}\n\n// Or register once, outside the hot path, and reuse it.\nhandleRequestGood();\nbus.emit('data', 'hello'); // synchronous dispatch",
     "codeLang": "js",
-    "tags": ["EventEmitter", "events", "memory-leak", "observer", "once"]
+    "tags": [
+      "EventEmitter",
+      "events",
+      "memory-leak",
+      "observer",
+      "once"
+    ],
+    "short": "EventEmitter is Node's observer pattern; `emit` fires listeners synchronously. The `MaxListenersExceededWarning` (default 10) is a leak detector, usually from adding listeners in a hot path without removing them. Fix with `off`, `once`, or registering once."
   },
   {
     "id": "nodejs-cluster-vs-worker-threads",
@@ -45,7 +81,14 @@
     "answer": "A single Node process runs JS on one thread, so a CPU-heavy task blocks the event loop and stalls every request. Two tools scale across cores:\n\n- **`cluster`** forks **multiple processes** (each with its own V8 heap and event loop) that share a listening socket; the OS/round-robin load-balances connections. Best for scaling an **I/O-bound HTTP server** horizontally on one machine. No shared memory – communicate via IPC messages.\n- **`worker_threads`** runs JS on **multiple threads inside one process**, with optional **shared memory** via `SharedArrayBuffer` and message passing via `MessagePort`. Best for **CPU-bound work** (hashing, image processing, parsing) you want to offload without leaving the process or paying full-process overhead.\n\nRule of thumb: scale the *server* with **cluster** (or a process manager like PM2); offload a *computation* with **worker_threads**. Below, a CPU-bound Fibonacci is moved to a worker so the main event loop stays responsive.",
     "code": "// main.js\nconst { Worker } = require('worker_threads');\n\nfunction runHeavy(n) {\n  return new Promise((resolve, reject) => {\n    const worker = new Worker(__filename, { workerData: n });\n    worker.once('message', resolve);\n    worker.once('error', reject);\n    worker.once('exit', (code) => {\n      if (code !== 0) reject(new Error(`worker exited ${code}`));\n    });\n  });\n}\n\n// worker side\nconst { parentPort, workerData, isMainThread } = require('worker_threads');\nif (!isMainThread) {\n  const fib = (n) => (n < 2 ? n : fib(n - 1) + fib(n - 2));\n  parentPort.postMessage(fib(workerData)); // runs off the main event loop\n}\n\nif (isMainThread) {\n  runHeavy(40).then((r) => console.log('result:', r));\n  console.log('main thread stays responsive');\n}",
     "codeLang": "js",
-    "tags": ["worker_threads", "cluster", "cpu-bound", "concurrency", "scaling"]
+    "tags": [
+      "worker_threads",
+      "cluster",
+      "cpu-bound",
+      "concurrency",
+      "scaling"
+    ],
+    "short": "`cluster` forks separate processes sharing a socket, ideal for scaling I/O-bound servers; `worker_threads` runs threads in one process with shared memory, ideal for CPU-bound work. Offload computation to a worker so the main event loop stays responsive."
   },
   {
     "id": "nodejs-cluster-http-server",
@@ -53,7 +96,14 @@
     "answer": "With **cluster**, the primary process forks one worker per CPU core. On most platforms Node uses **round-robin** distribution: the primary accepts connections and hands them to workers (on Windows the default is the OS deciding). Each worker is a **separate process** with its own memory – so you **cannot** share in-memory state (sessions, caches, rate-limit counters, WebSocket connection maps) directly between workers. Move that shared state to an external store like **Redis**, or use sticky sessions for stateful protocols.\n\nResilience matters in interviews: listen for the `'exit'` event on the primary and **fork a replacement** so a crashed worker doesn't permanently reduce capacity. In production you'd typically let **PM2** or a container orchestrator handle this, but you should be able to write it by hand.",
     "code": "const cluster = require('cluster');\nconst http = require('http');\nconst os = require('os');\n\nif (cluster.isPrimary) {\n  const cpus = os.availableParallelism?.() ?? os.cpus().length;\n  for (let i = 0; i < cpus; i++) cluster.fork();\n\n  // Self-heal: replace any worker that dies.\n  cluster.on('exit', (worker, code) => {\n    console.log(`worker ${worker.process.pid} died (${code}); restarting`);\n    cluster.fork();\n  });\n} else {\n  http\n    .createServer((req, res) => {\n      res.end(`handled by worker ${process.pid}\\n`);\n    })\n    .listen(3000);\n}",
     "codeLang": "js",
-    "tags": ["cluster", "http", "scaling", "fault-tolerance", "load-balancing"]
+    "tags": [
+      "cluster",
+      "http",
+      "scaling",
+      "fault-tolerance",
+      "load-balancing"
+    ],
+    "short": "The cluster primary forks one worker per core and round-robins connections; workers are separate processes that can't share in-memory state (use Redis instead). Listen for the `exit` event and fork a replacement so crashes don't reduce capacity."
   },
   {
     "id": "nodejs-commonjs-vs-esm-interop",
@@ -61,7 +111,15 @@
     "answer": "**CommonJS (CJS)** uses `require`/`module.exports`, loads modules **synchronously**, resolves `require` calls at runtime, and gives you `__dirname`, `__filename`, and a module-scoped `this === module.exports`. **ES Modules (ESM)** use `import`/`export`, are loaded **asynchronously** and statically analyzed (imports are hoisted and live-bound), run in strict mode, allow **top-level await**, and have `this === undefined` at module scope.\n\nYou opt into ESM via `\"type\": \"module\"` in `package.json` or the `.mjs` extension (`.cjs` forces CJS). Interop rules that trip people up:\n\n- ESM can `import` a CJS module; its `module.exports` becomes the **default** export.\n- CJS **cannot** `require()` an ESM module synchronously (older Node) – use dynamic `await import()` instead.\n- `__dirname`/`__filename` don't exist in ESM; reconstruct them from `import.meta.url`.",
     "code": "// ESM (file.mjs or \"type\": \"module\")\nimport { fileURLToPath } from 'node:url';\nimport { dirname } from 'node:path';\n\n// Recreate CommonJS __dirname / __filename in ESM:\nconst __filename = fileURLToPath(import.meta.url);\nconst __dirname = dirname(__filename);\n\n// Import a CommonJS module: its module.exports is the default import.\nimport cjsDefault from './legacy.cjs';\n\n// Load an ESM module from CommonJS code (dynamic import returns a Promise):\n// const { thing } = await import('./esm-only.mjs');\n\nconsole.log(__dirname, cjsDefault);",
     "codeLang": "js",
-    "tags": ["esm", "commonjs", "modules", "import", "interop", "import.meta"]
+    "tags": [
+      "esm",
+      "commonjs",
+      "modules",
+      "import",
+      "interop",
+      "import.meta"
+    ],
+    "short": "CJS uses synchronous `require` with `__dirname` and module-scoped `this`; ESM uses static async `import`/`export` with top-level await and `this === undefined`. ESM can import CJS (as default); CJS uses dynamic `import()`; rebuild `__dirname` from `import.meta.url`."
   },
   {
     "id": "nodejs-uncaught-unhandledrejection-handling",
@@ -69,7 +127,14 @@
     "answer": "Node has distinct error channels:\n\n- **Synchronous throws** – caught by `try/catch`.\n- **Async errors in callbacks** – surfaced via error-first arguments or `'error'` events.\n- **Rejected Promises** – caught by `.catch` / `try/catch` around `await`.\n\nTwo process-level events are the last line of defense: **`uncaughtException`** (a synchronous error bubbled all the way up) and **`unhandledRejection`** (a Promise rejection with no handler). The crucial point: after an `uncaughtException` the application is in an **undefined, possibly corrupted state** – you should **log, flush, and exit** (`process.exit(1)`), then let a supervisor (PM2/systemd/k8s) restart a clean process. Swallowing it and continuing risks leaked resources and inconsistent state. As of recent Node, an unhandled rejection terminates the process by default; the handler is for logging before that happens. The real fix is always to handle errors at the source.",
     "code": "process.on('uncaughtException', (err, origin) => {\n  console.error('uncaughtException:', err, 'origin:', origin);\n  // Do minimal, synchronous cleanup, then exit -- do NOT resume.\n  process.exit(1);\n});\n\nprocess.on('unhandledRejection', (reason) => {\n  console.error('unhandledRejection:', reason);\n  process.exit(1);\n});\n\n// Preferred: handle at the source so the safety net never fires.\nasync function fetchUser(id) {\n  try {\n    return await db.getUser(id);\n  } catch (err) {\n    throw new Error(`fetchUser(${id}) failed: ${err.message}`);\n  }\n}",
     "codeLang": "js",
-    "tags": ["error-handling", "uncaughtException", "unhandledRejection", "process", "resilience"]
+    "tags": [
+      "error-handling",
+      "uncaughtException",
+      "unhandledRejection",
+      "process",
+      "resilience"
+    ],
+    "short": "Sync errors use try/catch, callbacks use error-first args, Promises use `.catch`. Treat `uncaughtException` as corrupted state: log, flush, then `process.exit(1)` and let a supervisor restart; never resume. The real fix is handling errors at the source."
   },
   {
     "id": "nodejs-buffer-string-encoding",
@@ -77,7 +142,14 @@
     "answer": "A **Buffer** is a fixed-length chunk of raw binary memory **outside** the V8 heap, used for binary data: file contents, network packets, crypto, image bytes. Strings are for text and force an encoding; Buffers let you work with the actual bytes.\n\nAllocation safety is a classic interview point: use **`Buffer.alloc(n)`** (zero-filled, safe) for new buffers. Avoid the deprecated `new Buffer(n)` and be careful with **`Buffer.allocUnsafe(n)`**, which is faster but returns **uninitialized memory** that may contain old data – only use it when you immediately overwrite every byte.\n\nA subtle bug: a multi-byte UTF-8 character (emoji, accented letter) can be **split across two stream chunks**. Calling `chunk.toString('utf8')` per chunk then corrupts it. Use **`string_decoder.StringDecoder`**, which buffers the incomplete trailing bytes until the rest arrives.",
     "code": "const { StringDecoder } = require('string_decoder');\n\nconst safe = Buffer.alloc(8);          // zero-filled, safe\nsafe.write('hi');\nconsole.log(safe.toString('utf8').replace(/\\0+$/, '')); // 'hi'\n\n// Multi-byte char ('€' = 3 bytes) split across two chunks:\nconst decoder = new StringDecoder('utf8');\nconst euro = Buffer.from('€', 'utf8');\nlet out = '';\nout += decoder.write(euro.subarray(0, 2)); // '' -> holds incomplete bytes\nout += decoder.write(euro.subarray(2));    // '€' -> completes the character\nout += decoder.end();\nconsole.log(out); // '€' (not garbled)",
     "codeLang": "js",
-    "tags": ["buffer", "encoding", "string_decoder", "binary", "alloc"]
+    "tags": [
+      "buffer",
+      "encoding",
+      "string_decoder",
+      "binary",
+      "alloc"
+    ],
+    "short": "A Buffer is fixed-length raw binary memory outside the V8 heap for binary data. Use safe zero-filled `Buffer.alloc(n)`, avoid uninitialized `allocUnsafe` unless overwriting. Use `StringDecoder` so multi-byte UTF-8 chars split across chunks aren't corrupted."
   },
   {
     "id": "nodejs-child-process-spawn-vs-exec",
@@ -85,7 +157,14 @@
     "answer": "`child_process` offers four ways to run external work:\n\n- **`spawn`** – launches a process and **streams** stdout/stderr; no shell by default; best for large or long-lived output. Arguments are passed as an array, so there's **no shell interpolation** and no injection risk.\n- **`exec`** – runs a command **through a shell** and **buffers** all output into memory (with `maxBuffer` limit). Convenient but dangerous: interpolating user input into the command string enables **shell injection**. Avoid for untrusted input.\n- **`execFile`** – like `exec` but runs a binary directly **without a shell**, taking args as an array – safer than `exec`.\n- **`fork`** – specialized `spawn` for a new **Node.js** process with a built-in **IPC channel** (`child.send` / `'message'`), used for worker processes.\n\nRule: prefer **`spawn`/`execFile`** with an args array over `exec` whenever input is dynamic, so values are never parsed by a shell.",
     "code": "const { spawn } = require('child_process');\n\nfunction listDir(path) {\n  // Args as an array => no shell, so `path` cannot inject commands.\n  const child = spawn('ls', ['-la', path], { shell: false });\n\n  child.stdout.on('data', (chunk) => process.stdout.write(chunk)); // streamed\n  child.stderr.on('data', (chunk) => process.stderr.write(chunk));\n  child.on('error', (err) => console.error('spawn failed:', err.message));\n  child.on('close', (code) => console.log(`exited with ${code}`));\n}\n\nlistDir('.'); // even listDir('. ; rm -rf /') is harmless here",
     "codeLang": "js",
-    "tags": ["child_process", "spawn", "exec", "fork", "security"]
+    "tags": [
+      "child_process",
+      "spawn",
+      "exec",
+      "fork",
+      "security"
+    ],
+    "short": "`spawn` streams output without a shell; `exec` runs through a shell and buffers (injection risk); `execFile` runs a binary without a shell; `fork` spawns a Node process with IPC. Prefer `spawn`/`execFile` with an args array for dynamic input."
   },
   {
     "id": "nodejs-memory-leak-gc-investigation",
@@ -93,7 +172,14 @@
     "answer": "V8 uses a **generational, mark-and-sweep** collector. New objects go into the **young generation** (scavenge, collected often and cheaply); survivors are promoted to the **old generation** (less frequent, more expensive mark-sweep-compact). GC reclaims only objects that are **unreachable** from the roots – so a 'leak' in Node almost always means you are unintentionally **keeping references alive**.\n\nThe classic culprits:\n\n- **Unbounded module-level caches/maps** that only grow.\n- **Listeners/timers never removed** (each closure pins its captured scope).\n- **Closures capturing large objects** held by long-lived callbacks.\n- **Global arrays** used as queues that never drain.\n\nDetection: watch `process.memoryUsage().heapUsed` trend upward across a steady workload, take **heap snapshots** in Chrome DevTools / `--inspect` and diff them, or run with `--max-old-space-size` and observe OOM. The fix is usually bounding the cache (LRU + TTL) or using **`WeakMap`/`WeakRef`** so entries are GC-eligible when the key is no longer referenced elsewhere.",
     "code": "// LEAK: module-level map grows forever, nothing is ever evicted.\nconst cacheBad = new Map();\nfunction rememberBad(user) {\n  cacheBad.set(user.id, user); // strong refs accumulate -> heap climbs\n}\n\n// FIX A: WeakMap keyed by object -> entry GC'd when the key is unreachable.\nconst meta = new WeakMap();\nfunction tag(user) {\n  meta.set(user, { seenAt: Date.now() });\n}\n\n// FIX B: bounded cache with eviction.\nconst MAX = 1000;\nconst cache = new Map();\nfunction remember(user) {\n  if (cache.size >= MAX) cache.delete(cache.keys().next().value); // evict oldest\n  cache.set(user.id, user);\n}\n\nsetInterval(() => {\n  const { heapUsed } = process.memoryUsage();\n  console.log('heapUsed MB:', (heapUsed / 1024 / 1024).toFixed(1));\n}, 5000);",
     "codeLang": "js",
-    "tags": ["memory", "garbage-collection", "memory-leak", "WeakMap", "v8"]
+    "tags": [
+      "memory",
+      "garbage-collection",
+      "memory-leak",
+      "WeakMap",
+      "v8"
+    ],
+    "short": "V8 uses generational mark-and-sweep GC reclaiming only unreachable objects, so leaks mean unintended references: unbounded caches, un-removed listeners/timers, capturing closures, growing globals. Detect via heap snapshots; fix with bounded/LRU caches or `WeakMap`/`WeakRef`."
   },
   {
     "id": "nodejs-promise-concurrency-control",
@@ -101,7 +187,14 @@
     "answer": "The combinators differ in their resolution semantics:\n\n- **`Promise.all`** – resolves with all values, but **rejects fast** on the first rejection (other work keeps running but its results are discarded).\n- **`Promise.allSettled`** – never rejects; resolves with a `{status, value|reason}` for **every** promise. Use it when you want all outcomes regardless of failures.\n- **`Promise.race`** – settles (resolve *or* reject) as soon as the **first** promise settles.\n- **`Promise.any`** – resolves with the **first fulfilled** value; rejects only if **all** reject (with an `AggregateError`).\n\nThe practical follow-up is almost always: *'how do you avoid firing 10,000 requests at once?'* `Promise.all(items.map(fn))` launches **everything immediately**. Instead implement a **concurrency pool** that keeps at most N in flight – protecting downstream services and your own file-descriptor/socket limits.",
     "code": "async function mapLimit(items, limit, worker) {\n  const results = new Array(items.length);\n  let next = 0;\n\n  async function runner() {\n    while (next < items.length) {\n      const i = next++;            // claim an index atomically (single-threaded)\n      results[i] = await worker(items[i], i);\n    }\n  }\n\n  // Start `limit` runners that pull from the shared cursor until exhausted.\n  const pool = Array.from({ length: Math.min(limit, items.length) }, runner);\n  await Promise.all(pool);\n  return results;\n}\n\n// Usage: at most 3 concurrent fetches regardless of how many URLs.\nconst urls = Array.from({ length: 20 }, (_, i) => `/api/item/${i}`);\nmapLimit(urls, 3, async (u) => {\n  const res = await fetch(u);\n  return res.json();\n}).then((all) => console.log('fetched', all.length));",
     "codeLang": "js",
-    "tags": ["promises", "concurrency", "Promise.all", "allSettled", "rate-limiting"]
+    "tags": [
+      "promises",
+      "concurrency",
+      "Promise.all",
+      "allSettled",
+      "rate-limiting"
+    ],
+    "short": "`Promise.all` rejects on first failure; `allSettled` reports every outcome; `race` settles on the first settle; `any` resolves on first fulfillment. Avoid firing everything at once by using a concurrency pool that keeps at most N promises in flight."
   },
   {
     "id": "nodejs-require-cache-singleton",
@@ -109,7 +202,14 @@
     "answer": "When you `require()` a module the first time, Node wraps the file in a **function wrapper** — `(function (exports, require, module, __filename, __dirname) { ... })` — executes it once, and stores the resulting `module.exports` in **`require.cache`** keyed by the resolved absolute path. Every subsequent `require` of the same path returns the **cached** object without re-executing the file.\n\nThis caching is why a module **naturally behaves as a singleton**: a config or DB pool created at module top level is created once and shared everywhere it's imported. (Caveat: the cache is per resolved path, so the same package installed in two different `node_modules` locations yields two instances.)\n\nOccasionally – hot-reloading config, test isolation – you need a fresh copy. You can `delete require.cache[require.resolve('./mod')]` so the next `require` re-runs the file. Note ESM has **no equivalent mutable cache**; you'd append a query string to the import specifier to force re-evaluation.",
     "code": "// config.js  -- evaluated once, shared everywhere (singleton via require cache)\nlet config = { env: process.env.NODE_ENV, loadedAt: Date.now() };\nmodule.exports = config;\n\n// app.js\nconst a = require('./config');\nconst b = require('./config');\nconsole.log(a === b); // true -> same cached instance\n\n// Hot-reload: bust the cache so the next require re-evaluates the file.\nfunction reloadConfig() {\n  delete require.cache[require.resolve('./config')];\n  return require('./config'); // fresh object, new loadedAt\n}",
     "codeLang": "js",
-    "tags": ["require-cache", "commonjs", "module-wrapper", "singleton", "hot-reload"]
+    "tags": [
+      "require-cache",
+      "commonjs",
+      "module-wrapper",
+      "singleton",
+      "hot-reload"
+    ],
+    "short": "CommonJS wraps each file in a function, runs it once, and caches `module.exports` in `require.cache` by absolute path, so modules act as singletons. Delete the cache entry via `require.resolve` to hot-reload; ESM has no mutable cache (use a query string)."
   },
   {
     "id": "nodejs-graceful-shutdown",
@@ -117,6 +217,13 @@
     "answer": "Container orchestrators and process managers stop a service by sending **`SIGTERM`** (and `SIGINT` on Ctrl+C), then a hard **`SIGKILL`** after a grace period. If you exit immediately you **drop in-flight requests**, leave DB transactions half-done, and abandon open sockets. **Graceful shutdown** means: stop accepting new connections, let active requests finish, close DB/queue connections, then exit – all within the grace window.\n\nThe correct sequence:\n1. On `SIGTERM`/`SIGINT`, call `server.close()` so it stops accepting new connections but lets existing ones complete.\n2. Close external resources (DB pools, message brokers, file handles).\n3. Set a **safety timeout** that force-exits if draining hangs, so you don't get `SIGKILL`-ed mid-cleanup.\n4. `process.exit(0)` on success.\n\nThis is a very common senior-level question because it separates people who have actually shipped services from those who haven't.",
     "code": "const http = require('http');\nconst server = http.createServer((req, res) => res.end('ok'));\nserver.listen(3000);\n\nlet shuttingDown = false;\nasync function shutdown(signal) {\n  if (shuttingDown) return;\n  shuttingDown = true;\n  console.log(`${signal} received: draining...`);\n\n  // Stop accepting new connections; callback fires once existing ones finish.\n  server.close(async () => {\n    try {\n      await closeDbPool();        // close external resources\n      console.log('clean shutdown');\n      process.exit(0);\n    } catch (e) {\n      process.exit(1);\n    }\n  });\n\n  // Safety net: force-exit if draining takes too long.\n  setTimeout(() => {\n    console.error('drain timed out, forcing exit');\n    process.exit(1);\n  }, 10000).unref();\n}\n\nasync function closeDbPool() {/* await pool.end() */}\nprocess.on('SIGTERM', () => shutdown('SIGTERM'));\nprocess.on('SIGINT', () => shutdown('SIGINT'));",
     "codeLang": "js",
-    "tags": ["graceful-shutdown", "signals", "process", "http", "production"]
+    "tags": [
+      "graceful-shutdown",
+      "signals",
+      "process",
+      "http",
+      "production"
+    ],
+    "short": "On `SIGTERM`/`SIGINT`, gracefully shut down to avoid dropping in-flight requests: call `server.close()` to stop new connections, drain active ones, close DB/queue resources, add a force-exit safety timeout, then `process.exit(0)`."
   }
 ]

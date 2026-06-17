@@ -1,0 +1,200 @@
+[
+  {
+    "id": "css-box-model",
+    "question": "Explain the CSS box model and the difference between box-sizing: content-box and border-box.",
+    "short": "Every element is a box of content + padding + border + margin. With `content-box` (default) width sets only the content; with `border-box` width includes padding and border, so the box never grows past the value you set.",
+    "answer": "Every rendered element is a rectangular box made of four layers, from inside out:\n\n- **Content** - the text/image area sized by `width`/`height`.\n- **Padding** - transparent space inside the border.\n- **Border** - drawn around the padding.\n- **Margin** - transparent space outside the border that separates the element from neighbours (and can collapse vertically between block siblings).\n\nThe `box-sizing` property decides what `width`/`height` actually measure:\n\n- **`content-box`** (default): `width` applies to the content only. The painted box width = `width + padding-left/right + border-left/right`. Adding padding visually enlarges the element, which makes layout math error-prone.\n- **`border-box`**: `width` includes content, padding, and border. The element's rendered width equals the value you set; padding/border eat *into* it instead of adding to it.\n\nBecause `border-box` makes sizes predictable, most teams apply it globally via a universal reset. Note that **margin is always added on top** regardless of `box-sizing`.",
+    "code": "*,\n*::before,\n*::after {\n  box-sizing: border-box;\n}\n\n.card {\n  width: 200px;\n  padding: 20px;\n  border: 2px solid #333;\n  /* content-box -> rendered width 244px */\n  /* border-box  -> rendered width 200px (content shrinks to 156px) */\n}",
+    "codeLang": "css",
+    "tags": ["box-model", "box-sizing", "layout", "fundamentals"]
+  },
+  {
+    "id": "css-specificity",
+    "question": "How does CSS specificity work and how is it calculated?",
+    "short": "Specificity ranks competing rules as a tuple (inline, IDs, classes/attributes/pseudo-classes, elements/pseudo-elements). The higher tuple wins; ties are broken by source order, with the last rule winning.",
+    "answer": "When multiple rules target the same element and property, the browser picks the winner by **specificity** before falling back to source order. Specificity is a 4-part tuple `(a, b, c, d)` compared left to right:\n\n- **a - inline styles** (`style=\"...\"`) -> `1,0,0,0`\n- **b - ID selectors** (`#id`) -> `0,1,0,0`\n- **c - classes, attribute selectors, pseudo-classes** (`.btn`, `[type=text]`, `:hover`) -> `0,0,1,0`\n- **d - element types and pseudo-elements** (`div`, `::before`) -> `0,0,0,1`\n\nThe universal selector `*`, combinators (`>`, `+`, `~`), and `:where()` add **zero** specificity. `:is()` and `:not()` take the specificity of their most specific argument.\n\nA higher category always beats lower ones no matter how many lower selectors stack (one ID beats any number of classes). When specificity is **equal**, the rule declared **last in source order** wins. Specificity only compares rules of the same origin/layer - `!important` and the cascade order sit above this calculation.\n\n**Best practice:** keep specificity low and flat (prefer classes) so styles stay easy to override.",
+    "code": "/* (0,1,0,1) */ #nav a        { color: red; }\n/* (0,0,2,1) */ .menu .item a { color: blue; }\n/* #nav a wins: 1 ID outranks 2 classes */",
+    "codeLang": "css",
+    "tags": ["specificity", "cascade", "selectors"]
+  },
+  {
+    "id": "css-cascade-important",
+    "question": "What is the CSS cascade, and how do !important and origin affect it?",
+    "short": "The cascade resolves conflicts by origin/importance first, then specificity, then source order. `!important` jumps a declaration into a higher-priority origin tier, overriding normal specificity.",
+    "answer": "**Cascade** is the algorithm that decides which declaration wins when several apply to one element. It evaluates, in order:\n\n1. **Origin and importance** - author, user, and user-agent stylesheets, each split into normal and important. The priority (high to low) is: author `!important` > user `!important` > UA `!important` ... then normal author > normal user > normal UA. Note importance **flips** the order for the important tiers.\n2. **Specificity** - the `(a,b,c,d)` tuple, used only within the same origin/importance level.\n3. **Source order** - the later declaration wins on a tie.\n\n(Cascade layers via `@layer` insert an extra step between origin and specificity.)\n\n**`!important`** moves a declaration from the normal author tier into the important author tier, so it beats any normal declaration regardless of specificity. It should be a last resort because it breaks the natural cascade and the only way to override it is another `!important` with higher specificity - leading to escalation wars. Legitimate uses are utility overrides and patching third-party styles you cannot edit.",
+    "code": ".btn { color: blue !important; }\n#main .btn { color: green; } /* loses despite higher specificity */",
+    "codeLang": "css",
+    "tags": ["cascade", "important", "origin", "specificity"]
+  },
+  {
+    "id": "css-inheritance",
+    "question": "What is inheritance in CSS, and which properties inherit?",
+    "short": "Some properties pass their computed value from parent to child automatically. Typography-related properties (color, font, line-height) inherit; box/layout properties (margin, padding, border, width) do not.",
+    "answer": "**Inheritance** means a child element takes its parent's computed value for a property when no rule sets that property on the child.\n\n- **Naturally inherited** properties are mostly text/typography related: `color`, `font-family`, `font-size`, `font-weight`, `line-height`, `letter-spacing`, `text-align`, `visibility`, `list-style`, `white-space`, `cursor`.\n- **Not inherited** by default: box and layout properties like `margin`, `padding`, `border`, `width`, `height`, `background`, `display`, `position`.\n\nYou can control inheritance explicitly with keyword values usable on **any** property:\n\n- `inherit` - force the parent's computed value.\n- `initial` - use the property's spec default.\n- `unset` - inherit if the property normally inherits, otherwise act like `initial`.\n- `revert` - roll back to the value the user-agent/user stylesheet would set.\n\nA common pattern is setting `font` and `color` on `body` so the whole document inherits a baseline, and using `box-sizing: border-box` with `inherit` for predictable resets.",
+    "code": "body { color: #222; font-family: system-ui; }\n/* button does NOT inherit font by default */\nbutton { font: inherit; }",
+    "codeLang": "css",
+    "tags": ["inheritance", "cascade", "computed-value"]
+  },
+  {
+    "id": "css-flexbox-axes",
+    "question": "Explain flexbox: the main vs cross axis and how justify-content and align-items relate to them.",
+    "short": "Flexbox is one-dimensional. `flex-direction` sets the main axis; `justify-content` aligns items along the main axis and `align-items` aligns them along the perpendicular cross axis.",
+    "answer": "Flexbox lays items out along a **single axis** (a row or a column), making it ideal for distributing space among items in one direction.\n\n- **Main axis** - the primary direction set by `flex-direction` (`row` = horizontal, `column` = vertical). Items flow along it.\n- **Cross axis** - perpendicular to the main axis.\n\nAlignment properties are tied to those axes:\n\n- **`justify-content`** distributes items along the **main axis** (`flex-start`, `center`, `space-between`, `space-around`, `space-evenly`).\n- **`align-items`** aligns items along the **cross axis** (`stretch` default, `flex-start`, `center`, `baseline`).\n- **`align-content`** distributes *wrapped lines* along the cross axis (only matters with `flex-wrap: wrap` and multiple lines).\n- **`align-self`** overrides `align-items` for one item.\n\nA key gotcha: when you switch `flex-direction` to `column`, the axes swap, so `justify-content` now controls vertical positioning and `align-items` controls horizontal. `gap` adds consistent spacing between items without margins.",
+    "code": ".row {\n  display: flex;\n  flex-direction: row;     /* main axis = horizontal */\n  justify-content: space-between; /* spread along main axis */\n  align-items: center;     /* center on cross (vertical) axis */\n  gap: 16px;\n}",
+    "codeLang": "css",
+    "tags": ["flexbox", "layout", "alignment", "main-axis", "cross-axis"]
+  },
+  {
+    "id": "css-flex-shorthand",
+    "question": "What do flex-grow, flex-shrink, and flex-basis do, and what does the flex shorthand mean?",
+    "short": "`flex-basis` is an item's starting size; `flex-grow` shares leftover free space; `flex-shrink` removes overflow proportionally. `flex: 1` is shorthand for `1 1 0%`.",
+    "answer": "These three properties control how a flex item sizes relative to siblings, expanding the `flex` shorthand (`flex: grow shrink basis`):\n\n- **`flex-basis`** - the item's initial main-size *before* free space is distributed (e.g. `200px`, `0`, or `auto` which uses the content/`width`).\n- **`flex-grow`** - a unitless ratio for dividing **leftover** space. `0` means do not grow; `2` grows twice as fast as a sibling with `1`.\n- **`flex-shrink`** - a unitless ratio for shrinking when items **overflow**. `0` prevents shrinking; default `1` lets items shrink.\n\nCommon shorthands:\n\n- **`flex: 1`** = `1 1 0%` - all items grow from a zero basis to **equal** widths.\n- **`flex: auto`** = `1 1 auto` - grow/shrink but start from content size (unequal).\n- **`flex: none`** = `0 0 auto` - fixed to content size, no flexing.\n- **`flex: 0 1 auto`** - the default behaviour.\n\nThe nuance many miss: `flex: 1` gives equal widths because the basis is `0`, whereas `flex-grow: 1` alone (basis `auto`) distributes only the *extra* space on top of differing content sizes, so items stay unequal.",
+    "code": ".item-a { flex: 1; }       /* 1 1 0%  -> equal share */\n.item-b { flex: 2; }       /* grows twice as much */\n.fixed  { flex: 0 0 120px; } /* never grows or shrinks */",
+    "codeLang": "css",
+    "tags": ["flexbox", "flex-grow", "flex-shrink", "flex-basis", "shorthand"]
+  },
+  {
+    "id": "css-flexbox-vs-grid",
+    "question": "What is the difference between Flexbox and CSS Grid, and when should you use each?",
+    "short": "Flexbox is one-dimensional (a single row or column); Grid is two-dimensional (rows and columns together). Use Flexbox for components and single-axis distribution, Grid for overall page/section layouts.",
+    "answer": "Both are modern layout systems, but they solve different shapes of problem:\n\n**Flexbox - one dimension.** Lays content along a single axis at a time and is **content-driven**: item sizes naturally adapt to their content, and you distribute leftover space. Best for toolbars, nav bars, button groups, centering, and any row/column of items.\n\n**Grid - two dimensions.** Defines rows *and* columns simultaneously and is **layout-driven**: you declare the grid structure and place items into it, optionally by named template areas. Best for page scaffolding, dashboards, card galleries, and any design where alignment must hold across both axes.\n\nKey practical differences:\n\n- Grid lets you create gaps/tracks the items snap into; Flexbox sizes tracks around items.\n- Grid offers `grid-template-areas` for readable, declarative layouts and overlapping via line placement.\n- They **compose**: a grid cell is often a flex container, and vice versa.\n\n**Rule of thumb:** reach for Grid when you care about the relationship between rows and columns, Flexbox when you are arranging items along one line.",
+    "code": "/* Grid: 2D page shell */\n.page { display: grid; grid-template-columns: 240px 1fr; gap: 24px; }\n\n/* Flexbox: 1D toolbar inside it */\n.toolbar { display: flex; justify-content: space-between; align-items: center; }",
+    "codeLang": "css",
+    "tags": ["flexbox", "grid", "layout", "comparison"]
+  },
+  {
+    "id": "css-grid-fr-template-areas",
+    "question": "Explain CSS Grid fundamentals: fr units and grid-template-areas.",
+    "short": "`fr` is a flexible unit representing a fraction of the grid's free space, so tracks divide leftover room proportionally. `grid-template-areas` lets you name regions and place items by ASCII-art maps.",
+    "answer": "**The `fr` unit** (fractional unit) represents one share of the **leftover free space** in the grid container after fixed-size tracks, gaps, and content minimums are accounted for. `grid-template-columns: 1fr 2fr` splits remaining space so the second column is twice the first. `fr` adapts fluidly without media queries and combines with fixed units, e.g. `240px 1fr` for a fixed sidebar plus a flexible main area. Use `minmax()` to bound a flexible track (`minmax(0, 1fr)` is a common fix for overflow).\n\n**`grid-template-areas`** lets you give grid cells names and arrange them visually as strings, then assign each child a `grid-area` name. This makes layouts self-documenting and trivially re-arrangeable in media queries:\n\n- Each string is a row; repeated names span cells; a `.` denotes an empty cell.\n- The named blocks must form a **rectangle** or the declaration is invalid.\n\nIt is one of the most readable ways to express responsive layouts because you redraw the map per breakpoint.",
+    "code": ".layout {\n  display: grid;\n  grid-template-columns: 200px 1fr;\n  grid-template-rows: auto 1fr auto;\n  grid-template-areas:\n    \"header header\"\n    \"sidebar main\"\n    \"footer footer\";\n}\n.header { grid-area: header; }\n.sidebar { grid-area: sidebar; }\n.main { grid-area: main; }\n.footer { grid-area: footer; }",
+    "codeLang": "css",
+    "tags": ["grid", "fr-unit", "grid-template-areas", "layout"]
+  },
+  {
+    "id": "css-auto-fit-auto-fill",
+    "question": "In CSS Grid repeat(), what is the difference between auto-fit and auto-fill?",
+    "short": "Both create as many tracks as fit. `auto-fill` keeps the empty leftover tracks (items stay their min size); `auto-fit` collapses empty tracks to zero so existing items stretch to fill the row.",
+    "answer": "Both keywords are used inside `repeat()` to build a **responsive number of columns** without media queries, typically with `minmax()`:\n\n```\ngrid-template-columns: repeat(auto-fill, minmax(200px, 1fr));\n```\n\nThe difference shows only when the row has **more space than the items need**:\n\n- **`auto-fill`** generates as many tracks as can fit, **keeping empty tracks** that occupy space. Items remain near their minimum size and you get trailing empty columns.\n- **`auto-fit`** generates the same tracks but then **collapses empty tracks to 0 width**, so the remaining items expand (via the `1fr` max) to absorb the freed space.\n\nSo with a few items in a wide container: `auto-fill` leaves gaps on the right while items stay small; `auto-fit` stretches the items to fill the row. When the grid is full of items, the two behave identically.\n\n**Pick `auto-fit`** when you want items to stretch and fill the row, **`auto-fill`** when you want to preserve the column rhythm/slots even if empty.",
+    "code": ".gallery {\n  display: grid;\n  /* stretches items to fill the row when few */\n  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n  gap: 16px;\n}",
+    "codeLang": "css",
+    "tags": ["grid", "auto-fit", "auto-fill", "responsive", "minmax"]
+  },
+  {
+    "id": "css-positioning",
+    "question": "Explain the CSS position values: static, relative, absolute, fixed, and sticky.",
+    "short": "`static` is normal flow; `relative` offsets from its own spot; `absolute` positions to the nearest positioned ancestor (out of flow); `fixed` pins to the viewport; `sticky` toggles between relative and fixed at a scroll threshold.",
+    "answer": "`position` controls how an element is placed and how `top/right/bottom/left` (and `z-index`) apply:\n\n- **`static`** (default) - normal document flow; offset properties are ignored.\n- **`relative`** - stays in flow but is visually shifted by the offsets relative to its **original position**. The original space is preserved, and it becomes a **containing block** for absolute descendants.\n- **`absolute`** - removed from normal flow; positioned by offsets relative to the **nearest positioned ancestor** (any ancestor whose `position` is not `static`), falling back to the initial containing block (viewport). Surrounding elements ignore it.\n- **`fixed`** - removed from flow; positioned relative to the **viewport**, so it stays put while the page scrolls (sticky headers, FABs). Note a transformed/filtered ancestor becomes its containing block instead of the viewport.\n- **`sticky`** - a hybrid: behaves like `relative` until the element hits a scroll threshold (e.g. `top: 0`), then **sticks** like fixed within its scroll container/parent, releasing when the parent scrolls away.\n\n**Gotchas:** `sticky` needs an offset (`top`, etc.) to engage and can silently fail if an ancestor has `overflow: hidden/auto`. `absolute` requires a positioned ancestor or it escapes to the viewport.",
+    "code": ".tooltip-host { position: relative; }\n.tooltip { position: absolute; top: 100%; left: 0; }\n\n.navbar { position: sticky; top: 0; z-index: 10; }",
+    "codeLang": "css",
+    "tags": ["positioning", "absolute", "relative", "fixed", "sticky"]
+  },
+  {
+    "id": "css-stacking-context",
+    "question": "What is a stacking context, and why does z-index sometimes not work?",
+    "short": "A stacking context is a self-contained layer group; `z-index` only compares siblings within the same context. A high z-index fails when an ancestor forms a lower stacking context, trapping the child.",
+    "answer": "Elements paint in a defined order along the z-axis. A **stacking context** is an isolated grouping of layers: once an element creates one, all its descendants are painted **within** it, and their `z-index` values only compete **with each other** - never against elements outside the context.\n\nA new stacking context is created by, among others:\n\n- the **root** `<html>` element;\n- a **positioned** element (`relative/absolute/fixed/sticky`) with a `z-index` other than `auto`;\n- `opacity` less than `1`;\n- `transform`, `filter`, `perspective`, `clip-path`, `mask`, `will-change`, `mix-blend-mode`;\n- a flex/grid **child** with a `z-index` other than `auto`;\n- `isolation: isolate`.\n\n**Why z-index \"doesn't work\":** the classic trap is that element A has `z-index: 9999` but lives inside a parent that forms its *own* stacking context with a low z-index (or an `opacity < 1`). A's 9999 only ranks it inside the parent's context; the **parent's** stacking position decides whether A appears above sibling content outside it. The fix is to raise the *parent's* stacking position or restructure so the elements share a context. `isolation: isolate` is a clean way to create a context without other side effects.",
+    "code": ".parent { opacity: 0.99; }   /* unintentionally creates a stacking context */\n.child  { position: relative; z-index: 9999; } /* trapped inside parent */",
+    "codeLang": "css",
+    "tags": ["z-index", "stacking-context", "positioning", "layering"]
+  },
+  {
+    "id": "css-units",
+    "question": "Explain CSS units px, em, rem, %, vh, and vw, and when to use each.",
+    "short": "`px` is absolute; `em` is relative to the element's font-size (compounds), `rem` to the root font-size (consistent); `%` is relative to the parent; `vh`/`vw` are percentages of the viewport.",
+    "answer": "Units split into **absolute** and **relative**:\n\n- **`px`** - an absolute device-independent pixel. Predictable but does not scale with the user's font preferences; fine for borders/hairlines.\n- **`em`** - relative to the **current element's** `font-size` (or the parent's for the `font-size` property itself). It **compounds** through nesting, which can cause surprises but is handy for spacing that scales with local text.\n- **`rem`** - relative to the **root** (`<html>`) `font-size`. No compounding, so it gives consistent, accessible scaling - the go-to for typography and spacing.\n- **`%`** - relative to the **parent's** corresponding dimension (width %, height %, etc.).\n- **`vw` / `vh`** - 1% of the viewport's **width / height**; great for full-screen sections and fluid hero text. (`vmin`/`vmax`, and `dvh`/`svh`/`lvh` for mobile address-bar handling, are refinements.)\n\n**Guidance:** prefer `rem` for font sizes and spacing (respects user zoom/settings), `em` for properties that should scale with their own text, `%`/`fr`/viewport units for fluid layout, and `px` only where a fixed physical size is intended. Pair them with `clamp()` for fluid-yet-bounded values.",
+    "code": "html { font-size: 16px; }\n.title  { font-size: 2rem; }            /* 32px, root-based */\n.badge  { padding: 0.5em 1em; }         /* scales with badge text */\n.hero   { min-height: 100vh; }          /* full viewport height */\n.fluid  { font-size: clamp(1rem, 2.5vw, 2rem); }",
+    "codeLang": "css",
+    "tags": ["units", "rem", "em", "viewport-units", "responsive"]
+  },
+  {
+    "id": "css-pseudo-class-vs-element",
+    "question": "What is the difference between pseudo-classes and pseudo-elements?",
+    "short": "A pseudo-class targets an element in a particular state (`:hover`, `:nth-child`); a pseudo-element styles or creates a sub-part of an element (`::before`, `::first-line`). Convention: one colon vs two.",
+    "answer": "Both let you style things you cannot select with the plain DOM, but they differ in **what** they target:\n\n**Pseudo-classes** (single colon `:`) select an existing element based on its **state or position**:\n\n- state: `:hover`, `:focus`, `:active`, `:checked`, `:disabled`, `:visited`\n- structural: `:first-child`, `:last-child`, `:nth-child(n)`, `:not()`, `:is()`, `:where()`, `:has()`\n\n**Pseudo-elements** (double colon `::`) style a **specific part** of an element or inject content that is not in the DOM:\n\n- `::before` / `::after` - generate content via the `content` property\n- `::first-line`, `::first-letter`, `::selection`, `::placeholder`, `::marker`\n\nThe double-colon syntax was introduced in CSS3 to distinguish the two; single-colon still works for the legacy pseudo-elements for backwards compatibility. A practical rule: there can be only **one** of each pseudo-element per element, and `::before`/`::after` **require** a `content` value (even `\"\"`) to render. Generated content is decorative and not reliably exposed to assistive tech, so avoid putting meaningful text in it.",
+    "code": "a:hover { text-decoration: underline; }       /* pseudo-class: state */\nli:nth-child(odd) { background: #f5f5f5; }     /* pseudo-class: position */\n\n.req::after {                                  /* pseudo-element */\n  content: \" *\";\n  color: red;\n}",
+    "codeLang": "css",
+    "tags": ["pseudo-classes", "pseudo-elements", "selectors", "before-after"]
+  },
+  {
+    "id": "css-display-values",
+    "question": "Explain the main display values: block, inline, inline-block, none, flex, and grid.",
+    "short": "`block` stacks and takes full width; `inline` flows in text and ignores width/height; `inline-block` flows inline but accepts box dimensions; `none` removes the box; `flex`/`grid` enable layout contexts.",
+    "answer": "`display` sets how a box participates in layout - both its **outer** role (how it sits among siblings) and its **inner** formatting context:\n\n- **`block`** - starts on a new line and fills the available inline width; respects `width`, `height`, all margins/padding. (e.g. `div`, `p`, `section`).\n- **`inline`** - flows within a line like text; **ignores** `width`/`height` and vertical margins (horizontal padding/margin apply but do not push other blocks). (e.g. `span`, `a`).\n- **`inline-block`** - flows inline alongside other content **but** honours `width`, `height`, and full margins/padding - useful for chips/buttons sitting in a line.\n- **`none`** - the element is removed from the render tree entirely: no box, no space, not announced. (Contrast `visibility: hidden`, which keeps the space.)\n- **`flex`** - the element becomes a flex container; children become flex items laid out on one axis.\n- **`grid`** - the element becomes a grid container; children are placed into a 2D grid.\n\nThere are also `table`, `list-item`, `contents` (the box disappears but children remain), and the modern two-value syntax (`display: inline flex`).",
+    "code": ".tag {\n  display: inline-block; /* sits inline but sized like a box */\n  width: 80px;\n  padding: 4px 8px;\n}\n.hidden { display: none; } /* gone, no space reserved */",
+    "codeLang": "css",
+    "tags": ["display", "block", "inline", "inline-block", "layout"]
+  },
+  {
+    "id": "css-display-none-visibility-opacity",
+    "question": "What is the difference between display: none, visibility: hidden, and opacity: 0?",
+    "short": "`display: none` removes the box (no space, not clickable, not read). `visibility: hidden` hides it but keeps its space. `opacity: 0` hides it visually but it still occupies space and stays interactive.",
+    "answer": "All three make an element invisible, but with very different side effects:\n\n| Property | Takes up space? | Clickable / focusable? | In a11y tree? | Animatable? | Reflow on toggle? |\n|---|---|---|---|---|---|\n| `display: none` | No | No | No | No | Yes (reflow) |\n| `visibility: hidden` | Yes | No | No | Yes (discrete) | No (repaint) |\n| `opacity: 0` | Yes | **Yes** | Yes (still announced) | Yes (smooth) | No (composite) |\n\nKey takeaways:\n\n- **`display: none`** fully removes the element from layout and the accessibility tree; toggling it triggers a **reflow**. It cannot be transitioned.\n- **`visibility: hidden`** keeps the element's reserved space but makes it non-interactive and hidden from screen readers; children can override with `visibility: visible`.\n- **`opacity: 0`** only changes paint - the element is still in the layout, **still clickable**, still focusable, and still read by assistive tech (a common bug). It is the only one that animates smoothly and is GPU-composited, so it is preferred for fade transitions (often paired with `visibility` or `pointer-events: none`).",
+    "code": ".fade {\n  opacity: 0;\n  visibility: hidden;            /* removes interactivity + a11y */\n  transition: opacity 0.2s, visibility 0.2s;\n}\n.fade.is-open { opacity: 1; visibility: visible; }",
+    "codeLang": "css",
+    "tags": ["display", "visibility", "opacity", "accessibility", "transitions"]
+  },
+  {
+    "id": "css-responsive-mobile-first",
+    "question": "What is responsive design, and why is the mobile-first approach preferred?",
+    "short": "Responsive design adapts a layout to any screen using fluid units and media queries. Mobile-first writes base styles for small screens, then layers complexity up with min-width queries - simpler and more performant.",
+    "answer": "**Responsive design** builds one layout that adapts gracefully across screen sizes using fluid grids, flexible images, relative units, and **media queries** that apply styles at breakpoints. The viewport meta tag (`<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">`) is the prerequisite.\n\n**Mobile-first** means your **base** (unqualified) CSS targets the smallest screen, and you progressively *enhance* for larger screens with `min-width` media queries:\n\n```\n.card { display: block; }\n@media (min-width: 768px) { .card { display: flex; } }\n```\n\nWhy it is preferred over desktop-first (`max-width`):\n\n- **Progressive enhancement** - the simplest layout is the default; you add complexity only where there is room, instead of unwinding it.\n- **Performance** - small devices (often on weaker networks/CPUs) parse fewer overrides; expensive layout rules load only behind `min-width`.\n- **Maintainability** - additive `min-width` queries read top-to-bottom by size and avoid the override churn of `max-width`.\n- It aligns with the fact that most traffic is mobile.\n\nModern CSS reduces query reliance via `clamp()`, intrinsic sizing (`min()/max()`), `auto-fit` grids, and **container queries** for true component-level responsiveness.",
+    "code": "/* base = mobile */\n.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }\n\n@media (min-width: 600px) { .grid { grid-template-columns: 1fr 1fr; } }\n@media (min-width: 900px) { .grid { grid-template-columns: repeat(3, 1fr); } }",
+    "codeLang": "css",
+    "tags": ["responsive", "media-queries", "mobile-first", "breakpoints"]
+  },
+  {
+    "id": "css-centering",
+    "question": "What are the common ways to center an element horizontally and vertically in CSS?",
+    "short": "Modern best practice is Flexbox or Grid (`place-items: center` / `justify+align: center`). Other tools: `margin: 0 auto` for horizontal block centering, and absolute + transform for legacy cases.",
+    "answer": "Centering depends on context; the main techniques are:\n\n**1. Flexbox (most common)** - works for both axes:\n\n```\n.parent { display: flex; justify-content: center; align-items: center; }\n```\n\n**2. Grid (most concise)** - `place-items` is shorthand for align + justify:\n\n```\n.parent { display: grid; place-items: center; }\n```\n\n**3. `margin: auto`** - centers a **block** element horizontally when it has a defined width; inside a flex/grid item, `margin: auto` can center on both axes.\n\n```\n.box { width: 300px; margin: 0 auto; }\n```\n\n**4. Absolute + transform** - useful when you cannot change the parent's display or for overlays; works regardless of element size:\n\n```\n.box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }\n```\n\n**5. Inline text** - `text-align: center` for inline/inline-block content; `line-height` equal to height for single-line vertical centering.\n\n**Guidance:** prefer Flexbox/Grid for new code - they handle unknown sizes and multiple children cleanly. Reserve absolute+transform for overlays/modals where the element is taken out of flow.",
+    "code": "/* one-liner, any child size */\n.center { display: grid; place-items: center; min-height: 100vh; }",
+    "codeLang": "css",
+    "tags": ["centering", "flexbox", "grid", "layout"]
+  },
+  {
+    "id": "css-transition-vs-animation",
+    "question": "What is the difference between CSS transitions and animations (@keyframes)?",
+    "short": "A transition animates a property between two states triggered by a change (e.g. hover). An `@keyframes` animation runs a multi-step, repeatable timeline that can start automatically and loop without a trigger.",
+    "answer": "Both interpolate property values over time, but differ in control and triggering:\n\n**Transitions** - define how a property changes **from its current value to a new one** when something triggers the change (a class toggle, `:hover`, etc.). They are two-state (start -> end), run once per trigger, and need an external state change.\n\n```\n.btn { background: blue; transition: background 0.3s ease; }\n.btn:hover { background: navy; }\n```\n\n**Animations (`@keyframes`)** - define an explicit **timeline** with intermediate steps (`0% { } 50% { } 100% { }`). They can:\n\n- start **automatically** on load (no trigger needed),\n- run multiple steps, **loop** (`animation-iteration-count: infinite`),\n- alternate direction, pause, and hold end state (`animation-fill-mode`).\n\n**Choosing:** use a **transition** for simple state-driven effects (hover, focus, open/close). Use a **keyframe animation** for complex, multi-stage, looping, or auto-playing motion (spinners, attention pulses).\n\n**Performance:** for either, prefer animating `transform` and `opacity` (GPU-composited, no layout) over properties like `width`, `top`, or `margin` that trigger reflow. Respect `@media (prefers-reduced-motion)`.",
+    "code": "@keyframes spin {\n  from { transform: rotate(0deg); }\n  to   { transform: rotate(360deg); }\n}\n.loader {\n  animation: spin 1s linear infinite; /* auto-plays, loops */\n}",
+    "codeLang": "css",
+    "tags": ["transitions", "animations", "keyframes", "performance"]
+  },
+  {
+    "id": "css-custom-properties",
+    "question": "What are CSS custom properties (variables), and how do they differ from Sass variables?",
+    "short": "Custom properties (`--name`) are native, inherited, runtime values read with `var()`. Unlike Sass variables (compile-time, static), they cascade, can be themed, and are changeable live via JS or media queries.",
+    "answer": "**CSS custom properties** are user-defined variables declared with a `--` prefix and consumed via `var()`:\n\n```\n:root { --brand: #4f46e5; --space: 8px; }\n.btn { background: var(--brand); padding: var(--space); }\n```\n\nKey characteristics:\n\n- **Cascading & inherited** - they follow the cascade and inherit to descendants, so you can scope/override them per component or under a `.dark` class.\n- **Runtime / dynamic** - they live in the browser, so they can be changed at runtime via JavaScript (`element.style.setProperty('--brand', ...)`), in media queries, or on state changes - enabling live theming and dark mode.\n- **`var()` fallback** - `var(--x, defaultValue)` supplies a fallback if `--x` is unset.\n\n**Versus Sass/preprocessor variables (`$var`):**\n\n- Sass variables are resolved at **compile time** and vanish from the output - they cannot change at runtime, do not cascade/inherit, and are unaware of the DOM.\n- CSS custom properties are **live** in the browser, respond to the cascade and media queries, and are readable/writable from JS.\n\nUse custom properties for theming and dynamic values; preprocessor variables still suit build-time constants, loops, and math.",
+    "code": ":root { --bg: #fff; --fg: #111; }\n.dark { --bg: #111; --fg: #eee; }   /* re-theme by swapping a class */\nbody { background: var(--bg); color: var(--fg); }",
+    "codeLang": "css",
+    "tags": ["custom-properties", "variables", "theming", "sass"]
+  },
+  {
+    "id": "css-overflow",
+    "question": "Explain the CSS overflow property and its values.",
+    "short": "`overflow` controls content that exceeds its box: `visible` (default, spills out), `hidden` (clips), `scroll` (always shows scrollbars), `auto` (scrollbars only when needed). `overflow-x/y` set axes independently.",
+    "answer": "`overflow` decides what happens when content is larger than its containing block:\n\n- **`visible`** (default) - content overflows the box and is painted outside it.\n- **`hidden`** - overflowing content is **clipped** and not visible; no scrollbars. Often used to contain floats, clip rounded corners, or hide overflow intentionally.\n- **`scroll`** - clips and **always** shows scrollbars (even when not needed), which can reserve space.\n- **`auto`** - clips and shows scrollbars **only when** content overflows. The usual choice for scrollable regions.\n- **`clip`** - like `hidden` but forbids all scrolling (including programmatic), and is cheaper.\n\nAxis variants `overflow-x` and `overflow-y` control horizontal/vertical independently.\n\n**Important side effects:**\n\n- Setting `overflow` to anything other than `visible` establishes a **block formatting context (BFC)**, which contains floats and prevents margin collapsing - a classic trick.\n- A non-`visible` overflow on an ancestor can **break `position: sticky`** children and clip absolutely positioned tooltips/dropdowns.\n- It can also affect scroll anchoring and create a scroll container that interacts with `scroll-snap`.",
+    "code": ".scroll-area {\n  max-height: 300px;\n  overflow-y: auto;   /* scrollbar only when content exceeds 300px */\n}\n.clip { overflow: hidden; border-radius: 8px; } /* contains + rounds */",
+    "codeLang": "css",
+    "tags": ["overflow", "scroll", "bfc", "layout"]
+  },
+  {
+    "id": "css-reflow-vs-repaint",
+    "question": "What is the difference between reflow (layout) and repaint, and how do you minimize them?",
+    "short": "Reflow recalculates element geometry/positions and is expensive; repaint redraws pixels (color, shadow) without changing layout. Animate `transform`/`opacity` to skip both via the compositor.",
+    "answer": "These are stages of the browser rendering pipeline, in increasing cost:\n\n- **Reflow (layout)** - the browser recomputes geometry: the sizes and positions of elements. Triggered by changing `width`, `height`, `margin`, `padding`, `top/left`, `font-size`, adding/removing DOM nodes, or **reading** layout properties like `offsetHeight`/`getBoundingClientRect` (forced synchronous layout). A reflow on one element can cascade to ancestors, siblings, and descendants - the most expensive operation.\n- **Repaint** - redraws pixels for visual changes that **don't** affect layout: `color`, `background`, `box-shadow`, `visibility`, `outline`. Cheaper than reflow but still costs paint time.\n- **Composite only** - changes to `transform` and `opacity` can be handled by the GPU compositor, skipping both layout and paint - the cheapest and smoothest.\n\n**Minimizing them:**\n\n- Animate **`transform`/`opacity`** instead of `top/left/width/height`.\n- **Batch** DOM reads and writes; avoid interleaving them to prevent layout thrashing.\n- Mutate off-DOM (DocumentFragment) or toggle a single class instead of many inline style writes.\n- Use `will-change` sparingly to promote elements to their own layer.\n- Prefer `visibility`/`opacity` over `display` toggles inside animations (display toggles force reflow).",
+    "code": "/* reflow: animating layout properties (avoid) */\n.bad { transition: left 0.3s; left: 100px; }\n\n/* composite only: smooth, no reflow/repaint (prefer) */\n.good { transition: transform 0.3s; transform: translateX(100px); }",
+    "codeLang": "css",
+    "tags": ["performance", "reflow", "repaint", "rendering", "layout"]
+  },
+  {
+    "id": "css-bem",
+    "question": "What is BEM, and what problem does it solve in CSS?",
+    "short": "BEM (Block, Element, Modifier) is a naming convention - `.block__element--modifier` - that creates unique, flat, low-specificity class names to avoid conflicts and make CSS modular and predictable.",
+    "answer": "**BEM** stands for **Block, Element, Modifier** - a class-naming methodology for writing scalable, maintainable CSS without deep nesting or specificity wars.\n\n- **Block** - a standalone, reusable component: `.card`, `.menu`, `.button`.\n- **Element** - a part of a block that has no standalone meaning, joined with **two underscores**: `.card__title`, `.menu__item`.\n- **Modifier** - a variant or state flag, joined with **two hyphens**: `.button--primary`, `.menu__item--active`.\n\n**Problems it solves:**\n\n- **Naming collisions / global scope** - descriptive, namespaced classes keep styles isolated to their component.\n- **Specificity wars** - everything is a single class selector (`0,0,1,0`), so the cascade stays flat and overrides are predictable - no need for `!important` or long descendant chains.\n- **Readability** - the class name reveals the component relationship and intent right in the markup.\n- **Reusability** - blocks are self-contained and can move anywhere.\n\n**Trade-off:** verbose class names. BEM predates scoped styling; today CSS Modules, scoped component styles, and utility frameworks address the same isolation problem differently, but BEM remains a clear convention in plain CSS.",
+    "code": "/* Block / Element / Modifier */\n.card { }\n.card__title { }\n.card__button { }\n.card__button--primary { }\n.card--featured { }",
+    "codeLang": "css",
+    "tags": ["bem", "naming-convention", "architecture", "maintainability"]
+  }
+]

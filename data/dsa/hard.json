@@ -5,8 +5,13 @@
     "answer": "Binary search on the smaller array to find a partition. We choose a cut in nums1 and the complementary cut in nums2 so that the left half has exactly (m+n+1)/2 elements. A valid partition satisfies `maxLeft1 <= minRight2` and `maxLeft2 <= minRight1`. We binary-search the cut position in the smaller array; if `maxLeft1 > minRight2` we move left, otherwise right. Once valid, the median is either the max of the two left parts (odd total) or the average of the max-left and min-right (even total). Searching only the smaller array guarantees the log bound on the smaller dimension.\n\n**Time O(log(min(m,n))), Space O(1)**",
     "code": "function findMedianSortedArrays(nums1, nums2) {\n  if (nums1.length > nums2.length) [nums1, nums2] = [nums2, nums1];\n  const m = nums1.length, n = nums2.length;\n  let lo = 0, hi = m;\n  while (lo <= hi) {\n    const i = (lo + hi) >> 1;\n    const j = ((m + n + 1) >> 1) - i;\n    const maxL1 = i === 0 ? -Infinity : nums1[i - 1];\n    const minR1 = i === m ? Infinity : nums1[i];\n    const maxL2 = j === 0 ? -Infinity : nums2[j - 1];\n    const minR2 = j === n ? Infinity : nums2[j];\n    if (maxL1 <= minR2 && maxL2 <= minR1) {\n      if ((m + n) % 2 === 1) return Math.max(maxL1, maxL2);\n      return (Math.max(maxL1, maxL2) + Math.min(minR1, minR2)) / 2;\n    } else if (maxL1 > minR2) {\n      hi = i - 1;\n    } else {\n      lo = i + 1;\n    }\n  }\n  return 0;\n}",
     "codeLang": "js",
-    "tags": ["binary search", "arrays", "divide and conquer"],
-    "difficulty": "hard"
+    "tags": [
+      "binary search",
+      "arrays",
+      "divide and conquer"
+    ],
+    "difficulty": "hard",
+    "short": "Binary-search a partition on the smaller array so the left half holds `(m+n+1)/2` elements with `maxLeft <= minRight` on both sides; median is then the boundary max (odd) or average of boundary max/min (even). O(log min(m,n))."
   },
   {
     "id": "dsa-trapping-rain-water",
@@ -14,8 +19,13 @@
     "answer": "Water above each bar is bounded by `min(maxLeft, maxRight) - height[i]`. Use two pointers from both ends, tracking running left and right maxima. At each step process the side with the smaller running max, because that side's bound is known to be the limiting one. Add `leftMax - height[left]` (or the right analogue) when the current bar is below the running max. This avoids precomputing prefix/suffix max arrays.\n\n**Time O(n), Space O(1)**",
     "code": "function trap(height) {\n  let left = 0, right = height.length - 1;\n  let leftMax = 0, rightMax = 0, water = 0;\n  while (left < right) {\n    if (height[left] < height[right]) {\n      leftMax = Math.max(leftMax, height[left]);\n      water += leftMax - height[left];\n      left++;\n    } else {\n      rightMax = Math.max(rightMax, height[right]);\n      water += rightMax - height[right];\n      right--;\n    }\n  }\n  return water;\n}",
     "codeLang": "js",
-    "tags": ["two pointers", "arrays", "greedy"],
-    "difficulty": "hard"
+    "tags": [
+      "two pointers",
+      "arrays",
+      "greedy"
+    ],
+    "difficulty": "hard",
+    "short": "Two pointers from both ends tracking running left/right maxima; always advance the side with the smaller max and add `runningMax - height[i]`. O(n) time, O(1) space."
   },
   {
     "id": "dsa-edit-distance",
@@ -23,8 +33,12 @@
     "answer": "Classic Levenshtein distance via dynamic programming. Let dp[i][j] be the edit distance between the first i chars of word1 and first j chars of word2. Base cases: converting to/from an empty string costs the other length. Transition: if characters match, `dp[i][j] = dp[i-1][j-1]`; otherwise `1 + min(replace dp[i-1][j-1], delete dp[i-1][j], insert dp[i][j-1])`. We compress to a 1D rolling array keeping the previous diagonal value.\n\n**Time O(m*n), Space O(min(m,n))**",
     "code": "function minDistance(word1, word2) {\n  if (word1.length < word2.length) [word1, word2] = [word2, word1];\n  const m = word1.length, n = word2.length;\n  let prev = Array.from({ length: n + 1 }, (_, j) => j);\n  for (let i = 1; i <= m; i++) {\n    const curr = new Array(n + 1);\n    curr[0] = i;\n    for (let j = 1; j <= n; j++) {\n      if (word1[i - 1] === word2[j - 1]) {\n        curr[j] = prev[j - 1];\n      } else {\n        curr[j] = 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);\n      }\n    }\n    prev = curr;\n  }\n  return prev[n];\n}",
     "codeLang": "js",
-    "tags": ["dynamic programming", "strings"],
-    "difficulty": "hard"
+    "tags": [
+      "dynamic programming",
+      "strings"
+    ],
+    "difficulty": "hard",
+    "short": "Levenshtein DP where `dp[i][j]` is the edit distance of the two prefixes; on match carry the diagonal, else `1 + min(replace, delete, insert)`. Compressed to a 1D rolling row, O(m*n) time."
   },
   {
     "id": "dsa-regular-expression-matching",
@@ -32,8 +46,13 @@
     "answer": "Dynamic programming over indices of s and p. dp[i][j] means s[0..i) matches p[0..j). For a normal or '.' character, dp[i][j] depends on dp[i-1][j-1] when the current chars match. For '*', it can mean zero occurrences (dp[i][j-2]) or one-plus occurrences when the preceding pattern char matches s[i-1] (dp[i-1][j] and that char-match). Base case dp[0][0] is true; an empty string can match patterns like a* or a*b* via the zero-occurrence branch.\n\n**Time O(m*n), Space O(m*n)**",
     "code": "function isMatch(s, p) {\n  const m = s.length, n = p.length;\n  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));\n  dp[0][0] = true;\n  for (let j = 1; j <= n; j++) {\n    if (p[j - 1] === '*') dp[0][j] = dp[0][j - 2];\n  }\n  for (let i = 1; i <= m; i++) {\n    for (let j = 1; j <= n; j++) {\n      if (p[j - 1] === '*') {\n        dp[i][j] = dp[i][j - 2];\n        if (p[j - 2] === '.' || p[j - 2] === s[i - 1]) {\n          dp[i][j] = dp[i][j] || dp[i - 1][j];\n        }\n      } else if (p[j - 1] === '.' || p[j - 1] === s[i - 1]) {\n        dp[i][j] = dp[i - 1][j - 1];\n      }\n    }\n  }\n  return dp[m][n];\n}",
     "codeLang": "js",
-    "tags": ["dynamic programming", "strings", "recursion"],
-    "difficulty": "hard"
+    "tags": [
+      "dynamic programming",
+      "strings",
+      "recursion"
+    ],
+    "difficulty": "hard",
+    "short": "DP where `dp[i][j]` means `s[0..i)` matches `p[0..j)`; `*` takes either zero occurrences (`dp[i][j-2]`) or one-plus when the preceding char matches (`dp[i-1][j]`). O(m*n)."
   },
   {
     "id": "dsa-longest-valid-parentheses",
@@ -41,8 +60,13 @@
     "answer": "Use a stack of indices seeded with a sentinel -1 representing the last unmatched position. Push indices of '('. On ')', pop; if the stack becomes empty, the ')' is unmatched so push its index as the new base. Otherwise the current valid length is `i - stack.top()`. Track the maximum over all positions. The sentinel/base trick lets us compute lengths spanning multiple matched pairs.\n\n**Time O(n), Space O(n)**",
     "code": "function longestValidParentheses(s) {\n  const stack = [-1];\n  let max = 0;\n  for (let i = 0; i < s.length; i++) {\n    if (s[i] === '(') {\n      stack.push(i);\n    } else {\n      stack.pop();\n      if (stack.length === 0) {\n        stack.push(i);\n      } else {\n        max = Math.max(max, i - stack[stack.length - 1]);\n      }\n    }\n  }\n  return max;\n}",
     "codeLang": "js",
-    "tags": ["stack", "strings", "dynamic programming"],
-    "difficulty": "hard"
+    "tags": [
+      "stack",
+      "strings",
+      "dynamic programming"
+    ],
+    "difficulty": "hard",
+    "short": "Stack of indices seeded with sentinel -1; push `(`, and on `)` pop then either reset the base (empty stack) or record `i - stack.top()` as a valid length. O(n)."
   },
   {
     "id": "dsa-word-break-ii",
@@ -50,8 +74,14 @@
     "answer": "Backtracking with memoization. For each starting index, try every dictionary prefix; recurse on the remainder and prepend the current word to each returned suffix sentence. Memoize results keyed by start index so overlapping subproblems are solved once. Using a Set for the dictionary gives O(1) membership checks. The memo maps a start index to the list of all sentences for the remaining substring.\n\n**Time O(n^2 * 2^n) worst case (exponential number of sentences), Space O(2^n)**",
     "code": "function wordBreak(s, wordDict) {\n  const dict = new Set(wordDict);\n  const memo = new Map();\n  function dfs(start) {\n    if (start === s.length) return [''];\n    if (memo.has(start)) return memo.get(start);\n    const res = [];\n    for (let end = start + 1; end <= s.length; end++) {\n      const word = s.slice(start, end);\n      if (dict.has(word)) {\n        for (const sub of dfs(end)) {\n          res.push(sub === '' ? word : word + ' ' + sub);\n        }\n      }\n    }\n    memo.set(start, res);\n    return res;\n  }\n  return dfs(0);\n}",
     "codeLang": "js",
-    "tags": ["backtracking", "dynamic programming", "memoization", "strings"],
-    "difficulty": "hard"
+    "tags": [
+      "backtracking",
+      "dynamic programming",
+      "memoization",
+      "strings"
+    ],
+    "difficulty": "hard",
+    "short": "Memoized backtracking: from each index try every dictionary-word prefix, recurse on the remainder, and prepend the word to each suffix sentence; memoize sentences by start index. Exponential output."
   },
   {
     "id": "dsa-n-queens",
@@ -59,8 +89,12 @@
     "answer": "Backtrack row by row, placing one queen per row. Maintain three sets for occupied columns, the two diagonal directions (`row - col` and `row + col` uniquely identify diagonals). For each row try every column not under attack, mark the sets, recurse, then unmark. When a queen is placed in every row, render the board from the column assignments. The set-based attack checks make each placement O(1).\n\n**Time O(n!), Space O(n^2) for output**",
     "code": "function solveNQueens(n) {\n  const res = [];\n  const cols = new Set(), diag1 = new Set(), diag2 = new Set();\n  const queens = new Array(n);\n  function backtrack(row) {\n    if (row === n) {\n      res.push(queens.map(c => '.'.repeat(c) + 'Q' + '.'.repeat(n - c - 1)));\n      return;\n    }\n    for (let c = 0; c < n; c++) {\n      if (cols.has(c) || diag1.has(row - c) || diag2.has(row + c)) continue;\n      cols.add(c); diag1.add(row - c); diag2.add(row + c);\n      queens[row] = c;\n      backtrack(row + 1);\n      cols.delete(c); diag1.delete(row - c); diag2.delete(row + c);\n    }\n  }\n  backtrack(0);\n  return res;\n}",
     "codeLang": "js",
-    "tags": ["backtracking", "recursion"],
-    "difficulty": "hard"
+    "tags": [
+      "backtracking",
+      "recursion"
+    ],
+    "difficulty": "hard",
+    "short": "Backtrack one queen per row using sets for occupied columns and both diagonals (`row-col`, `row+col`) for O(1) attack checks; render the board when all rows are filled. O(n!)."
   },
   {
     "id": "dsa-merge-k-sorted-lists",
@@ -68,8 +102,14 @@
     "answer": "Use a min-heap (priority queue) holding the current front node of each list. Pop the smallest, append it to the result, and push that node's next. Repeat until the heap is empty. With k lists and N total nodes, each push/pop is O(log k), giving O(N log k). Here we implement a small binary heap of nodes keyed by value. A dummy head simplifies result construction.\n\n**Time O(N log k), Space O(k)**",
     "code": "class MinHeap {\n  constructor() { this.h = []; }\n  size() { return this.h.length; }\n  push(node) {\n    const h = this.h; h.push(node); let i = h.length - 1;\n    while (i > 0) {\n      const p = (i - 1) >> 1;\n      if (h[p].val <= h[i].val) break;\n      [h[p], h[i]] = [h[i], h[p]]; i = p;\n    }\n  }\n  pop() {\n    const h = this.h, top = h[0], last = h.pop();\n    if (h.length) {\n      h[0] = last; let i = 0;\n      while (true) {\n        let s = i, l = 2 * i + 1, r = 2 * i + 2;\n        if (l < h.length && h[l].val < h[s].val) s = l;\n        if (r < h.length && h[r].val < h[s].val) s = r;\n        if (s === i) break;\n        [h[s], h[i]] = [h[i], h[s]]; i = s;\n      }\n    }\n    return top;\n  }\n}\nfunction mergeKLists(lists) {\n  const heap = new MinHeap();\n  for (const node of lists) if (node) heap.push(node);\n  const dummy = { val: 0, next: null };\n  let tail = dummy;\n  while (heap.size()) {\n    const node = heap.pop();\n    tail.next = node; tail = node;\n    if (node.next) heap.push(node.next);\n  }\n  return dummy.next;\n}",
     "codeLang": "js",
-    "tags": ["heap", "priority queue", "linked list", "merge"],
-    "difficulty": "hard"
+    "tags": [
+      "heap",
+      "priority queue",
+      "linked list",
+      "merge"
+    ],
+    "difficulty": "hard",
+    "short": "Min-heap holding each list's current front node; repeatedly pop the smallest, append it, and push its `next`. O(N log k) time, O(k) space."
   },
   {
     "id": "dsa-word-ladder",
@@ -77,8 +117,13 @@
     "answer": "Model words as graph nodes; edges connect words differing by one letter. BFS from beginWord finds the shortest path. To generate neighbors efficiently, for each position substitute every letter a-z and check membership in a Set, deleting visited words to avoid revisiting. The BFS level count plus one gives the sequence length. This avoids building the full adjacency list explicitly.\n\n**Time O(N * L * 26), Space O(N * L)** where N is word count and L is word length.",
     "code": "function ladderLength(beginWord, endWord, wordList) {\n  const dict = new Set(wordList);\n  if (!dict.has(endWord)) return 0;\n  let queue = [beginWord];\n  dict.delete(beginWord);\n  let steps = 1;\n  while (queue.length) {\n    const next = [];\n    for (const word of queue) {\n      if (word === endWord) return steps;\n      const arr = word.split('');\n      for (let i = 0; i < arr.length; i++) {\n        const orig = arr[i];\n        for (let c = 97; c <= 122; c++) {\n          arr[i] = String.fromCharCode(c);\n          const cand = arr.join('');\n          if (dict.has(cand)) { dict.delete(cand); next.push(cand); }\n        }\n        arr[i] = orig;\n      }\n    }\n    queue = next;\n    steps++;\n  }\n  return 0;\n}",
     "codeLang": "js",
-    "tags": ["graph", "bfs", "strings"],
-    "difficulty": "hard"
+    "tags": [
+      "graph",
+      "bfs",
+      "strings"
+    ],
+    "difficulty": "hard",
+    "short": "BFS over words as graph nodes (edges = one-letter differences); generate neighbors by substituting each a-z and checking a Set, deleting visited words. Shortest path length found by BFS levels."
   },
   {
     "id": "dsa-alien-dictionary",
@@ -86,8 +131,14 @@
     "answer": "Build a directed graph: compare each adjacent pair of words, and the first differing character gives an ordering edge from the earlier word's char to the later word's char. Guard the invalid prefix case (a longer word appearing before its proper prefix). Then run Kahn's topological sort using in-degrees; if all letters are emitted, return the order, otherwise a cycle exists and we return \"\". Initialize all seen letters with zero in-degree so isolated letters still appear.\n\n**Time O(C) where C is total content length, Space O(1) (bounded alphabet)**",
     "code": "function alienOrder(words) {\n  const adj = new Map();\n  const indeg = new Map();\n  for (const w of words) for (const ch of w) { if (!adj.has(ch)) { adj.set(ch, new Set()); indeg.set(ch, 0); } }\n  for (let i = 0; i < words.length - 1; i++) {\n    const a = words[i], b = words[i + 1];\n    const len = Math.min(a.length, b.length);\n    let j = 0;\n    for (; j < len; j++) {\n      if (a[j] !== b[j]) {\n        if (!adj.get(a[j]).has(b[j])) { adj.get(a[j]).add(b[j]); indeg.set(b[j], indeg.get(b[j]) + 1); }\n        break;\n      }\n    }\n    if (j === len && a.length > b.length) return '';\n  }\n  const queue = [];\n  for (const [ch, d] of indeg) if (d === 0) queue.push(ch);\n  let res = '';\n  while (queue.length) {\n    const ch = queue.shift();\n    res += ch;\n    for (const nb of adj.get(ch)) {\n      indeg.set(nb, indeg.get(nb) - 1);\n      if (indeg.get(nb) === 0) queue.push(nb);\n    }\n  }\n  return res.length === adj.size ? res : '';\n}",
     "codeLang": "js",
-    "tags": ["graph", "topological sort", "bfs", "strings"],
-    "difficulty": "hard"
+    "tags": [
+      "graph",
+      "topological sort",
+      "bfs",
+      "strings"
+    ],
+    "difficulty": "hard",
+    "short": "Build ordering edges from the first differing char of each adjacent word pair (guarding the bad-prefix case), then Kahn's topological sort; return `\"\"` if a cycle leaves letters unemitted."
   },
   {
     "id": "dsa-course-schedule-ii",
@@ -95,8 +146,13 @@
     "answer": "Topological sort via Kahn's algorithm. Build an adjacency list from prerequisite to dependent course and compute in-degrees. Initialize a queue with all zero in-degree courses, repeatedly pop one into the result and decrement neighbors' in-degrees, enqueuing any that hit zero. If the result contains all courses, it is a valid order; otherwise a cycle prevents completion and we return [].\n\n**Time O(V + E), Space O(V + E)**",
     "code": "function findOrder(numCourses, prerequisites) {\n  const adj = Array.from({ length: numCourses }, () => []);\n  const indeg = new Array(numCourses).fill(0);\n  for (const [a, b] of prerequisites) { adj[b].push(a); indeg[a]++; }\n  const queue = [];\n  for (let i = 0; i < numCourses; i++) if (indeg[i] === 0) queue.push(i);\n  const order = [];\n  while (queue.length) {\n    const c = queue.shift();\n    order.push(c);\n    for (const nb of adj[c]) {\n      if (--indeg[nb] === 0) queue.push(nb);\n    }\n  }\n  return order.length === numCourses ? order : [];\n}",
     "codeLang": "js",
-    "tags": ["graph", "topological sort", "bfs"],
-    "difficulty": "hard"
+    "tags": [
+      "graph",
+      "topological sort",
+      "bfs"
+    ],
+    "difficulty": "hard",
+    "short": "Kahn's topological sort: build the prereq adjacency list and in-degrees, repeatedly dequeue zero in-degree courses, decrementing neighbors; return the order if it covers all courses else `[]`. O(V+E)."
   },
   {
     "id": "dsa-number-of-islands-ii",
@@ -104,8 +160,13 @@
     "answer": "Union-Find with path compression and union by rank. Maintain a count of components. When a cell becomes land, if it was already land skip it; otherwise mark it land and increment the count, then union it with any of its 4 land neighbors, decrementing the count on each successful merge. Map 2D coordinates to a 1D index r*n+c. Each operation is near O(1) amortized via the inverse-Ackermann bound.\n\n**Time O(k * alpha) for k operations, Space O(m*n)**",
     "code": "function numIslands2(m, n, positions) {\n  const parent = new Array(m * n).fill(-1);\n  const rank = new Array(m * n).fill(0);\n  let count = 0;\n  const res = [];\n  function find(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; }\n  function union(a, b) {\n    const ra = find(a), rb = find(b);\n    if (ra === rb) return false;\n    if (rank[ra] < rank[rb]) parent[ra] = rb;\n    else if (rank[ra] > rank[rb]) parent[rb] = ra;\n    else { parent[rb] = ra; rank[ra]++; }\n    return true;\n  }\n  const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];\n  for (const [r, c] of positions) {\n    const idx = r * n + c;\n    if (parent[idx] !== -1) { res.push(count); continue; }\n    parent[idx] = idx; count++;\n    for (const [dr, dc] of dirs) {\n      const nr = r + dr, nc = c + dc, ni = nr * n + nc;\n      if (nr >= 0 && nr < m && nc >= 0 && nc < n && parent[ni] !== -1) {\n        if (union(idx, ni)) count--;\n      }\n    }\n    res.push(count);\n  }\n  return res;\n}",
     "codeLang": "js",
-    "tags": ["union find", "graph", "grid"],
-    "difficulty": "hard"
+    "tags": [
+      "union find",
+      "graph",
+      "grid"
+    ],
+    "difficulty": "hard",
+    "short": "Union-Find with path compression and union by rank, tracking a component count; each new land cell increments the count then unions with land neighbors, decrementing per successful merge. Near O(1) per op."
   },
   {
     "id": "dsa-serialize-deserialize-binary-tree",
@@ -113,8 +174,14 @@
     "answer": "Use preorder traversal recording null children with a sentinel marker. Serialize by recursively writing the node value or a marker and joining with commas. Deserialize by reading tokens in the same preorder order: consume one token, if it is the marker return null, otherwise create a node and recursively build its left then right subtrees. A shared index/cursor advances through the token list. Preorder with explicit nulls uniquely encodes structure.\n\n**Time O(n), Space O(n)**",
     "code": "function serialize(root) {\n  const out = [];\n  (function dfs(node) {\n    if (!node) { out.push('#'); return; }\n    out.push(String(node.val));\n    dfs(node.left);\n    dfs(node.right);\n  })(root);\n  return out.join(',');\n}\nfunction deserialize(data) {\n  const tokens = data.split(',');\n  let i = 0;\n  function build() {\n    const t = tokens[i++];\n    if (t === '#') return null;\n    const node = { val: Number(t), left: null, right: null };\n    node.left = build();\n    node.right = build();\n    return node;\n  }\n  return build();\n}",
     "codeLang": "js",
-    "tags": ["tree", "dfs", "design", "recursion"],
-    "difficulty": "hard"
+    "tags": [
+      "tree",
+      "dfs",
+      "design",
+      "recursion"
+    ],
+    "difficulty": "hard",
+    "short": "Preorder traversal recording null children with a sentinel marker, joined by commas; deserialize by consuming tokens in the same preorder order with a shared cursor to rebuild left then right. O(n)."
   },
   {
     "id": "dsa-binary-tree-max-path-sum",
@@ -122,8 +189,14 @@
     "answer": "Post-order DFS returning the best downward path gain from each node: `node.val + max(0, leftGain, rightGain)` clamping negative subtree contributions to 0. At each node, the best path passing through it as the highest point is `node.val + leftGain + rightGain`; we update a global maximum with this value. The returned gain only includes one child branch since a parent can extend through just one side.\n\n**Time O(n), Space O(h) for recursion stack**",
     "code": "function maxPathSum(root) {\n  let max = -Infinity;\n  function gain(node) {\n    if (!node) return 0;\n    const left = Math.max(0, gain(node.left));\n    const right = Math.max(0, gain(node.right));\n    max = Math.max(max, node.val + left + right);\n    return node.val + Math.max(left, right);\n  }\n  gain(root);\n  return max;\n}",
     "codeLang": "js",
-    "tags": ["tree", "dfs", "dynamic programming", "recursion"],
-    "difficulty": "hard"
+    "tags": [
+      "tree",
+      "dfs",
+      "dynamic programming",
+      "recursion"
+    ],
+    "difficulty": "hard",
+    "short": "Post-order DFS returning each node's best single-branch downward gain (clamping negatives to 0); update a global max with `node.val + leftGain + rightGain` at each node. O(n)."
   },
   {
     "id": "dsa-largest-rectangle-histogram",
@@ -131,8 +204,13 @@
     "answer": "Use a monotonic increasing stack of indices. While the current bar is shorter than the bar at the stack top, pop it and compute the area where the popped bar is the limiting height: width spans from the new stack top (exclusive) to the current index (exclusive). Append a sentinel height 0 at the end to flush the stack. The stack maintains indices of bars in increasing height so each pop knows its left and right boundaries.\n\n**Time O(n), Space O(n)**",
     "code": "function largestRectangleArea(heights) {\n  const stack = [];\n  let max = 0;\n  for (let i = 0; i <= heights.length; i++) {\n    const h = i === heights.length ? 0 : heights[i];\n    while (stack.length && heights[stack[stack.length - 1]] > h) {\n      const height = heights[stack.pop()];\n      const width = stack.length ? i - stack[stack.length - 1] - 1 : i;\n      max = Math.max(max, height * width);\n    }\n    stack.push(i);\n  }\n  return max;\n}",
     "codeLang": "js",
-    "tags": ["stack", "monotonic stack", "arrays"],
-    "difficulty": "hard"
+    "tags": [
+      "stack",
+      "monotonic stack",
+      "arrays"
+    ],
+    "difficulty": "hard",
+    "short": "Monotonic increasing stack of indices; when a shorter bar appears, pop and compute area with the popped bar as the limiting height and width spanning to the new top, using a trailing 0 sentinel to flush. O(n)."
   },
   {
     "id": "dsa-maximal-rectangle",
@@ -140,8 +218,14 @@
     "answer": "Reduce to the largest-rectangle-in-histogram problem row by row. Maintain a heights array where heights[c] is the count of consecutive 1's ending at the current row in column c (reset to 0 when the cell is 0). After updating heights for each row, run the monotonic-stack histogram algorithm and track the global max. Each row's histogram captures all rectangles whose bottom edge lies on that row.\n\n**Time O(rows * cols), Space O(cols)**",
     "code": "function maximalRectangle(matrix) {\n  if (!matrix.length) return 0;\n  const cols = matrix[0].length;\n  const heights = new Array(cols).fill(0);\n  let max = 0;\n  for (const row of matrix) {\n    for (let c = 0; c < cols; c++) {\n      heights[c] = row[c] === '1' ? heights[c] + 1 : 0;\n    }\n    max = Math.max(max, largestInRow(heights));\n  }\n  return max;\n}\nfunction largestInRow(heights) {\n  const stack = [];\n  let max = 0;\n  for (let i = 0; i <= heights.length; i++) {\n    const h = i === heights.length ? 0 : heights[i];\n    while (stack.length && heights[stack[stack.length - 1]] > h) {\n      const height = heights[stack.pop()];\n      const width = stack.length ? i - stack[stack.length - 1] - 1 : i;\n      max = Math.max(max, height * width);\n    }\n    stack.push(i);\n  }\n  return max;\n}",
     "codeLang": "js",
-    "tags": ["dynamic programming", "stack", "monotonic stack", "matrix"],
-    "difficulty": "hard"
+    "tags": [
+      "dynamic programming",
+      "stack",
+      "monotonic stack",
+      "matrix"
+    ],
+    "difficulty": "hard",
+    "short": "Reduce to largest-rectangle-in-histogram per row: maintain column heights of consecutive 1's (reset on 0) and run the monotonic-stack histogram algorithm each row, tracking the global max. O(rows*cols)."
   },
   {
     "id": "dsa-sliding-window-maximum",
@@ -149,8 +233,14 @@
     "answer": "Use a monotonic decreasing deque storing indices whose values could still be a window max. Before adding index i, pop from the back all indices with values <= nums[i] (they can never be the max while i is present), then push i. Pop from the front any index that has slid out of the window (index <= i - k). Once the first window is complete, the front of the deque is the current window's maximum.\n\n**Time O(n), Space O(k)**",
     "code": "function maxSlidingWindow(nums, k) {\n  const deque = [];\n  const res = [];\n  for (let i = 0; i < nums.length; i++) {\n    while (deque.length && nums[deque[deque.length - 1]] <= nums[i]) deque.pop();\n    deque.push(i);\n    if (deque[0] <= i - k) deque.shift();\n    if (i >= k - 1) res.push(nums[deque[0]]);\n  }\n  return res;\n}",
     "codeLang": "js",
-    "tags": ["deque", "monotonic queue", "sliding window", "arrays"],
-    "difficulty": "hard"
+    "tags": [
+      "deque",
+      "monotonic queue",
+      "sliding window",
+      "arrays"
+    ],
+    "difficulty": "hard",
+    "short": "Monotonic decreasing deque of indices; pop smaller-or-equal values from the back before pushing `i`, drop front indices that slid out of the window, and the front is each window's max. O(n)."
   },
   {
     "id": "dsa-minimum-window-substring",
@@ -158,8 +248,14 @@
     "answer": "Sliding window with character-count matching. Count required characters of t. Expand the right edge, decrementing need counts; track how many required characters are fully satisfied (formed). When all are formed, contract the left edge to shrink the window while it still satisfies t, updating the best window each time, and break the formed condition when a required char drops below zero. Returns the smallest valid window seen.\n\n**Time O(|s| + |t|), Space O(|t|)**",
     "code": "function minWindow(s, t) {\n  if (!t.length || s.length < t.length) return '';\n  const need = new Map();\n  for (const ch of t) need.set(ch, (need.get(ch) || 0) + 1);\n  let required = need.size, formed = 0;\n  const window = new Map();\n  let left = 0, bestLen = Infinity, bestStart = 0;\n  for (let right = 0; right < s.length; right++) {\n    const c = s[right];\n    window.set(c, (window.get(c) || 0) + 1);\n    if (need.has(c) && window.get(c) === need.get(c)) formed++;\n    while (formed === required) {\n      if (right - left + 1 < bestLen) { bestLen = right - left + 1; bestStart = left; }\n      const lc = s[left];\n      window.set(lc, window.get(lc) - 1);\n      if (need.has(lc) && window.get(lc) < need.get(lc)) formed--;\n      left++;\n    }\n  }\n  return bestLen === Infinity ? '' : s.substr(bestStart, bestLen);\n}",
     "codeLang": "js",
-    "tags": ["sliding window", "hash map", "strings", "two pointers"],
-    "difficulty": "hard"
+    "tags": [
+      "sliding window",
+      "hash map",
+      "strings",
+      "two pointers"
+    ],
+    "difficulty": "hard",
+    "short": "Sliding window with char-count matching: expand right to satisfy all required counts (`formed == required`), then contract left to shrink while still valid, recording the smallest window. O(|s|+|t|)."
   },
   {
     "id": "dsa-word-search-ii",
@@ -167,8 +263,14 @@
     "answer": "Build a Trie of all words, then DFS from every board cell, walking the Trie in lockstep with the path. Mark a visited cell temporarily (e.g., set to '#') and restore on backtrack. When a Trie node carries a complete word, add it to results and clear its word marker to avoid duplicates. The Trie lets us prune entire branches the moment no word shares the current prefix, which is far faster than searching each word independently.\n\n**Time O(m*n*4^L) worst case, Space O(total word chars)** where L is the max word length.",
     "code": "function findWords(board, words) {\n  const root = {};\n  for (const w of words) {\n    let node = root;\n    for (const ch of w) node = node[ch] || (node[ch] = {});\n    node.word = w;\n  }\n  const m = board.length, n = board[0].length, res = [];\n  function dfs(r, c, node) {\n    const ch = board[r][c];\n    const next = node[ch];\n    if (!next) return;\n    if (next.word) { res.push(next.word); next.word = null; }\n    board[r][c] = '#';\n    const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];\n    for (const [dr, dc] of dirs) {\n      const nr = r + dr, nc = c + dc;\n      if (nr >= 0 && nr < m && nc >= 0 && nc < n && board[nr][nc] !== '#') dfs(nr, nc, next);\n    }\n    board[r][c] = ch;\n  }\n  for (let r = 0; r < m; r++) for (let c = 0; c < n; c++) dfs(r, c, root);\n  return res;\n}",
     "codeLang": "js",
-    "tags": ["trie", "backtracking", "dfs", "matrix"],
-    "difficulty": "hard"
+    "tags": [
+      "trie",
+      "backtracking",
+      "dfs",
+      "matrix"
+    ],
+    "difficulty": "hard",
+    "short": "Build a Trie of the words and DFS each board cell in lockstep with the Trie, marking visited cells temporarily; emit a word at terminal nodes and clear its marker to dedupe, pruning dead prefixes early."
   },
   {
     "id": "dsa-find-median-from-data-stream",
@@ -176,7 +278,13 @@
     "answer": "Maintain two heaps: a max-heap (lo) for the smaller half and a min-heap (hi) for the larger half. On addNum, push to lo then move lo's top to hi to keep ordering, and rebalance sizes so lo holds the extra element when the count is odd. The median is lo's top when sizes differ, or the average of both tops when equal. Each insertion is O(log n); median lookup is O(1).\n\n**Time O(log n) per add, O(1) per findMedian, Space O(n)**",
     "code": "class Heap {\n  constructor(cmp) { this.h = []; this.cmp = cmp; }\n  size() { return this.h.length; }\n  peek() { return this.h[0]; }\n  push(v) {\n    const h = this.h; h.push(v); let i = h.length - 1;\n    while (i > 0) { const p = (i - 1) >> 1; if (this.cmp(h[p], h[i]) <= 0) break; [h[p], h[i]] = [h[i], h[p]]; i = p; }\n  }\n  pop() {\n    const h = this.h, top = h[0], last = h.pop();\n    if (h.length) { h[0] = last; let i = 0;\n      while (true) { let s = i, l = 2*i+1, r = 2*i+2;\n        if (l < h.length && this.cmp(h[l], h[s]) < 0) s = l;\n        if (r < h.length && this.cmp(h[r], h[s]) < 0) s = r;\n        if (s === i) break; [h[s], h[i]] = [h[i], h[s]]; i = s; } }\n    return top;\n  }\n}\nclass MedianFinder {\n  constructor() {\n    this.lo = new Heap((a, b) => b - a);\n    this.hi = new Heap((a, b) => a - b);\n  }\n  addNum(num) {\n    this.lo.push(num);\n    this.hi.push(this.lo.pop());\n    if (this.hi.size() > this.lo.size()) this.lo.push(this.hi.pop());\n  }\n  findMedian() {\n    if (this.lo.size() > this.hi.size()) return this.lo.peek();\n    return (this.lo.peek() + this.hi.peek()) / 2;\n  }\n}",
     "codeLang": "js",
-    "tags": ["heap", "priority queue", "design", "two heaps"],
-    "difficulty": "hard"
+    "tags": [
+      "heap",
+      "priority queue",
+      "design",
+      "two heaps"
+    ],
+    "difficulty": "hard",
+    "short": "Two heaps: a max-heap for the lower half and a min-heap for the upper; on add push-and-rebalance to keep sizes balanced, so the median is the larger heap's top or the average of both tops. O(log n) per add."
   }
 ]

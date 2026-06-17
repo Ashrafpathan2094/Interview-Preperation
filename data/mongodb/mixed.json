@@ -5,7 +5,13 @@
     "answer": "**The decision is driven by access patterns, growth, and atomicity needs:**\n\n- **Embed** when the related data is read together with the parent, is bounded in size, and changes with the parent. Embedding gives single-document reads (no join) and atomic single-document writes.\n- **Reference** when the related data is unbounded/high-cardinality, accessed independently, or shared across parents. This avoids the **16 MB document limit** and the *unbounded array* anti-pattern.\n\nFor product reviews, the array of reviews can grow without bound and reviews are often queried/paginated on their own, so a **referencing** (parent-reference) model is the safer production choice. If you only ever show the **latest few** reviews on the product page, a hybrid **subset pattern** (embed the last 3, reference the rest) is ideal.\n\n**Rule of thumb:** *\"data that is accessed together should be stored together\"* — but never let an embedded array grow unbounded.",
     "code": "// Referencing model: reviews in their own collection\ndb.reviews.insertOne({\n  productId: ObjectId(\"64aa00000000000000000001\"),\n  userId: ObjectId(\"64bb00000000000000000002\"),\n  rating: 5,\n  text: \"Excellent build quality\",\n  createdAt: new Date()\n});\n\n// Index to make the join/lookup efficient\ndb.reviews.createIndex({ productId: 1, createdAt: -1 });\n\n// Paginated read of reviews for a product\ndb.reviews\n  .find({ productId: ObjectId(\"64aa00000000000000000001\") })\n  .sort({ createdAt: -1 })\n  .limit(20);\n\n// Hybrid subset pattern: keep only the latest 3 on the product doc\ndb.products.updateOne(\n  { _id: ObjectId(\"64aa00000000000000000001\") },\n  {\n    $push: {\n      recentReviews: {\n        $each: [{ userId: ObjectId(\"64bb00000000000000000002\"), rating: 5, text: \"Excellent\" }],\n        $position: 0,\n        $slice: 3 // cap the embedded array so it never grows unbounded\n      }\n    }\n  }\n);",
     "codeLang": "js",
-    "tags": ["schema-design", "embedding", "referencing", "data-modeling"]
+    "tags": [
+      "schema-design",
+      "embedding",
+      "referencing",
+      "data-modeling"
+    ],
+    "short": "Embed bounded data read with its parent for atomic single-document reads/writes; reference unbounded, independently-queried data like reviews to avoid the 16 MB limit. A hybrid subset pattern (embed latest 3, reference rest) suits product reviews."
   },
   {
     "id": "mongodb-compound-index-esr-rule",
@@ -13,7 +19,13 @@
     "answer": "A compound index serves a query best when its key order follows the **ESR rule**:\n\n1. **Equality** fields first (exact matches like `status: \"active\"`) — they narrow the scan the most.\n2. **Sort** fields next — so the index can return results already ordered, avoiding an in-memory **blocking sort** (`SORT` stage).\n3. **Range** fields last (`$gt`, `$lt`, `$in` ranges) — a range \"opens up\" the index, so any sort placed after it can no longer be served by the index.\n\nIf you put the range before the sort, MongoDB can still use the index for filtering but must perform an in-memory sort. Verify with `explain()`: you want `IXSCAN` and **no** `SORT` stage, with `totalKeysExamined` close to `nReturned`.",
     "code": "// ESR-ordered compound index: Equality(status) -> Sort(createdAt) -> Range(amount)\ndb.orders.createIndex({ status: 1, createdAt: -1, amount: 1 });\n\nconst plan = db.orders\n  .find({ status: \"active\", amount: { $gte: 100 } })\n  .sort({ createdAt: -1 })\n  .explain(\"executionStats\");\n\n// Expect: winningPlan.inputStage.stage === 'IXSCAN', no 'SORT' stage,\n// and executionStats.totalKeysExamined ~= nReturned (efficient index use)\nprint(plan.executionStats.totalKeysExamined, plan.executionStats.nReturned);",
     "codeLang": "js",
-    "tags": ["indexing", "compound-index", "esr", "query-optimization"]
+    "tags": [
+      "indexing",
+      "compound-index",
+      "esr",
+      "query-optimization"
+    ],
+    "short": "Order compound index keys as Equality, then Sort, then Range so the index both filters and returns sorted results without a blocking in-memory `SORT`. Verify with `explain()`: expect `IXSCAN`, no `SORT`, and keys examined near `nReturned`."
   },
   {
     "id": "mongodb-explain-diagnose-slow-query",
@@ -21,7 +33,13 @@
     "answer": "Run the query with `.explain(\"executionStats\")` and inspect:\n\n- **`winningPlan.stage`**: a `COLLSCAN` means a full collection scan — usually a **missing index**. An `IXSCAN` means an index is used.\n- **`totalDocsExamined` vs `nReturned`**: a large ratio (e.g. examining 1,000,000 docs to return 10) means the index is non-selective or absent.\n- **`SORT` stage**: an in-memory blocking sort, which fails past 100 MB unless `allowDiskUse` is set — fix by adding the sort field to the index (ESR).\n- **`totalKeysExamined`**: ideally close to `nReturned`.\n\nThe fix is typically to **create a selective index** matching the predicate (and sort). After adding it, re-run `explain()` and confirm the plan switched to `IXSCAN` with examined counts near `nReturned`. Also check that a recent data-distribution change didn't make the planner pick a worse cached plan (clear with index changes).",
     "code": "// 1) Diagnose\nconst before = db.events\n  .find({ tenantId: \"acme\", type: \"login\" })\n  .sort({ ts: -1 })\n  .explain(\"executionStats\");\n// winningPlan shows the plan tree; a top/nested COLLSCAN means a missing index\nprintjson(before.queryPlanner.winningPlan);            // look for 'COLLSCAN' -> bad\nprint(before.executionStats.totalDocsExamined,         // huge\n      before.executionStats.nReturned);                // small -> red flag\n\n// 2) Fix: selective compound index following ESR (equality -> sort)\ndb.events.createIndex({ tenantId: 1, type: 1, ts: -1 });\n\n// 3) Verify\nconst after = db.events\n  .find({ tenantId: \"acme\", type: \"login\" })\n  .sort({ ts: -1 })\n  .explain(\"executionStats\");\nprintjson(after.queryPlanner.winningPlan);             // now 'IXSCAN' (+ FETCH), no 'SORT' -> good\nprint(after.executionStats.totalDocsExamined,\n      after.executionStats.nReturned);                 // now close together",
     "codeLang": "js",
-    "tags": ["query-optimization", "explain", "indexing", "performance"]
+    "tags": [
+      "query-optimization",
+      "explain",
+      "indexing",
+      "performance"
+    ],
+    "short": "Run `.explain(\"executionStats\")` and look for `COLLSCAN`, a high `totalDocsExamined`-to-`nReturned` ratio, or a blocking `SORT` stage signaling a missing index. Fix by adding a selective ESR-ordered index and confirm the plan switches to `IXSCAN`."
   },
   {
     "id": "mongodb-aggregation-monthly-sales-report",
@@ -29,7 +47,14 @@
     "answer": "The **aggregation pipeline** processes documents through ordered stages, each transforming the stream:\n\n- **`$match`** first to filter to the current year — placing it early reduces the documents flowing downstream and lets the stage use an index.\n- **`$unwind`** to flatten the line-items array so each item becomes its own document for grouping.\n- **`$group`** to accumulate `revenue` (`$sum` of price*qty) and `orders` per `category`.\n- **`$sort`** to order by revenue descending.\n- **`$project`** to shape the final output and drop `_id` clutter.\n\n**Optimization note:** keep `$match` and `$sort` near the front so the planner can leverage indexes before the pipeline becomes non-indexable after `$group`.",
     "code": "db.orders.aggregate([\n  { $match: { createdAt: { $gte: ISODate(\"2026-01-01\"), $lt: ISODate(\"2027-01-01\") } } },\n  { $unwind: \"$items\" },\n  { $group: {\n      _id: \"$items.category\",\n      revenue: { $sum: { $multiply: [\"$items.price\", \"$items.qty\"] } },\n      orders: { $sum: 1 }\n  } },\n  { $sort: { revenue: -1 } },\n  { $project: { _id: 0, category: \"$_id\", revenue: 1, orders: 1 } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$group", "$match", "$unwind", "reporting"]
+    "tags": [
+      "aggregation",
+      "$group",
+      "$match",
+      "$unwind",
+      "reporting"
+    ],
+    "short": "Build a pipeline: `$match` the current year early (index-friendly), `$unwind` line items, `$group` revenue and order count per category, `$sort` by revenue descending, then `$project` to shape output. Keep `$match`/`$sort` up front."
   },
   {
     "id": "mongodb-lookup-join-orders-customers",
@@ -37,7 +62,13 @@
     "answer": "**`$lookup`** performs a **left outer join** to another collection in the same database. For every input document it matches documents in the foreign collection and stores them in a new **array field**. Because the result is an array, you typically follow it with **`$unwind`** when you expect a single match.\n\n**Performance:** `$lookup` is most efficient when the **foreign field is indexed** — otherwise MongoDB scans the foreign collection per input document. For large datasets, do the heavy `$match`/filtering on the local collection *before* the `$lookup` so fewer lookups run. The newer correlated-subquery form (`let` + `pipeline`) lets you add conditions and projections inside the join.\n\nMongoDB is not a relational engine — frequent multi-collection joins can be a sign that a model should have **embedded** the related data instead.",
     "code": "// Ensure the join field is indexed on the foreign collection\ndb.customers.createIndex({ _id: 1 }); // _id is indexed by default; index custom join keys explicitly\n\ndb.orders.aggregate([\n  { $match: { status: \"shipped\" } }, // filter locally first to reduce lookups\n  { $lookup: {\n      from: \"customers\",\n      localField: \"customerId\",\n      foreignField: \"_id\",\n      as: \"customer\"\n  } },\n  { $unwind: \"$customer\" }, // expect exactly one customer per order\n  { $project: {\n      _id: 1,\n      total: 1,\n      \"customer.name\": 1,\n      \"customer.email\": 1\n  } }\n]);",
     "codeLang": "js",
-    "tags": ["aggregation", "$lookup", "join", "performance"]
+    "tags": [
+      "aggregation",
+      "$lookup",
+      "join",
+      "performance"
+    ],
+    "short": "`$lookup` does a left outer join, storing matches as an array (follow with `$unwind` for single matches). It's fastest when the foreign field is indexed and you `$match`/filter locally first; frequent joins may signal you should have embedded."
   },
   {
     "id": "mongodb-multi-document-transaction-transfer",
@@ -45,7 +76,13 @@
     "answer": "MongoDB supports **multi-document ACID transactions** (since 4.0 on replica sets, 4.2 on sharded clusters). They guarantee **all-or-nothing** semantics across multiple documents and collections.\n\n**Key requirements and notes:**\n\n- Transactions run inside a **session** and require a **replica set or sharded cluster** (not a standalone).\n- Wrap operations in `startTransaction` / `commitTransaction`, and `abortTransaction` on error.\n- Prefer the driver's `withTransaction()` helper — it **automatically retries** on transient transaction errors and `UnknownTransactionCommitResult`.\n- Keep transactions **short** and touch few documents; long-running transactions hold locks and can hit the default 60-second `transactionLifetimeLimitSeconds`.\n- Where a single-document atomic update suffices, **prefer that** — single-document writes are always atomic and cheaper. Use transactions only when truly multi-document.",
     "code": "const session = client.startSession();\ntry {\n  await session.withTransaction(async () => {\n    const accounts = client.db(\"bank\").collection(\"accounts\");\n\n    const debit = await accounts.updateOne(\n      { _id: \"A\", balance: { $gte: 100 } }, // guard against overdraft\n      { $inc: { balance: -100 } },\n      { session }\n    );\n    if (debit.modifiedCount !== 1) {\n      throw new Error(\"Insufficient funds\"); // aborts the transaction\n    }\n\n    await accounts.updateOne(\n      { _id: \"B\" },\n      { $inc: { balance: 100 } },\n      { session }\n    );\n  }, {\n    readConcern: { level: \"snapshot\" },\n    writeConcern: { w: \"majority\" }\n  });\n} finally {\n  await session.endSession();\n}",
     "codeLang": "js",
-    "tags": ["transactions", "acid", "sessions", "crud"]
+    "tags": [
+      "transactions",
+      "acid",
+      "sessions",
+      "crud"
+    ],
+    "short": "Multi-document ACID transactions run in a session on a replica set or sharded cluster, giving all-or-nothing semantics. Use the driver's `withTransaction()` (auto-retries transient errors), keep them short, and prefer atomic single-document updates when possible."
   },
   {
     "id": "mongodb-ttl-index-session-expiry",
@@ -53,7 +90,13 @@
     "answer": "A **TTL (Time To Live) index** is a special single-field index on a **BSON date** field. A background thread (`TTLMonitor`) runs roughly **every 60 seconds** and removes documents whose date field is older than `expireAfterSeconds`.\n\n**Key points and limitations:**\n\n- The indexed field **must be a `Date`** (or an array of dates — then the *earliest* date is used). Non-date values are ignored.\n- Deletion is **not precise** — documents may live up to ~60s past expiry because the monitor runs periodically.\n- A TTL index must be a **single-field** index; you cannot make a compound index a TTL index.\n- To expire at a fixed clock time instead of a relative offset, set `expireAfterSeconds: 0` and store the absolute expiry timestamp in the field.\n- On sharded clusters the monitor runs per shard primary.",
     "code": "// Expire 30 minutes (1800s) after createdAt\ndb.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 1800 });\n\ndb.sessions.insertOne({\n  _id: \"sess_abc\",\n  userId: ObjectId(\"64bb00000000000000000002\"),\n  createdAt: new Date() // MUST be a Date for the TTL monitor to act on it\n});\n\n// Alternative: expire at an explicit absolute time using expireAfterSeconds: 0\ndb.tokens.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });\ndb.tokens.insertOne({ _id: \"t1\", expiresAt: new Date(Date.now() + 30 * 60 * 1000) });",
     "codeLang": "js",
-    "tags": ["indexing", "ttl", "expiration", "data-modeling"]
+    "tags": [
+      "indexing",
+      "ttl",
+      "expiration",
+      "data-modeling"
+    ],
+    "short": "A TTL index on a `Date` field lets the `TTLMonitor` (running ~every 60s) delete documents older than `expireAfterSeconds`. It must be single-field, deletion isn't precise (~60s lag), and `expireAfterSeconds: 0` expires at an absolute stored timestamp."
   },
   {
     "id": "mongodb-write-read-concern-tradeoffs",
@@ -61,7 +104,13 @@
     "answer": "**Write concern (`w`)** controls how many replica-set members must acknowledge a write before it is considered successful:\n\n- `w: 1` (acknowledged by primary only) is fast but can be **rolled back** if the primary fails before the write replicates.\n- `w: \"majority\"` waits until a majority of voting members have the write, so it **survives failover** and is never rolled back. Add `j: true` to require the write be written to the on-disk journal.\n\n**Read concern** controls the consistency/recency of data read:\n\n- `\"local\"` returns the latest data on the node (may be rolled back).\n- `\"majority\"` returns only data acknowledged by a majority (durable, never rolled back).\n- `\"linearizable\"` gives the strongest single-document guarantee but with higher latency.\n\nThe trade-off is **durability/consistency vs latency**. For financial/order writes, use `w: \"majority\", j: true`; for high-volume telemetry where some loss is tolerable, `w: 1` is fine.",
     "code": "// Durable write that survives a primary failover\ndb.orders.insertOne(\n  { _id: \"ord_1001\", items: [/* ... */], total: 250 },\n  { writeConcern: { w: \"majority\", j: true, wtimeout: 5000 } }\n);\n\n// Read only majority-committed (non-rollback-able) data\ndb.orders.find({ _id: \"ord_1001\" }).readConcern(\"majority\");\n\n// Node.js driver: set it at the collection level\nconst orders = client\n  .db(\"shop\")\n  .collection(\"orders\", { writeConcern: { w: \"majority\", j: true } });",
     "codeLang": "js",
-    "tags": ["write-concern", "read-concern", "replication", "durability"]
+    "tags": [
+      "write-concern",
+      "read-concern",
+      "replication",
+      "durability"
+    ],
+    "short": "Write concern `w:\"majority\"` (with `j:true`) ensures writes survive failover and aren't rolled back, trading latency for durability; `w:1` is faster but loseable. Read concern `\"majority\"` returns only durable data. Use majority for order/financial writes."
   },
   {
     "id": "mongodb-shard-key-selection",
@@ -69,7 +118,13 @@
     "answer": "**Sharding** distributes a collection's documents across multiple shards using a **shard key**. A good shard key has:\n\n- **High cardinality** — many distinct values so data can be split into many chunks.\n- **Low frequency** — no single value dominates, otherwise you get **jumbo chunks** and a hotspot.\n- **Non-monotonic** writes — a monotonically increasing key (like a timestamp or auto-increment `_id`) sends all new writes to the **same shard** (the one owning the top chunk), creating a write hotspot. **Hashed sharding** or a compound key fixes this.\n\n**Alignment with queries matters:** queries that include the shard key are **targeted** to one shard; queries without it are **scatter-gather** across all shards and are slower. For a multi-tenant app, a compound key like `{ tenantId: 1, ts: 1 }` (or hashed `tenantId`) distributes load while keeping per-tenant queries targeted.\n\nNote: the shard key is **immutable per document's value placement** historically, though MongoDB 5.0+ allows resharding and (4.2+) updating the shard-key value of a document with extra cost — choose carefully up front.",
     "code": "// Enable sharding on the database\nsh.enableSharding(\"analytics\");\n\n// Index must exist that supports the shard key\ndb.events.createIndex({ tenantId: 1, ts: 1 });\n\n// Compound shard key: targeted per-tenant queries, spreads write load\nsh.shardCollection(\"analytics.events\", { tenantId: 1, ts: 1 });\n\n// Alternative for a monotonic-only key: hashed sharding avoids a write hotspot\n// sh.shardCollection(\"analytics.events\", { _id: \"hashed\" });\n\n// Targeted query (includes shard key) -> hits one shard\ndb.events.find({ tenantId: \"acme\", ts: { $gte: ISODate(\"2026-06-01\") } });",
     "codeLang": "js",
-    "tags": ["sharding", "shard-key", "scaling", "performance"]
+    "tags": [
+      "sharding",
+      "shard-key",
+      "scaling",
+      "performance"
+    ],
+    "short": "Choose a shard key with high cardinality, low frequency, and non-monotonic writes to avoid jumbo chunks and write hotspots; align it with queries so they're targeted, not scatter-gather. A compound key like `{tenantId:1, ts:1}` suits multi-tenant apps."
   },
   {
     "id": "mongodb-multikey-index-array-query",
@@ -77,7 +132,13 @@
     "answer": "A **multikey index** is automatically created when you index a field that holds an **array**. MongoDB creates a separate index entry for **each element** of the array, so queries matching any element can use the index.\n\n**Key constraints:**\n\n- You **do not** declare it specially — indexing an array field makes it multikey automatically.\n- A **compound index can contain at most one array (multikey) field**; indexing two array fields together is not allowed (would create a combinatorial explosion).\n- Multikey indexes support `$in`, `$all`, equality on elements, and queries on array-of-subdocuments fields.\n- They can be larger than single-value indexes because of one entry per element.\n\nUse `$all` to require **all** listed tags, and `$in`/equality to match **any**.",
     "code": "// Indexing an array field => multikey index (automatic)\ndb.products.createIndex({ tags: 1 });\n\n// Match products containing ANY of these tags (uses the multikey index)\ndb.products.find({ tags: { $in: [\"sale\", \"new\"] } });\n\n// Match products containing ALL of these tags\ndb.products.find({ tags: { $all: [\"electronics\", \"wireless\"] } });\n\n// Compound multikey on array of subdocuments (only ONE array field allowed)\ndb.products.createIndex({ \"variants.color\": 1, price: 1 });\ndb.products.find({ \"variants.color\": \"red\", price: { $lt: 100 } });",
     "codeLang": "js",
-    "tags": ["indexing", "multikey-index", "arrays", "query-optimization"]
+    "tags": [
+      "indexing",
+      "multikey-index",
+      "arrays",
+      "query-optimization"
+    ],
+    "short": "Indexing an array field auto-creates a multikey index with one entry per element, supporting `$in`, `$all`, and element equality. A compound index may include at most one array field. Use `$all` to require all tags, `$in`/equality to match any."
   },
   {
     "id": "mongodb-text-index-search",
@@ -85,7 +146,13 @@
     "answer": "A **text index** tokenizes string fields, removes stop words, and applies stemming, enabling full-text search via the **`$text`** operator. Each matched document gets a relevance score exposed through `$meta: \"textScore\"`, which you sort on to rank results.\n\n**Key points and limitations:**\n\n- A collection can have **only one text index**, but it may span **multiple fields** (and you can weight them).\n- Use **weights** to make matches in the title count more than the body.\n- `$text` matches whole tokens (with stemming); it is **not** a substring/regex search and does not support prefix/wildcard matching the way a dedicated search engine does.\n- For advanced needs (typo tolerance, faceting, autocomplete) consider **Atlas Search** instead.\n- The `textScore` is only available when a `$text` query is present.",
     "code": "// Weighted text index across two fields (only one text index per collection)\ndb.articles.createIndex(\n  { title: \"text\", body: \"text\" },\n  { weights: { title: 5, body: 1 }, name: \"ArticleTextIndex\" }\n);\n\n// Search with relevance ranking\ndb.articles.find(\n  { $text: { $search: \"mongodb indexing\" } },\n  { score: { $meta: \"textScore\" }, title: 1 }\n).sort({ score: { $meta: \"textScore\" } });\n\n// Exclude a term and require a phrase\ndb.articles.find({ $text: { $search: \"\\\"aggregation pipeline\\\" -deprecated\" } });",
     "codeLang": "js",
-    "tags": ["indexing", "text-index", "$text", "search"]
+    "tags": [
+      "indexing",
+      "text-index",
+      "$text",
+      "search"
+    ],
+    "short": "A text index tokenizes, stems, and removes stop words for `$text` full-text search, with relevance via `$meta:\"textScore\"`. Only one text index per collection (can span weighted fields); it matches whole tokens, not substrings/regex. Use Atlas Search for advanced needs."
   },
   {
     "id": "mongodb-capped-collection-logging",
@@ -93,7 +160,13 @@
     "answer": "A **capped collection** is a fixed-size collection that behaves like a circular buffer: once it reaches its `size` (or `max` document count), the **oldest documents are automatically overwritten** by new inserts. They preserve **insertion order** and offer very high write throughput, which makes them great for logs, recent-events buffers, and caches.\n\n**Constraints:**\n\n- You **cannot delete** individual documents from a capped collection.\n- Updates **must not grow** a document's size (since 4.2 doc-size-growing updates fail).\n- You cannot shard a capped collection.\n- Size is set at creation; documents are returned in **natural (insertion) order** by default, which can be reversed with `$natural: -1`.\n- A `_id` index exists by default; you can add others, but reads in natural order need no index.\n\nFor time-based retention you would instead use a **TTL index** on a normal collection; capped collections evict by *size*, not by *age*.",
     "code": "// Create a 10 MB capped collection holding at most 100000 docs\ndb.createCollection(\"logs\", { capped: true, size: 10 * 1024 * 1024, max: 100000 });\n\ndb.logs.insertOne({ level: \"info\", msg: \"service started\", at: new Date() });\n\n// Read newest-first using natural order (no sort index required)\ndb.logs.find().sort({ $natural: -1 }).limit(20);\n\n// Tailable cursor pattern (driver) for streaming new log entries\n// const cursor = db.collection(\"logs\").find({}, { tailable: true, awaitData: true });",
     "codeLang": "js",
-    "tags": ["capped-collection", "logging", "data-modeling", "crud"]
+    "tags": [
+      "capped-collection",
+      "logging",
+      "data-modeling",
+      "crud"
+    ],
+    "short": "A capped collection is a fixed-size circular buffer that auto-evicts oldest documents and preserves insertion order, ideal for high-throughput logs. You can't delete docs or grow them on update; read newest-first via `$natural:-1`. Use a TTL index for age-based eviction."
   },
   {
     "id": "mongodb-bulk-upsert-idempotent-ingestion",
@@ -101,7 +174,13 @@
     "answer": "**Upsert** (`upsert: true`) updates a matching document or **inserts it if none matches**, which is the core of idempotent ingestion — re-running the same batch produces the same end state. Use `$setOnInsert` for fields that should only be written on the initial insert (e.g. `createdAt`).\n\n**`bulkWrite`** batches many operations into one round trip:\n\n- **Ordered (default)**: stops at the first error — use when operations depend on order.\n- **Unordered (`ordered: false`)**: continues past errors and the server may parallelize them — faster for independent ops and the right choice for bulk ingestion.\n\nCombine an **upsert filter on a natural/business key** (with a **unique index** to enforce dedupe) so duplicate batch entries collapse to one document. This makes the job safely re-runnable after a crash.",
     "code": "// Unique index on the business key enforces idempotency / dedupe\ndb.products.createIndex({ sku: 1 }, { unique: true });\n\nconst batch = [\n  { sku: \"A-1\", name: \"Widget\", price: 9.99 },\n  { sku: \"A-2\", name: \"Gadget\", price: 19.99 }\n];\n\ndb.products.bulkWrite(\n  batch.map(p => ({\n    updateOne: {\n      filter: { sku: p.sku },\n      update: {\n        $set: { name: p.name, price: p.price, updatedAt: new Date() },\n        $setOnInsert: { createdAt: new Date() } // only on first insert\n      },\n      upsert: true\n    }\n  })),\n  { ordered: false } // independent ops -> faster, continues past errors\n);",
     "codeLang": "js",
-    "tags": ["crud", "upsert", "bulkwrite", "idempotency"]
+    "tags": [
+      "crud",
+      "upsert",
+      "bulkwrite",
+      "idempotency"
+    ],
+    "short": "Upserts (`upsert:true` with `$setOnInsert`) make ingestion idempotent, and `bulkWrite` batches ops in one round trip; use unordered (`ordered:false`) for faster independent ops. Match on a business key backed by a unique index to dedupe."
   },
   {
     "id": "mongodb-covered-query-projection",
@@ -109,6 +188,12 @@
     "answer": "A **covered query** is one where **all fields** the query needs — both the **filter** fields and the **projected** fields — exist in a single index, so MongoDB answers entirely from the index and **never fetches the document** from disk (no `FETCH` stage). This dramatically reduces I/O for hot read paths.\n\n**Requirements to be covered:**\n\n- All filter and returned fields must be in the same index.\n- You must **exclude `_id`** in the projection (unless `_id` is part of the index), because `_id` is returned by default and is not in your secondary index.\n- The query cannot return fields stored only in the document.\n- Fields cannot be in **embedded arrays** (multikey indexes can't cover).\n\nVerify with `explain()`: the winning plan should show `IXSCAN` with **no `FETCH`** stage and `totalDocsExamined: 0`.",
     "code": "// Index contains both the filter field and the returned field\ndb.users.createIndex({ email: 1, name: 1 });\n\n// Covered query: filter on email, return name, exclude _id\nconst plan = db.users\n  .find({ email: \"jo@x.com\" }, { _id: 0, name: 1 })\n  .explain(\"executionStats\");\n\n// Covered when: stage is IXSCAN, no FETCH, totalDocsExamined === 0\nprint(plan.executionStats.totalDocsExamined); // expect 0\nprint(plan.queryPlanner.winningPlan.stage);   // expect 'PROJECTION_COVERED' / IXSCAN, no FETCH",
     "codeLang": "js",
-    "tags": ["query-optimization", "covered-query", "indexing", "projection"]
+    "tags": [
+      "query-optimization",
+      "covered-query",
+      "indexing",
+      "projection"
+    ],
+    "short": "A covered query answers entirely from one index (no `FETCH`) because all filter and projected fields live in that index; you must exclude `_id` and avoid array (multikey) fields. Verify via `explain()`: `IXSCAN`, no `FETCH`, `totalDocsExamined: 0`."
   }
 ]

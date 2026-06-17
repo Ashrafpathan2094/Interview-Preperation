@@ -5,7 +5,13 @@
     "answer": "**INNER JOIN** returns only rows where the join predicate matches in *both* tables. **LEFT JOIN** returns every row from the left table and fills the right-side columns with `NULL` when there is no match.\n\nTo find customers with **no** orders, you must keep the unmatched left rows, so an INNER JOIN is wrong by definition — it would silently drop exactly the customers you are looking for. The standard pattern is a **LEFT JOIN ... WHERE right_key IS NULL** (an *anti-join*): keep all customers, then filter down to those whose order side came back `NULL`.\n\nThe filter must reference the right table's key in the `WHERE`, not the `ON`. Putting `o.customer_id IS NULL` in the `ON` would have no effect because the LEFT JOIN already preserves left rows; the `NULL` check belongs in the `WHERE` so it runs after the join.\n\n**Equivalent alternatives:** `NOT EXISTS` (often the optimizer's preferred anti-join form) or `NOT IN` (avoid when the column is nullable, since a single NULL makes the whole predicate return no rows).",
     "code": "-- Anti-join with LEFT JOIN + IS NULL\nSELECT c.customer_id, c.name\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.customer_id\nWHERE o.customer_id IS NULL;\n\n-- Equivalent and often optimizer-preferred:\nSELECT c.customer_id, c.name\nFROM customers c\nWHERE NOT EXISTS (\n  SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id\n);",
     "codeLang": "sql",
-    "tags": ["joins", "left-join", "anti-join", "not-exists"]
+    "tags": [
+      "joins",
+      "left-join",
+      "anti-join",
+      "not-exists"
+    ],
+    "short": "INNER JOIN keeps only matched rows so it would drop the customers you want; use a LEFT JOIN with `WHERE orders.customer_id IS NULL` (an anti-join), or equivalently `NOT EXISTS`."
   },
   {
     "id": "sql-nth-highest-salary",
@@ -13,7 +19,13 @@
     "answer": "This classic question hides a subtle decision: **do ties count as one rank or many?**\n\n- **`DENSE_RANK()`** gives the same rank to ties and does **not** skip numbers, so \"the Nth highest *distinct* salary\" maps cleanly to `dr = N`. Use `DISTINCT` salaries (or DENSE_RANK) so two people earning the top salary do not push the real 2nd-highest out of view.\n- **`ROW_NUMBER()`** assigns unique sequential numbers, so it answers \"the Nth highest *row*\" (ties break arbitrarily) — usually *not* what \"Nth highest salary\" means.\n- **`RANK()`** skips numbers after ties (1,1,3), so `rank = 2` could return nothing.\n\n**Trade-off:** the window-function version is read once, set-based, and scales well. The classic **correlated subquery** (`COUNT(DISTINCT ...) = N-1`) is portable to engines without window functions but can be O(N^2)-ish without good indexing. Prefer the window function on modern engines.",
     "code": "-- Window-function approach (Nth highest DISTINCT salary; here N = 2)\nWITH ranked AS (\n  SELECT salary,\n         DENSE_RANK() OVER (ORDER BY salary DESC) AS dr\n  FROM employees\n)\nSELECT DISTINCT salary\nFROM ranked\nWHERE dr = 2;\n\n-- Portable correlated-subquery approach (N = 2 => N-1 = 1 distinct salary above)\nSELECT MIN(salary) AS second_highest\nFROM employees e1\nWHERE (\n  SELECT COUNT(DISTINCT e2.salary)\n  FROM employees e2\n  WHERE e2.salary > e1.salary\n) = 1;",
     "codeLang": "sql",
-    "tags": ["window-functions", "dense-rank", "subqueries", "ranking"]
+    "tags": [
+      "window-functions",
+      "dense-rank",
+      "subqueries",
+      "ranking"
+    ],
+    "short": "Use `DENSE_RANK()` (handles ties as one rank, no gaps) and filter `dr = N` for the Nth highest distinct salary; the portable `COUNT(DISTINCT ...) = N-1` correlated subquery works without window functions but scales worse."
   },
   {
     "id": "sql-where-vs-having-group-by",
@@ -21,7 +33,13 @@
     "answer": "`WHERE` and `HAVING` filter at **different stages** of logical query processing:\n\n1. `FROM`/`JOIN`\n2. **`WHERE`** — filters individual rows *before* grouping. It cannot reference aggregates.\n3. `GROUP BY` — collapses rows into groups.\n4. **`HAVING`** — filters *groups* after aggregation. It can reference aggregates like `AVG(salary)`.\n5. `SELECT` (aliases assigned here)\n6. `ORDER BY`\n\nSo \"only full-time employees\" is a **row-level** condition and belongs in `WHERE` (do it early to shrink the data before grouping — this is also more efficient). \"Average salary exceeds 80,000\" is a **group-level** aggregate condition and belongs in `HAVING`.\n\nA common mistake is putting the aggregate in `WHERE` (error: aggregates not allowed there) or pushing the `employment_type` filter into `HAVING` (works only with a `MIN/MAX` trick and scans more rows unnecessarily).",
     "code": "SELECT department_id,\n       AVG(salary) AS avg_salary,\n       COUNT(*)    AS headcount\nFROM employees\nWHERE employment_type = 'FULL_TIME'   -- row filter, runs before grouping\nGROUP BY department_id\nHAVING AVG(salary) > 80000            -- group filter, runs after aggregation\nORDER BY avg_salary DESC;",
     "codeLang": "sql",
-    "tags": ["group-by", "having", "where", "aggregate-functions"]
+    "tags": [
+      "group-by",
+      "having",
+      "where",
+      "aggregate-functions"
+    ],
+    "short": "`WHERE` filters individual rows before grouping (no aggregates), `HAVING` filters groups after aggregation. Put the full-time filter in `WHERE` and `AVG(salary) > 80000` in `HAVING`."
   },
   {
     "id": "sql-running-total-window-vs-self-join",
@@ -29,7 +47,13 @@
     "answer": "A **window function** computes a value over a set of rows (the *window*) related to the current row, **without collapsing** them the way `GROUP BY` does. The `OVER` clause defines:\n\n- **`PARTITION BY`** — resets the calculation per group (e.g., per store).\n- **`ORDER BY`** — orders rows within the partition.\n- **frame** — which rows are included relative to the current row. For a running total you want `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`.\n\nNote: when you specify `ORDER BY` in a window with `SUM()` and omit an explicit frame, the default frame is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`, which can over-count tied dates. Being explicit with `ROWS` avoids that surprise.\n\n**Why not a self-join?** The classic running total via `JOIN ... ON s2.date <= s1.date` plus `GROUP BY` is O(N^2) and re-scans the table for every row. The window function is a single ordered pass, far faster and clearer.",
     "code": "SELECT\n  sale_date,\n  amount,\n  SUM(amount) OVER (\n    ORDER BY sale_date\n    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\n  ) AS running_total\nFROM daily_sales\nORDER BY sale_date;",
     "codeLang": "sql",
-    "tags": ["window-functions", "running-total", "frame", "performance"]
+    "tags": [
+      "window-functions",
+      "running-total",
+      "frame",
+      "performance"
+    ],
+    "short": "Use `SUM(amount) OVER (ORDER BY sale_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` for a single-pass running total; specify ROWS to avoid the default RANGE frame over-counting ties, far faster than an O(N^2) self-join."
   },
   {
     "id": "sql-lag-lead-month-over-month",
@@ -37,7 +61,13 @@
     "answer": "**`LAG(expr, offset, default)`** returns the value of `expr` from a row `offset` positions *before* the current row within the window; **`LEAD()`** looks *forward*. Both require an `ORDER BY` inside `OVER` to define what \"previous\"/\"next\" means.\n\nKey points:\n\n- **`PARTITION BY product_id`** restarts the sequence per product, so January of product B does not subtract from December of product A.\n- The third argument is the **default** returned when there is no prior/next row (here the first month per product). Using `0` avoids a `NULL` that would make the growth calculation `NULL`.\n- Guard the division: when the previous month is `0` or `NULL`, percentage growth is undefined — use `NULLIF` to avoid divide-by-zero.\n\nThis is a textbook case where LAG removes the need for a fragile self-join on `month = month - 1`.",
     "code": "SELECT\n  product_id,\n  month,\n  revenue,\n  LAG(revenue, 1, 0) OVER (\n    PARTITION BY product_id ORDER BY month\n  ) AS prev_revenue,\n  ROUND(\n    (revenue - LAG(revenue, 1, 0) OVER (PARTITION BY product_id ORDER BY month))\n    * 100.0 / NULLIF(LAG(revenue, 1, 0) OVER (PARTITION BY product_id ORDER BY month), 0),\n  2) AS mom_growth_pct\nFROM monthly_product_revenue\nORDER BY product_id, month;",
     "codeLang": "sql",
-    "tags": ["window-functions", "lag", "lead", "time-series"]
+    "tags": [
+      "window-functions",
+      "lag",
+      "lead",
+      "time-series"
+    ],
+    "short": "`LAG`/`LEAD` fetch a prior/next row's value within an ordered window; `PARTITION BY product_id` resets per product, a default of 0 avoids NULLs, and `NULLIF` guards divide-by-zero in the growth calc."
   },
   {
     "id": "sql-find-and-delete-duplicates",
@@ -45,7 +75,13 @@
     "answer": "**Identifying** duplicates is a `GROUP BY` + `HAVING COUNT(*) > 1` on the columns that define uniqueness. That tells you *which* keys are duplicated and how many copies exist.\n\n**Deleting** safely is the trickier part because you must keep exactly one row per group. The robust, engine-friendly pattern is `ROW_NUMBER()` partitioned by the duplicate key, ordered by a tie-breaker (e.g., keep the smallest `id` / earliest `created_at`), then delete every row where `rn > 1`.\n\nWhy `ROW_NUMBER()` and not `RANK()`? `RANK()` gives ties the same number, so two identical rows would both get `rank = 1` and you'd delete neither or both. `ROW_NUMBER()` guarantees a unique sequence so exactly one survivor remains per group.\n\nAlways run the `SELECT` form first to verify what would be deleted before issuing the `DELETE`.",
     "code": "-- 1) Identify duplicate keys\nSELECT email, COUNT(*) AS copies\nFROM users\nGROUP BY email\nHAVING COUNT(*) > 1;\n\n-- 2) Delete all but the earliest (smallest id) per email\nWITH ranked AS (\n  SELECT id,\n         ROW_NUMBER() OVER (\n           PARTITION BY email ORDER BY id\n         ) AS rn\n  FROM users\n)\nDELETE FROM users\nWHERE id IN (SELECT id FROM ranked WHERE rn > 1);",
     "codeLang": "sql",
-    "tags": ["window-functions", "row-number", "duplicates", "data-cleanup"]
+    "tags": [
+      "window-functions",
+      "row-number",
+      "duplicates",
+      "data-cleanup"
+    ],
+    "short": "Identify dupes with `GROUP BY email HAVING COUNT(*) > 1`; delete extras using `ROW_NUMBER()` partitioned by email (unique sequence keeps exactly one) and remove rows where `rn > 1`."
   },
   {
     "id": "sql-normalization-3nf-decompose",
@@ -53,7 +89,13 @@
     "answer": "Storing `customer_name` and `customer_city` on every order row is a **transitive dependency**: those attributes depend on the customer, not on the order. The order's key determines `customer_id`, and `customer_id` determines the customer's name/city — i.e., `order_id -> customer_id -> customer_name`.\n\nThis violates **3NF**, which requires that every non-key attribute depend on the key, the whole key, and **nothing but the key** (no transitive dependency through another non-key attribute).\n\n**Problems it causes:**\n- **Update anomaly:** a customer who moves cities requires updating many order rows; miss one and data is inconsistent.\n- **Insertion anomaly:** you cannot record a customer until they place an order.\n- **Deletion anomaly:** deleting their last order erases the customer's details.\n- **Redundancy/storage waste.**\n\n**Fix:** decompose into `customers` (the determinant of name/city) and `orders` (which references the customer via a foreign key).",
     "code": "-- Normalized to 3NF: customer attributes live with the customer\nCREATE TABLE customers (\n  customer_id   INT PRIMARY KEY,\n  customer_name VARCHAR(100) NOT NULL,\n  customer_city VARCHAR(100) NOT NULL\n);\n\nCREATE TABLE orders (\n  order_id    INT PRIMARY KEY,\n  customer_id INT NOT NULL,\n  order_date  DATE NOT NULL,\n  amount      DECIMAL(10,2) NOT NULL,\n  CONSTRAINT fk_orders_customer\n    FOREIGN KEY (customer_id) REFERENCES customers(customer_id)\n);\n\n-- Reconstruct the original denormalized view when needed:\nSELECT o.order_id, c.customer_name, c.customer_city, o.amount\nFROM orders o\nJOIN customers c ON c.customer_id = o.customer_id;",
     "codeLang": "sql",
-    "tags": ["normalization", "3nf", "transitive-dependency", "schema-design"]
+    "tags": [
+      "normalization",
+      "3nf",
+      "transitive-dependency",
+      "schema-design"
+    ],
+    "short": "Storing customer_name/city on orders is a transitive dependency (order to customer to attributes) that violates 3NF, causing update/insert/delete anomalies; fix by splitting into `customers` and `orders` linked by a foreign key."
   },
   {
     "id": "sql-composite-index-leftmost-prefix",
@@ -61,7 +103,13 @@
     "answer": "A composite B-tree index on `(a, b, c)` is sorted **first by a, then by b, then by c**. Because of this ordering it can satisfy queries that filter on a **leftmost prefix**: `(a)`, `(a, b)`, or `(a, b, c)` — but **not** `(b)` or `(c)` alone, because those columns are not globally sorted within the index.\n\nThat is exactly why filtering only on `status` is slow with an index on `(tenant_id, status)`: `status` is the second column, so the index can't be range-scanned on it alone and the engine falls back to a scan.\n\n**Design rules:**\n- Put the most selective / most frequently filtered (especially equality) columns leftmost; this matches the **Equality-then-Range** intuition.\n- One well-ordered composite index can serve several query shapes (covering the prefixes), reducing index count and write overhead.\n- If filtering by `status` alone is genuinely common, add a separate index `(status)` or reorder — but each extra index costs write/maintenance time.\n\nConfirm with `EXPLAIN` (look for an Index Seek/Range Scan rather than a full table scan).",
     "code": "-- Serves WHERE tenant_id = ? AND status = ?  and  WHERE tenant_id = ?\nCREATE INDEX idx_orders_tenant_status ON orders (tenant_id, status);\n\n-- Uses the index (leftmost prefix present):\nEXPLAIN SELECT * FROM orders WHERE tenant_id = 42 AND status = 'OPEN';\nEXPLAIN SELECT * FROM orders WHERE tenant_id = 42;\n\n-- Does NOT use the composite index efficiently (status is not the leftmost column):\nEXPLAIN SELECT * FROM orders WHERE status = 'OPEN';\n\n-- Fix if that pattern is hot:\nCREATE INDEX idx_orders_status ON orders (status);",
     "codeLang": "sql",
-    "tags": ["indexing", "b-tree", "composite-index", "query-plan"]
+    "tags": [
+      "indexing",
+      "b-tree",
+      "composite-index",
+      "query-plan"
+    ],
+    "short": "A composite index on (tenant_id, status) is sorted by tenant_id first, so it serves leftmost prefixes but not `status` alone; order most-selective/equality columns leftmost and add a separate `(status)` index if that filter is hot."
   },
   {
     "id": "sql-covering-index-avoid-lookup",
@@ -69,7 +117,13 @@
     "answer": "When a non-clustered index matches the `WHERE` clause but the query also needs columns **not** in the index, the engine performs a **key lookup (bookmark lookup)**: for each matched index entry it jumps back to the table/clustered index to fetch the missing columns. Thousands of these random lookups can dominate query time.\n\nA **covering index** contains *all* columns the query touches — both the filter/sort keys and the selected columns — so the query is answered **entirely from the index** (`EXPLAIN` shows \"Using index\" / no lookup). \n\nThe efficient way to add the non-search columns is the **INCLUDE** clause (SQL Server / PostgreSQL): included columns are stored at the index leaf level only, so they cover the query without bloating the B-tree's navigational keys or affecting key ordering. Putting them in the key instead would waste space and slow inserts.\n\n**Trade-off:** covering/wide indexes speed reads but increase storage and write cost, so cover the columns a *hot* query actually needs, not everything.",
     "code": "-- Query: filter on customer_id, return order_date and amount only\n-- Covering index: key = filter column, INCLUDE = the returned columns\nCREATE INDEX idx_orders_cust_cover\n  ON orders (customer_id)\n  INCLUDE (order_date, amount);\n\n-- Now answered from the index leaf with no key lookup back to the table\nSELECT order_date, amount\nFROM orders\nWHERE customer_id = 1001;\n\n-- MySQL/InnoDB equivalent (no INCLUDE keyword; put columns in the key):\n-- CREATE INDEX idx_orders_cust_cover ON orders (customer_id, order_date, amount);",
     "codeLang": "sql",
-    "tags": ["indexing", "covering-index", "key-lookup", "query-optimization"]
+    "tags": [
+      "indexing",
+      "covering-index",
+      "key-lookup",
+      "query-optimization"
+    ],
+    "short": "A covering index holds every column the query touches so it answers entirely from the index, avoiding per-row key lookups; use `INCLUDE` to store non-search columns at the leaf, trading extra storage/write cost for read speed."
   },
   {
     "id": "sql-acid-transaction-fund-transfer",
@@ -77,7 +131,13 @@
     "answer": "A money transfer is the canonical ACID example because it is two writes that must behave as one logical unit:\n\n- **Atomicity** — both the debit and the credit happen, or neither does. If the credit fails after the debit, `ROLLBACK` undoes the debit so money is never destroyed.\n- **Consistency** — the transaction moves the database from one valid state to another, preserving invariants (e.g., a `CHECK (balance >= 0)` constraint or the source-account guard prevents overdraft).\n- **Isolation** — concurrent transfers don't see each other's half-finished state; the chosen isolation level governs what interleavings are allowed (see locking/isolation questions).\n- **Durability** — once `COMMIT` returns, the change survives a crash (written to the WAL/redo log).\n\nWithout a transaction, a crash between the two `UPDATE`s leaves the system in a corrupt state (money debited but never credited). The `WHERE balance >= amount` guard plus checking rows-affected enforces the business rule atomically.",
     "code": "BEGIN TRANSACTION;\n\nUPDATE accounts\nSET balance = balance - 100\nWHERE account_id = 'A' AND balance >= 100;  -- guard against overdraft\n\nIF @@ROWCOUNT <> 1\nBEGIN\n  ROLLBACK TRANSACTION;   -- insufficient funds or account missing\n  THROW 50001, 'Transfer failed: insufficient funds', 1;\nEND;\n\nUPDATE accounts\nSET balance = balance + 100\nWHERE account_id = 'B';\n\nIF @@ROWCOUNT <> 1\nBEGIN\n  ROLLBACK TRANSACTION;   -- destination account missing\n  THROW 50002, 'Transfer failed: destination not found', 1;\nEND;\n\nCOMMIT TRANSACTION;",
     "codeLang": "sql",
-    "tags": ["transactions", "acid", "atomicity", "error-handling"]
+    "tags": [
+      "transactions",
+      "acid",
+      "atomicity",
+      "error-handling"
+    ],
+    "short": "A transfer must be one transaction so debit and credit succeed or roll back together, demonstrating Atomicity, Consistency, Isolation, and Durability; a balance guard plus rows-affected check enforces no-overdraft atomically."
   },
   {
     "id": "sql-isolation-levels-lost-update",
@@ -85,7 +145,13 @@
     "answer": "The ANSI isolation levels trade consistency for concurrency by allowing progressively fewer read phenomena:\n\n| Level | Dirty read | Non-repeatable read | Phantom read |\n|---|---|---|---|\n| READ UNCOMMITTED | possible | possible | possible |\n| READ COMMITTED | prevented | possible | possible |\n| REPEATABLE READ | prevented | prevented | possible* |\n| SERIALIZABLE | prevented | prevented | prevented |\n\n- **Dirty read:** reading another transaction's uncommitted change.\n- **Non-repeatable read:** re-reading the same row yields a different value because another transaction committed in between.\n- **Phantom read:** a re-run range query returns new rows. (*InnoDB's REPEATABLE READ prevents phantoms via next-key locks.)\n\nA **lost update** (read-modify-write where one write clobbers the other) is best fixed not by reading first at all but by doing the update **atomically in one statement** (`SET counter = counter + 1`), letting the engine take the row write-lock. If you must read-then-write, use `SELECT ... FOR UPDATE` to take a pessimistic lock, or raise isolation to `REPEATABLE READ`/`SERIALIZABLE`.",
     "code": "-- BEST: atomic increment avoids the read-modify-write race entirely\nUPDATE counters\nSET value = value + 1\nWHERE name = 'page_views';\n\n-- If you must read first, lock the row pessimistically:\nBEGIN;\nSELECT value FROM counters WHERE name = 'page_views' FOR UPDATE; -- row write-lock\n-- ... compute new value in app ...\nUPDATE counters SET value = value + 1 WHERE name = 'page_views';\nCOMMIT;\n\n-- Or raise the isolation level for the session:\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;",
     "codeLang": "sql",
-    "tags": ["transactions", "isolation-levels", "locking", "lost-update"]
+    "tags": [
+      "transactions",
+      "isolation-levels",
+      "locking",
+      "lost-update"
+    ],
+    "short": "Higher isolation levels prevent more read phenomena (dirty, non-repeatable, phantom). Fix lost updates with an atomic `SET value = value + 1`, or `SELECT ... FOR UPDATE` / raised isolation if you must read first."
   },
   {
     "id": "sql-deadlock-cause-and-prevention",
@@ -93,7 +159,13 @@
     "answer": "A **deadlock** is a cycle: transaction T1 holds lock on row A and waits for row B, while T2 holds row B and waits for row A. Neither can proceed, so the database's **deadlock detector** picks a *victim*, rolls it back, and returns a deadlock error — the other transaction then completes.\n\n**Deadlock vs blocking:** plain *blocking* is one transaction simply waiting for another to release a lock; it resolves on its own when the holder commits. A deadlock is a mutual wait that can *never* resolve without intervention, hence the forced rollback.\n\n**Prevention techniques:**\n- **Consistent lock ordering** — always acquire resources in the same order (e.g., always update the lower `account_id` first). This is the single most effective fix and breaks the cycle that causes deadlocks.\n- Keep transactions **short**, touch fewer rows, and commit promptly.\n- Add appropriate indexes so the engine takes narrow row locks instead of broad range/page locks.\n- **Retry** the victim transaction on deadlock error, since it is often transient.",
     "code": "-- DEADLOCK-PRONE: the two sessions lock accounts in opposite orders\n-- Session 1:                       Session 2:\nBEGIN;                            -- BEGIN;\nUPDATE accounts SET balance=balance-50 WHERE id=1;  -- UPDATE ... WHERE id=2;\nUPDATE accounts SET balance=balance+50 WHERE id=2;  -- UPDATE ... WHERE id=1;  <-- cycle!\nCOMMIT;\n\n-- SAFE: transfer 50 from :src to :dst, but always lock rows in a\n-- consistent order (ascending id) so no cycle can form. A single\n-- statement that touches both rows lets the engine lock them in\n-- index (id) order; the CASE keeps the debit/credit on the right rows.\nBEGIN;\nUPDATE accounts\nSET balance = CASE\n                WHEN id = :src THEN balance - 50\n                WHEN id = :dst THEN balance + 50\n              END\nWHERE id IN (:src, :dst);\nCOMMIT;",
     "codeLang": "sql",
-    "tags": ["transactions", "deadlock", "locking", "concurrency"]
+    "tags": [
+      "transactions",
+      "deadlock",
+      "locking",
+      "concurrency"
+    ],
+    "short": "A deadlock is a mutual lock-wait cycle the DB resolves by killing a victim, unlike plain blocking which clears on its own; prevent it with consistent lock ordering, short transactions, good indexes, and retries."
   },
   {
     "id": "sql-cte-recursive-org-hierarchy",
@@ -101,7 +173,13 @@
     "answer": "A **CTE** (`WITH` clause) is a named, inline result set scoped to one statement. A **recursive CTE** has two parts unioned together:\n\n1. an **anchor** member (the starting rows — the given manager), and\n2. a **recursive** member that references the CTE itself, repeatedly joining the previous result back to the table until no new rows are produced.\n\n**When to use what:**\n- A **plain subquery or self-join** works only for a *fixed, known depth* (e.g., manager and direct reports). It cannot traverse an arbitrary-depth tree without writing N joins.\n- A **recursive CTE** is the right tool for **hierarchies/graphs of unknown depth**: org charts, bill-of-materials, category trees, threaded comments.\n\nGuard against infinite loops on cyclic data with a depth limit (e.g., `WHERE depth < 100` or `OPTION (MAXRECURSION)` in SQL Server). The `depth` column also lets you indent or filter by level.",
     "code": "WITH RECURSIVE subordinates AS (\n  -- Anchor: the manager we start from\n  SELECT employee_id, manager_id, name, 0 AS depth\n  FROM employees\n  WHERE employee_id = 1\n\n  UNION ALL\n\n  -- Recursive step: people who report to anyone already in the set\n  SELECT e.employee_id, e.manager_id, e.name, s.depth + 1\n  FROM employees e\n  JOIN subordinates s ON e.manager_id = s.employee_id\n  WHERE s.depth < 100          -- safety guard against cycles\n)\nSELECT employee_id, name, depth\nFROM subordinates\nWHERE employee_id <> 1          -- exclude the starting manager\nORDER BY depth, employee_id;",
     "codeLang": "sql",
-    "tags": ["cte", "recursive-cte", "hierarchy", "self-join"]
+    "tags": [
+      "cte",
+      "recursive-cte",
+      "hierarchy",
+      "self-join"
+    ],
+    "short": "A recursive CTE (anchor UNION ALL recursive member) traverses arbitrary-depth hierarchies, unlike a self-join that only handles fixed depth; add a depth guard to prevent infinite loops on cycles."
   },
   {
     "id": "sql-union-vs-union-all-dedup",
@@ -109,7 +187,13 @@
     "answer": "Both combine the result sets of two queries with matching column lists, but:\n\n- **`UNION`** removes duplicate rows across the combined result. To do that the engine must **sort or hash the entire output** to detect duplicates — extra CPU, memory, and often a sort spill on large sets.\n- **`UNION ALL`** simply concatenates both result sets with **no de-duplication**, so it skips that expensive step and is significantly faster.\n\n**The decision rule:** if the two inputs are **guaranteed disjoint** (active vs archived orders share no rows by definition), the de-duplication of `UNION` is pure wasted work — use `UNION ALL`. Only use plain `UNION` when duplicates are actually possible *and* you want them collapsed.\n\nA frequent performance bug is reflexively writing `UNION` out of habit; switching to `UNION ALL` where rows can't overlap is often a free, large speedup. Both branches must have the same number/compatible types of columns and the column names come from the first SELECT.",
     "code": "-- SLOW: forces a dedup sort/hash even though the sets can't overlap\nSELECT order_id, customer_id, amount FROM active_orders\nUNION\nSELECT order_id, customer_id, amount FROM archived_orders;\n\n-- FAST: active and archived are disjoint, so skip de-duplication\nSELECT order_id, customer_id, amount FROM active_orders\nUNION ALL\nSELECT order_id, customer_id, amount FROM archived_orders;",
     "codeLang": "sql",
-    "tags": ["union", "union-all", "set-operators", "query-optimization"]
+    "tags": [
+      "union",
+      "union-all",
+      "set-operators",
+      "query-optimization"
+    ],
+    "short": "`UNION` removes duplicates via an expensive sort/hash, while `UNION ALL` just concatenates; since active and archived orders are disjoint, switch to `UNION ALL` for a free speedup."
   },
   {
     "id": "sql-sargable-predicate-index-usage",
@@ -117,7 +201,13 @@
     "answer": "**SARGable** (Search ARGument able) means a predicate can use an index range scan/seek. The requirement is that the **indexed column appears bare on one side** of the comparison so the engine can navigate the B-tree by the stored key values.\n\nWrapping the column in a function — `YEAR(created_at)`, `UPPER(name)`, `created_at + INTERVAL ...`, or implicit type casts — makes it **non-SARGable**: the index stores `created_at`, not `YEAR(created_at)`, so the engine must compute the function for *every* row, forcing a full scan.\n\n**Rewrite strategy:** transform the *constant* side instead of the column. Replace `YEAR(created_at) = 2025` with a **half-open range** `created_at >= '2025-01-01' AND created_at < '2026-01-01'`. The column is now bare, the comparison values are constants, and the index on `created_at` can do an efficient range scan.\n\n(Alternative when you truly need the expression: create a **functional/computed index** on `YEAR(created_at)`.)",
     "code": "-- NON-SARGable: function on the column defeats the index -> full scan\nSELECT * FROM orders\nWHERE YEAR(created_at) = 2025;\n\n-- SARGable rewrite: bare column vs constant range -> index range scan\nSELECT * FROM orders\nWHERE created_at >= '2025-01-01'\n  AND created_at <  '2026-01-01';\n\n-- Alternative: an index on the expression itself (PostgreSQL)\nCREATE INDEX idx_orders_year ON orders ((EXTRACT(YEAR FROM created_at)));",
     "codeLang": "sql",
-    "tags": ["query-optimization", "sargable", "indexing", "predicates"]
+    "tags": [
+      "query-optimization",
+      "sargable",
+      "indexing",
+      "predicates"
+    ],
+    "short": "A predicate is SARGable when the indexed column appears bare so the engine can seek the B-tree. Wrapping it in a function like `YEAR(created_at)` forces a full scan; rewrite as a range: `created_at >= '2025-01-01' AND created_at < '2026-01-01'`."
   },
   {
     "id": "sql-view-vs-stored-procedure",
@@ -125,6 +215,12 @@
     "answer": "**Views** and **stored procedures** both encapsulate logic but serve different roles:\n\n- A **view** is a named, stored *query* — a virtual table. You `SELECT` from it like a table, and it always reflects current underlying data (it stores the definition, not the rows, unless it's a materialized view). Views are great for **abstraction, security** (expose only certain columns/rows via column-level grants), and **reuse of a SELECT shape**. They take no parameters and generally can't contain procedural/control-flow logic or multiple statements.\n- A **stored procedure** is a precompiled routine that can take **parameters**, run **multiple statements**, use control flow (`IF`/loops), perform **DML** and transactions, and return result sets or output values. Use it for **parameterized operations and multi-step business logic**.\n\n**Rule of thumb:** if you need a reusable, parameter-free query you can join against, use a **view**; if you need parameters, side effects, or procedural logic, use a **stored procedure**.",
     "code": "-- VIEW: reusable, parameter-free SELECT shape\nCREATE VIEW active_premium_customers AS\nSELECT customer_id, name, email\nFROM customers\nWHERE status = 'ACTIVE' AND tier = 'PREMIUM';\n\nSELECT * FROM active_premium_customers WHERE name LIKE 'A%';\n\n-- STORED PROCEDURE: parameterized, multi-statement routine\nCREATE PROCEDURE monthly_revenue_report(IN report_year INT, IN report_month INT)\nBEGIN\n  SELECT product_id,\n         SUM(amount) AS revenue,\n         COUNT(*)    AS orders\n  FROM orders\n  WHERE YEAR(order_date) = report_year\n    AND MONTH(order_date) = report_month\n  GROUP BY product_id\n  ORDER BY revenue DESC;\nEND;\n\nCALL monthly_revenue_report(2025, 6);",
     "codeLang": "sql",
-    "tags": ["views", "stored-procedures", "encapsulation", "ddl"]
+    "tags": [
+      "views",
+      "stored-procedures",
+      "encapsulation",
+      "ddl"
+    ],
+    "short": "A view is a named parameter-free query (a virtual table) good for abstraction and security; a stored procedure takes parameters and runs multi-statement procedural logic with side effects. Use a view for the reusable SELECT, a procedure for the parameterized report."
   }
 ]
