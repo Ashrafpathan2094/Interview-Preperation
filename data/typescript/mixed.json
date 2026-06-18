@@ -11,7 +11,7 @@
       "excess-property-check",
       "branded-types"
     ],
-    "short": "TypeScript compares types by shape, not name, so any value with the required members is assignable; excess-property checks still reject fresh object literals with extra keys (bypassed via a variable, or defeated with branded types)."
+    "short": "**TypeScript compares types by shape, not name, so any value with the required members is assignable — even without `extends` or `implements`.**\n\n- **Width subtyping:** the source may have *more* members than the target; extra members are ignored for assignment via a variable.\n- **Excess property checks:** fresh object literals assigned directly are rejected for unknown extra keys to catch typos.\n- **Branded types:** intersect with a phantom field (e.g. `UserId = string & { __brand: 'UserId' }`) to opt into nominal-like behavior."
   },
   {
     "id": "typescript-interface-vs-type-alias-when-to-use",
@@ -25,7 +25,7 @@
       "declaration-merging",
       "union-types"
     ],
-    "short": "Use `interface` for object/class contracts needing declaration merging and clean `extends`/`implements`; use `type` for unions, tuples, mapped/conditional types, and primitive/function aliases. Interfaces merge silently; duplicate type aliases error."
+    "short": "**Use `interface` for object/class contracts needing declaration merging and clean `extends`; use `type` for unions, tuples, mapped/conditional types, and primitive aliases.**\n\n- **Interface merging:** multiple same-named `interface` blocks combine silently — essential for augmenting third-party types.\n- **Type alias no merge:** duplicate `type` names are always a compile error, preventing accidental augmentation.\n- **What only `type` can express:** union types (`A | B`), tuples, mapped types, conditional types, and function-type aliases."
   },
   {
     "id": "typescript-generic-constraint-extends-keyof-getproperty",
@@ -39,7 +39,7 @@
       "keyof",
       "indexed-access-types"
     ],
-    "short": "Constraining `K extends keyof T` restricts the key to real property names and returns the precise indexed-access type `T[K]`, giving compile-time rejection of bad keys and an exact per-call return type."
+    "short": "**Constraining `K extends keyof T` restricts the key to real property names and returns the precise indexed-access type `T[K]`, giving compile-time rejection of bad keys.**\n\n- **Without constraint:** a bare `<T, K>` lets any key pass and loses the precise return type.\n- **`K extends keyof T`:** the compiler knows `K` is one of `T`'s actual property names, so `T[K]` resolves to the exact value type per call.\n- **Practical value:** powers type-safe object utilities, ORMs, and form libraries where key correctness matters."
   },
   {
     "id": "typescript-discriminated-union-exhaustive-never",
@@ -53,7 +53,7 @@
       "never",
       "exhaustiveness"
     ],
-    "short": "A discriminated union shares a literal discriminant (e.g. `kind`) so narrowing reveals the exact variant and makes impossible states unrepresentable; assigning the narrowed value to `never` via `assertNever` in the default branch enforces exhaustiveness."
+    "short": "**A discriminated union shares a literal discriminant (e.g. `kind`) so narrowing reveals the exact variant, making impossible states unrepresentable.**\n\n- **Discriminant property:** must be a literal type unique per variant; switching on it narrows the union to one member with safe field access.\n- **`assertNever` pattern:** passing the narrowed value to a function typed `(x: never): never` enforces exhaustiveness — a new unhandled variant becomes a compile error.\n- **vs. flat optional fields:** impossible combinations (e.g. a `circle` with `sideLength`) simply cannot be expressed in a discriminated union."
   },
   {
     "id": "typescript-user-defined-type-guard-predicate",
@@ -67,7 +67,7 @@
       "narrowing",
       "assertion-functions"
     ],
-    "short": "Built-in narrowing uses `typeof`/`instanceof`/`in`; a user-defined guard returns a type predicate `x is Type` to narrow custom shapes. Returning plain `boolean` instead performs no narrowing, losing variant access."
+    "short": "**A type predicate return type `animal is Cat` makes a user-defined guard that narrows in the caller's branch; returning plain `boolean` performs no narrowing.**\n\n- **Built-in narrowing:** `typeof` for primitives, `instanceof` for class instances, `in` for property presence — automatic, no extra annotation needed.\n- **Type predicate:** `function isCat(a: Animal): a is Cat` narrows to `Cat` when `true` and to the remaining union when `false`.\n- **Assertion function:** `asserts a is Cat` narrows for the rest of the scope after the call if no exception is thrown — a stronger variant."
   },
   {
     "id": "typescript-utility-types-partial-pick-omit-record",
@@ -82,7 +82,7 @@
       "Omit",
       "Record"
     ],
-    "short": "Derive types from `User` instead of redeclaring: `Partial` for optional PATCH fields, `Omit` to strip `id`/`createdAt`, `Pick` for narrow DTOs, and `Record<string, User>` for an id-keyed cache; derived types update automatically."
+    "short": "**Derive types from `User` instead of redeclaring: `Partial` for optional PATCH fields, `Omit` to strip server fields, `Pick` for narrow DTOs, and `Record` for keyed caches.**\n\n- **`Partial<Omit<User, 'id' | 'createdAt'>>`:** strips server-managed fields then makes the rest optional — a one-liner PATCH payload type.\n- **`Pick<User, 'id' | 'name'>`:** keeps only listed keys for a compact summary DTO.\n- **`Record<string, User>`:** typed dictionary/cache; with a literal union key, every key is required and exhaustively checked."
   },
   {
     "id": "typescript-conditional-type-infer-unwrap",
@@ -96,7 +96,7 @@
       "ReturnType",
       "recursive-types"
     ],
-    "short": "Conditional types (`T extends U ? X : Y`) pick a type by assignability; `infer R` captures a matched position into a variable usable in the true branch, powering `ReturnType`, `Parameters`, and recursive unwrappers like `Unwrap`."
+    "short": "**Conditional types (`T extends U ? X : Y`) pick a type by assignability; `infer R` captures a matched position into a variable usable in the true branch.**\n\n- **`infer` mechanics:** appears in the `extends` clause to pattern-match a structural position — e.g. `(...args: any[]) => infer R` captures the return type.\n- **Distribution:** conditional types over a naked type parameter distribute over unions; wrap in a tuple `[T] extends [U]` to opt out.\n- **Recursive unwrap:** `Unwrap<T>` strips `Promise` and `Array` wrappers by recursing in the true branch until reaching a base type."
   },
   {
     "id": "typescript-mapped-types-modifiers-key-remap",
@@ -110,7 +110,7 @@
       "key-remapping",
       "template-literal-types"
     ],
-    "short": "Mapped types iterate keys (`{ [K in keyof T]: ... }`) and toggle `readonly`/`?` via `+`/`-`; `as` key remapping renames or filters keys (map to `never` to drop), and combining with template literals or recursion builds handler and deep-readonly types."
+    "short": "**Mapped types iterate keys (`{ [K in keyof T]: ... }`) and toggle `readonly`/`?` via `+`/`-`; `as` key remapping renames or filters keys for advanced transformations.**\n\n- **Modifiers:** `+`/`-` add or remove `readonly` and `?` — e.g. `-readonly` strips immutability, `-?` strips optionality (`Required`).\n- **Key remapping with `as`:** rename keys or return `never` to drop them; combine with `Capitalize` and template literals for handler names like `onNameChange`.\n- **`Optional<T, K>`:** `Omit<T, K> & Partial<Pick<T, K>>` makes only selected keys optional, a composable alternative to full `Partial`."
   },
   {
     "id": "typescript-satisfies-vs-annotation-vs-as",
@@ -124,7 +124,7 @@
       "type-inference",
       "literal-types"
     ],
-    "short": "`: T` validates but widens away literals; `as T` skips real checking and can hide bugs; `satisfies T` validates assignability while preserving the precise inferred types, ideal for config/lookup objects you index into."
+    "short": "**`: T` validates but widens away literal types; `as T` skips real checking; `satisfies T` validates assignability while keeping the precise inferred types.**\n\n- **Annotation widening:** `const palette: Palette` makes `primary` typed as `string | Color`, losing the precise `string` literal and preventing `.toUpperCase()` without assertion.\n- **`as` unsafety:** only sanity-checks overlap, so type mismatches can hide — not a real validation.\n- **`satisfies` sweet spot:** catches constraint violations (e.g. wrong value type) while keeping the narrow inferred type for downstream indexing."
   },
   {
     "id": "typescript-function-overloads-vs-union",
@@ -138,7 +138,7 @@
       "signatures",
       "generics"
     ],
-    "short": "Use overloads when the return type depends on the specific input type, which a union signature can't express; declare multiple signatures plus one implementation signature that is hidden from callers. Order specific overloads first."
+    "short": "**Use overloads when the return type depends on the specific input type, which a single union signature cannot express without forcing callers to re-narrow the result.**\n\n- **Union signature limitation:** `(v: string | unknown[]) => string | unknown[]` loses the correlation — the caller doesn't know which return type to expect.\n- **Overload resolution:** callers see only the declared overload signatures; the implementation signature is hidden and not directly callable.\n- **Ordering:** more specific overloads must come first; the compiler picks the first matching signature."
   },
   {
     "id": "typescript-unknown-vs-any-vs-never",
@@ -152,7 +152,7 @@
       "never",
       "type-safety"
     ],
-    "short": "`any` disables type checking and spreads silently; `unknown` is its safe counterpart requiring narrowing before use (ideal at boundaries like `JSON.parse`); `never` is the empty type for non-returning functions, exhausted unions, and impossible intersections."
+    "short": "**`any` opts out of type checking and spreads silently; `unknown` is the safe boundary type requiring narrowing; `never` is the empty type for impossibility and exhaustiveness.**\n\n- **`any` risk:** any operation is allowed, so bugs hide until runtime — avoid at I/O boundaries.\n- **`unknown` discipline:** `JSON.parse`, API responses, and catch clauses should return `unknown` to force explicit validation before use.\n- **`never` uses:** non-returning functions (throw/infinite loop), exhausted union branches in `default`, and impossible intersections like `string & number`."
   },
   {
     "id": "typescript-enum-vs-const-enum-vs-union",
@@ -166,7 +166,7 @@
       "string-literal-union",
       "as-const"
     ],
-    "short": "Numeric enums add reverse mappings, string enums are debuggable, both emit runtime objects; `const enum` inlines with no output but has interop caveats. For libraries, prefer a string-literal union or `as const` object for zero runtime cost."
+    "short": "**Numeric enums add reverse mappings, string enums are more debuggable, `const enum` inlines with no output — for libraries, prefer a string-literal union or `as const` object.**\n\n- **Numeric enum:** auto-incremented values with reverse mapping (`Dir[0] === 'Up'`); emits a runtime object.\n- **`const enum`:** values replaced by literals at compile time, no emitted object — but incompatible with `isolatedModules`/Babel and can't be iterated.\n- **`as const` alternative:** `{ Admin: 'admin' } as const` gives enum-like values plus a derived union type with zero TS-specific runtime artifacts."
   },
   {
     "id": "typescript-declaration-merging-module-augmentation",
@@ -180,7 +180,7 @@
       "interface",
       "ambient-declarations"
     ],
-    "short": "Declaration merging combines same-named interfaces and namespaces (type aliases error), so library types like `Request`/`Window` stay extensible; module augmentation reopens a module via `declare module` to add members, e.g. `req.user` on Express."
+    "short": "**Declaration merging combines same-named interfaces/namespaces (type aliases error); module augmentation uses `declare module` to add members to third-party types you don't own.**\n\n- **Why interfaces merge:** library types like `Request` and `Window` are interfaces precisely so consumers can extend them without forking.\n- **Module augmentation pattern:** `declare module 'express-serve-static-core' { interface Request { user?: ... } }` adds `req.user` after auth middleware.\n- **Global augmentation:** `declare global { interface Window { ... } }` adds properties to the browser `window` type; the file must be a module (needs an `export {}`)."
   },
   {
     "id": "typescript-readonly-tuples-and-as-const",
@@ -194,6 +194,6 @@
       "as-const",
       "literal-types"
     ],
-    "short": "`readonly T[]` forbids mutation and tuples fix length/per-position types; `as const` makes literals deeply readonly, turns arrays into literal tuples, and narrows primitives to literals. Returning a tuple lets callers name destructured parts, like `useState`."
+    "short": "**`readonly` arrays/tuples block mutation at compile time, while `as const` freezes a literal and narrows it to its most precise type.**\n\n- **`readonly T[]`:** rejects mutating methods like `push` and index assignment; a **tuple** `[string, number]` fixes length and per-position types.\n- **`as const`:** makes a literal deeply readonly, turns arrays into **literal tuples**, and narrows primitives to literal types (`'GET'`, not `string`).\n- **Tuple return:** returning a tuple (not an object) lets callers destructure and name the parts themselves — exactly how `useState` works."
   }
 ]

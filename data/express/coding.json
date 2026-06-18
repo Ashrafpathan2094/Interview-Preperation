@@ -11,7 +11,7 @@
       "next",
       "lifecycle"
     ],
-    "short": "A `(req, res, next)` middleware times requests via `res.on('finish')`, logging method, URL and duration. Register it with `app.use()` before routes, and always call `next()` or the request hangs."
+    "short": "**A custom logger is a `(req, res, next)` middleware that captures a start timestamp and logs method, URL, status, and duration when the `res.on('finish')` event fires.**\n\n- **`res.on('finish')`:** fires after the response is fully sent, so the duration includes the entire handler execution — not just up to where the middleware ran.\n- **Register before routes:** `app.use(requestLogger)` must come before your routes so it runs on every request.\n- **Always call `next()`:** omitting it leaves the request hanging indefinitely, since control never reaches the next middleware or route handler."
   },
   {
     "id": "express-middleware-execution-order-output",
@@ -25,7 +25,7 @@
       "next",
       "output"
     ],
-    "short": "Middleware runs top-to-bottom only while `next()` is called. Logs `A` then `B`; client gets `Handled by B` (200). `C` never runs because B ends the response without calling `next()`."
+    "short": "**Middleware runs top-to-bottom in registration order, advancing only when `next()` is called — a handler that sends a response without calling `next()` ends the chain.**\n\n- **Output:** logs `A` then `B`; client receives `Handled by B` with status 200.\n- **Why C never runs:** handler B calls `res.send()` which ends the response, and does not call `next()` — so Express stops walking the stack.\n- **Calling both:** if B had called `next()` after `res.send()`, Express would throw `ERR_HTTP_HEADERS_SENT` when C also tried to respond — respond or call `next()`, never both."
   },
   {
     "id": "express-error-handling-middleware-4arg",
@@ -39,7 +39,7 @@
       "next",
       "status-codes"
     ],
-    "short": "Express identifies error handlers solely by their four args `(err, req, res, next)`; register it last. Default status to 500, log server-side, return safe messages, and check `res.headersSent`."
+    "short": "**Express identifies error-handling middleware purely by arity — exactly four params `(err, req, res, next)` — and you must register it last, after all routes.**\n\n- **Trigger:** routes call `next(err)` to forward errors; Express then skips all remaining normal middleware and invokes the first 4-arg handler.\n- **`res.headersSent` guard:** check this before responding — if a response already started, delegate to Express's default handler via `next(err)` to close the connection cleanly.\n- **Production safety:** log the full error server-side (`console.error(err.stack)`); return only a safe message (or correlation ID) to the client — never expose stack traces."
   },
   {
     "id": "express-async-error-handling-wrapper",
@@ -53,7 +53,7 @@
       "promises",
       "express5"
     ],
-    "short": "In Express 4, rejected async handlers aren't auto-forwarded, so the request hangs. Fix with try/catch + `next(err)` or a reusable `asyncHandler` wrapper. Express 5 forwards rejections automatically."
+    "short": "**In Express 4 rejected async handlers are not auto-forwarded to the error handler — the rejection escapes silently and the request hangs with no response.**\n\n- **The fix:** wrap each async handler with `(fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)` — the reusable `asyncHandler` pattern that forwards any rejection to `next(err)` automatically.\n- **Avoid repetition:** define the wrapper once and wrap every async route; this is DRY and avoids try/catch in every handler.\n- **Express 5:** the router awaits handler return values natively, so rejected promises auto-forward to the error handler without any wrapper."
   },
   {
     "id": "express-route-params-query-parsing",
@@ -67,7 +67,7 @@
       "req.query",
       "validation"
     ],
-    "short": "`req.params` holds named route segments and `req.query` holds the parsed query string; both are strings. Coerce numeric values, guard against `NaN`, provide defaults, and clamp limits."
+    "short": "**`req.params` holds named route segments from the URL path; `req.query` holds the parsed query string — both are always strings and require coercion before use.**\n\n- **Coerce and validate:** use `parseInt(req.query.page, 10) || 1` for numeric query params; guard against `NaN` and provide sensible defaults when params are missing.\n- **Clamp user-supplied limits:** cap values like `limit` with `Math.min`/`Math.max` to prevent a client requesting `limit=1000000` and overloading the server.\n- **Path vs query:** use path params (`/:id`) to identify a resource; use query strings (`?page=2`) to describe how to filter, sort, or paginate it."
   },
   {
     "id": "express-body-parsing-json-urlencoded",
@@ -81,7 +81,7 @@
       "urlencoded",
       "middleware"
     ],
-    "short": "`req.body` is undefined because Express doesn't parse bodies by default. Register `express.json()` and `express.urlencoded({extended:true})` before routes, set a `limit`, and ensure the `Content-Type` matches."
+    "short": "**`req.body` is `undefined` because Express does not parse request bodies by default — you must register a body-parsing middleware before any route that reads `req.body`.**\n\n- **`express.json()`:** parses `Content-Type: application/json` bodies; only triggers when the request sends the correct content type header.\n- **`express.urlencoded({ extended: true })`:** parses HTML form submissions (`application/x-www-form-urlencoded`); `extended: true` allows nested objects via `qs`.\n- **Set a `limit`:** e.g. `express.json({ limit: '10kb' })` — without a limit, large payloads can cause memory pressure or DoS."
   },
   {
     "id": "express-app-use-vs-app-method",
@@ -95,7 +95,7 @@
       "routing",
       "output"
     ],
-    "short": "`app.use()` matches any method on a path prefix; `app.get()` matches a specific method and exact path. `GET /api/x` logs both lines; `POST /api/x` runs only the `use` then 404s."
+    "short": "**`app.use()` matches any HTTP method via prefix matching; `app.get()` matches only GET with exact path matching — the same request can hit both.**\n\n- **`GET /api/x`:** logs `use /api ran` then `GET handler ran` — the `use` middleware matches the prefix `/api`, then the route matches exactly.\n- **`POST /api/x`:** logs only `use /api ran` — the `use` matches, but there is no POST route, so the request falls through to Express's default 404.\n- **Key difference:** `app.use('/api', fn)` also matches `/api/users`, `/api/x/y`; `app.get('/api/x', fn)` matches only `/api/x` exactly."
   },
   {
     "id": "express-router-modular-structure",
@@ -109,7 +109,7 @@
       "modular",
       "middleware"
     ],
-    "short": "`express.Router()` is a mountable mini-app for structuring large apps by resource. Mount with `app.use('/users', router)` to prefix routes, and use `router.use()` for router-scoped middleware."
+    "short": "**`express.Router()` creates a mountable mini-application — the standard way to split a large Express app into modular, resource-focused route files.**\n\n- **Mounting:** `app.use('/users', usersRouter)` prefixes every route in the router; `router.get('/')` becomes `GET /users` and `router.get('/:id')` becomes `GET /users/:id`.\n- **Router-scoped middleware:** `router.use(requireAuth)` applies only to routes in that router — no global pollution; ideal for feature-level auth guards.\n- **Separation of concerns:** each file owns one resource (`routes/users.js`, `routes/orders.js`), keeping `app.js` thin and routes easy to find."
   },
   {
     "id": "express-jwt-auth-middleware",
@@ -123,7 +123,7 @@
       "middleware",
       "security"
     ],
-    "short": "JWT middleware reads the `Authorization: Bearer` header, verifies the signature, and attaches the payload to `req.user`, returning 401 on failure. JWTs are stateless/scalable but hard to revoke; sessions are stateful but easily revoked."
+    "short": "**JWT middleware reads the `Authorization: Bearer <token>` header, verifies the signature and expiry, and attaches the decoded payload to `req.user` — returning 401 on any failure.**\n\n- **Stateless:** the server validates the signature without a DB lookup, making JWTs easy to scale horizontally across many instances.\n- **Hard to revoke:** a valid JWT remains valid until `exp` — mitigate with short expiry times, refresh tokens, or a server-side token denylist.\n- **vs Sessions:** sessions store state server-side (trivial to revoke, need shared storage); JWTs are client-held (no storage overhead, but revocation is complex)."
   },
   {
     "id": "express-rbac-middleware-factory",
@@ -138,7 +138,7 @@
       "security",
       "status-codes"
     ],
-    "short": "A factory `allowRoles(...roles)` returns a guard middleware that checks `req.user.role` (set by prior auth). Return 401 if unauthenticated, 403 if authenticated without the role, and compose guards on routes."
+    "short": "**A middleware factory `allowRoles(...roles)` returns a parameterized guard that checks `req.user.role`, letting you reuse one function across all role-protected routes.**\n\n- **401 vs 403:** return 401 if `req.user` is missing (not authenticated); return 403 if authenticated but the role is not in the allowed list (not permitted).\n- **Composition:** chain guards as `app.get('/admin', authenticate, allowRoles('admin'), handler)` — `authenticate` sets `req.user`, then the RBAC guard checks the role.\n- **Factory pattern:** `allowRoles('admin', 'superadmin')` returns a new middleware closure each time, keeping the logic DRY without separate functions per role combination."
   },
   {
     "id": "express-security-helmet-cors-ratelimit",
@@ -152,7 +152,7 @@
       "cors",
       "rate-limiting"
     ],
-    "short": "Harden APIs with `helmet()` for secure headers, `cors()` scoped to an explicit origin (never `*` with credentials), and `express-rate-limit` per IP. Register them early, with stricter limits on auth routes."
+    "short": "**Harden an Express API with three early-registered layers: `helmet()` for secure headers, `cors()` with an explicit origin allow-list, and `express-rate-limit` to cap requests per IP.**\n\n- **`helmet()`:** sets CSP, HSTS, `X-Content-Type-Options`, removes `X-Powered-By`, and more — register it first so headers apply to every response.\n- **`cors()`:** specify `origin: 'https://app.example.com'` (never `*`); set `credentials: true` only when cookies or auth headers must cross origins.\n- **Rate limiting:** apply `express-rate-limit` globally to `/api` and add a stricter limiter to sensitive routes like `/api/login` to blunt brute-force attacks."
   },
   {
     "id": "express-input-validation-sanitization",
@@ -166,7 +166,7 @@
       "security",
       "express-validator"
     ],
-    "short": "Validate input shape/type/constraints and sanitize before business logic, rejecting bad requests with 400. Use `express-validator` chains plus a middleware checking `validationResult(req)`; always validate server-side and hash passwords."
+    "short": "**Validate and sanitize input at the route boundary before business logic runs — reject malformed requests with 400 so handlers only receive well-formed, typed data.**\n\n- **`express-validator` pattern:** declare chainable rules (`body('email').isEmail().normalizeEmail()`) as an array of middleware, then a final step checks `validationResult(req)` and short-circuits with the errors.\n- **Sanitization:** always combine validation with sanitization — `trim()`, `normalizeEmail()`, `escape()` reduce XSS and normalize data before it reaches the DB.\n- **Always server-side:** client-side validation is UX only — the server must validate independently; also hash passwords (e.g. bcrypt) and never store plaintext."
   },
   {
     "id": "express-serve-static-files",
@@ -180,7 +180,7 @@
       "caching",
       "routing"
     ],
-    "short": "`express.static(root, options)` serves files from a directory; mounting at root maps to `/file`, while a prefix adds a virtual `/static/file` path. Use absolute paths, set `maxAge`, and register early."
+    "short": "**`express.static(root, options)` serves files from a directory by mapping request paths to the filesystem, calling `next()` on a miss (it never sends a 404 itself).**\n\n- **Root vs prefix:** `app.use(express.static('public'))` serves `public/logo.png` at `/logo.png`; `app.use('/static', express.static('public'))` exposes it at `/static/logo.png` (a virtual path).\n- **Use absolute paths:** `path.join(__dirname, 'public')` ensures the path works regardless of where the process was started.\n- **Caching:** set `maxAge: '7d'` (or longer for content-hashed assets) so browsers cache files and reduce load."
   },
   {
     "id": "express-next-route-vs-next-err",
@@ -195,7 +195,7 @@
       "error-handling",
       "output"
     ],
-    "short": "`next()` advances to the next handler, `next('route')` skips remaining handlers of the current route to the next matching route, and `next(err)` jumps to the error handler. `GET /item/0` returns `fallback`; `/item/5` returns `detail 5`."
+    "short": "**`next()`, `next('route')`, and `next(err)` each move control differently through the Express stack.**\n\n- **`next()`:** advances to the next handler in the current route's handler array, then to the next matching layer.\n- **`next('route')`:** skips all remaining handlers on the current route and jumps to the next matching route — only works inside `app.METHOD()`/`router.METHOD()` arrays, not `app.use()`.\n- **Output:** `GET /item/0` → id is 0 so `next('route')` fires → returns `fallback`; `GET /item/5` → `next()` fires → returns `detail 5`."
   },
   {
     "id": "express-404-and-catch-all-handler",
@@ -209,7 +209,7 @@
       "error-handling",
       "middleware-order"
     ],
-    "short": "Unmatched requests fall through, so add a catch-all `app.use()` returning 404 after all routes but before the 4-arg error handler. Wrong ordering either intercepts every route or misses forwarded errors."
+    "short": "**Unmatched requests fall through the entire stack, so a 404 handler is a plain `app.use()` catch-all registered after all routes — no special API needed.**\n\n- **Correct order:** all real routes → 404 catch-all → 4-arg error handler (last). Reversing any of these breaks routing or error handling.\n- **Why order matters:** a 404 handler placed before routes intercepts everything so no route ever runs; an error handler placed before the 404 never receives errors forwarded from the 404 middleware.\n- **Optional:** the 404 handler can `next(new NotFoundError())` instead of responding directly, so a single error handler shapes all error responses consistently."
   },
   {
     "id": "express-route-param-middleware",
@@ -223,7 +223,7 @@
       "middleware",
       "dry"
     ],
-    "short": "`app.param(name, cb)` runs once per request when a route has that param, loading/validating the resource (e.g. `req.loadedUser`) before handlers run. It centralizes lookups so each `/:id` route doesn't repeat them."
+    "short": "**`app.param(name, cb)` registers a callback that runs automatically once per request whenever a named route param appears — before any of that route's handlers.**\n\n- **Signature:** `(req, res, next, value)` where `value` is the matched param — fetch the entity, attach it to `req` (e.g. `req.loadedUser`), then call `next()` or 404.\n- **DRY resource loading:** instead of repeating the same DB lookup in every `/:userId` handler, define it once in `app.param('userId', ...)` and all routes share it.\n- **Error forwarding:** if the entity is not found, call `next(err)` or respond 404 directly inside the param callback — handlers never run for missing resources."
   },
   {
     "id": "express-headers-sent-bug",
@@ -237,6 +237,6 @@
       "headers-sent",
       "lifecycle"
     ],
-    "short": "The error 'Cannot set headers after they are sent' occurs because a validation branch sends a response but doesn't `return`, so execution falls through to a second send. Fix by adding `return` (or if/else) so only one terminal response runs."
+    "short": "**The `Cannot set headers after they are sent` error occurs when a guard branch sends a response but does not `return`, so execution falls through and sends a second response.**\n\n- **Root cause:** `res.status(400).json(...)` was called without `return`, so the code continues to the `res.json(user)` call below — two terminal responses for one request.\n- **Fix:** use `return res.status(400).json(...)` so the function exits immediately after the guard, or restructure with `if/else` so exactly one branch sends a response.\n- **General rule:** treat sending a response as the single exit point of a handler — `return` early on guard clauses and never mix `next()` with a response in the same branch."
   }
 ]

@@ -11,7 +11,7 @@
       "divide and conquer"
     ],
     "difficulty": "hard",
-    "short": "Binary-search a partition on the smaller array so the left half holds `(m+n+1)/2` elements with `maxLeft <= minRight` on both sides; median is then the boundary max (odd) or average of boundary max/min (even). O(log min(m,n))."
+    "short": "**Binary-search a partition on the smaller array so the combined left half holds `(m+n+1)/2` elements with `maxLeft <= minRight` on both sides.**\n\n- **Key idea:** a valid partition means `maxLeft1 <= minRight2` and `maxLeft2 <= minRight1`; binary-search on the smaller array to find it.\n- **Median:** max of both left parts (odd total) or average of max-left and min-right (even total).\n- **Complexity:** `O(log min(m, n))` time, `O(1)` space."
   },
   {
     "id": "dsa-trapping-rain-water",
@@ -25,7 +25,7 @@
       "greedy"
     ],
     "difficulty": "hard",
-    "short": "Two pointers from both ends tracking running left/right maxima; always advance the side with the smaller max and add `runningMax - height[i]`. O(n) time, O(1) space."
+    "short": "**Two pointers from both ends track running left/right maxima; always advance the side with the smaller max because that side's bound is definitively known.**\n\n- **Key idea:** water at bar `i` = `min(maxLeft, maxRight) - height[i]`; the two-pointer approach avoids pre-computing prefix/suffix arrays.\n- **Approach:** whichever running max is smaller, add `runningMax - height[ptr]` and advance that pointer inward.\n- **Complexity:** `O(n)` time, `O(1)` space."
   },
   {
     "id": "dsa-edit-distance",
@@ -38,7 +38,7 @@
       "strings"
     ],
     "difficulty": "hard",
-    "short": "Levenshtein DP where `dp[i][j]` is the edit distance of the two prefixes; on match carry the diagonal, else `1 + min(replace, delete, insert)`. Compressed to a 1D rolling row, O(m*n) time."
+    "short": "**Levenshtein DP: `dp[i][j]` is the edit distance between the first `i` chars of word1 and first `j` chars of word2.**\n\n- **Transition:** if characters match, `dp[i][j] = dp[i-1][j-1]`; otherwise `1 + min(replace dp[i-1][j-1], delete dp[i-1][j], insert dp[i][j-1])`.\n- **Optimisation:** compress to a 1-D rolling array, keeping only the previous row.\n- **Complexity:** `O(m * n)` time, `O(min(m, n))` space."
   },
   {
     "id": "dsa-regular-expression-matching",
@@ -52,7 +52,7 @@
       "recursion"
     ],
     "difficulty": "hard",
-    "short": "DP where `dp[i][j]` means `s[0..i)` matches `p[0..j)`; `*` takes either zero occurrences (`dp[i][j-2]`) or one-plus when the preceding char matches (`dp[i-1][j]`). O(m*n)."
+    "short": "**DP where `dp[i][j]` means `s[0..i)` fully matches `p[0..j)`; the tricky case is `*` which can match zero or more of the preceding element.**\n\n- **`*` transition:** zero occurrences → `dp[i][j-2]`; one-or-more (when preceding pattern char matches `s[i-1]`) → `dp[i-1][j]`.\n- **`.` or char match:** `dp[i][j] = dp[i-1][j-1]`.\n- **Complexity:** `O(m * n)` time and space."
   },
   {
     "id": "dsa-longest-valid-parentheses",
@@ -66,7 +66,7 @@
       "dynamic programming"
     ],
     "difficulty": "hard",
-    "short": "Stack of indices seeded with sentinel -1; push `(`, and on `)` pop then either reset the base (empty stack) or record `i - stack.top()` as a valid length. O(n)."
+    "short": "**Stack of indices seeded with a sentinel -1; push `(` indices, and on `)` pop then either reset the base or record `i - stack.top()` as the valid length.**\n\n- **Key idea:** the sentinel (and unmatched `)` replacements) acts as the left boundary so lengths spanning multiple pairs are computed correctly.\n- **Approach:** if stack is empty after a pop, push current index as new base; otherwise update `max = i - stack.top()`.\n- **Complexity:** `O(n)` time, `O(n)` space."
   },
   {
     "id": "dsa-word-break-ii",
@@ -81,7 +81,7 @@
       "strings"
     ],
     "difficulty": "hard",
-    "short": "Memoized backtracking: from each index try every dictionary-word prefix, recurse on the remainder, and prepend the word to each suffix sentence; memoize sentences by start index. Exponential output."
+    "short": "**Memoized backtracking: from each start index try every dictionary-word prefix, recurse on the remainder, and prepend the word to each returned suffix sentence.**\n\n- **Memoisation:** cache the list of sentences for each start index so overlapping subproblems are solved only once.\n- **Key idea:** use a `Set` for `O(1)` dictionary lookups; the memo maps `start → [sentences]`.\n- **Complexity:** exponential output in the worst case; `O(n^2)` subproblems with memoisation."
   },
   {
     "id": "dsa-n-queens",
@@ -94,7 +94,7 @@
       "recursion"
     ],
     "difficulty": "hard",
-    "short": "Backtrack one queen per row using sets for occupied columns and both diagonals (`row-col`, `row+col`) for O(1) attack checks; render the board when all rows are filled. O(n!)."
+    "short": "**Backtrack one queen per row, using sets for occupied columns and both diagonals to check attacks in O(1) per placement.**\n\n- **Approach:** for each row try every column not in `cols`, `diag1` (`row-col`), or `diag2` (`row+col`); mark, recurse, then unmark.\n- **Board output:** when all n rows are placed, render strings from the stored column assignments.\n- **Complexity:** `O(n!)` time, `O(n^2)` space for the output."
   },
   {
     "id": "dsa-merge-k-sorted-lists",
@@ -109,7 +109,7 @@
       "merge"
     ],
     "difficulty": "hard",
-    "short": "Min-heap holding each list's current front node; repeatedly pop the smallest, append it, and push its `next`. O(N log k) time, O(k) space."
+    "short": "**Min-heap holds the current front node of each list; repeatedly pop the smallest, append it to the result, and push its `next`.**\n\n- **Key idea:** the heap always holds at most `k` nodes, keeping ordering efficient across all lists simultaneously.\n- **Complexity:** `O(N log k)` time (N total nodes, each pushed/popped once), `O(k)` space.\n- **Watch out:** use a dummy head node to simplify result list construction."
   },
   {
     "id": "dsa-word-ladder",
@@ -123,7 +123,7 @@
       "strings"
     ],
     "difficulty": "hard",
-    "short": "BFS over words as graph nodes (edges = one-letter differences); generate neighbors by substituting each a-z and checking a Set, deleting visited words. Shortest path length found by BFS levels."
+    "short": "**BFS treats words as graph nodes where edges connect words differing by one letter; the shortest transformation sequence is the BFS level count.**\n\n- **Neighbor generation:** for each position substitute every letter a–z and check a `Set`; delete matched words immediately to avoid revisiting.\n- **Complexity:** `O(N * L * 26)` time, `O(N * L)` space where N is word count and L is word length.\n- **Watch out:** return 0 if `endWord` is not in the dictionary before starting BFS."
   },
   {
     "id": "dsa-alien-dictionary",
@@ -138,7 +138,7 @@
       "strings"
     ],
     "difficulty": "hard",
-    "short": "Build ordering edges from the first differing char of each adjacent word pair (guarding the bad-prefix case), then Kahn's topological sort; return `\"\"` if a cycle leaves letters unemitted."
+    "short": "**Extract ordering edges from the first differing character in each adjacent word pair, then run Kahn's topological sort to find the alien alphabet order.**\n\n- **Edge building:** compare adjacent words character by character; the first difference gives a directed edge; guard against a longer word appearing before its own prefix (invalid input).\n- **Cycle detection:** if the topological sort doesn't emit all letters, a cycle exists — return `\"\"`.\n- **Complexity:** `O(C)` time where C is total character content, `O(1)` space (bounded alphabet)."
   },
   {
     "id": "dsa-course-schedule-ii",
@@ -152,7 +152,7 @@
       "bfs"
     ],
     "difficulty": "hard",
-    "short": "Kahn's topological sort: build the prereq adjacency list and in-degrees, repeatedly dequeue zero in-degree courses, decrementing neighbors; return the order if it covers all courses else `[]`. O(V+E)."
+    "short": "**Kahn's topological sort: build the prerequisite adjacency list and in-degree counts, then dequeue zero-in-degree courses one by one, decrementing their dependents.**\n\n- **Approach:** start the queue with all in-degree-zero courses; each dequeued course goes into the result and decrements its dependents' in-degrees, enqueuing any that hit zero.\n- **Cycle detection:** if the result doesn't contain all courses, a cycle makes completion impossible — return `[]`.\n- **Complexity:** `O(V + E)` time and space."
   },
   {
     "id": "dsa-number-of-islands-ii",
@@ -166,7 +166,7 @@
       "grid"
     ],
     "difficulty": "hard",
-    "short": "Union-Find with path compression and union by rank, tracking a component count; each new land cell increments the count then unions with land neighbors, decrementing per successful merge. Near O(1) per op."
+    "short": "**Union-Find with path compression and union by rank tracks a live component count; each new land cell increments the count, then unions with its 4 land neighbours, decrementing per successful merge.**\n\n- **Key idea:** map 2D coordinates to a 1D index `r * n + c`; use `parent[idx] === -1` to track unset (water) cells.\n- **Duplicate handling:** if a position was already land, skip it and record the unchanged count.\n- **Complexity:** `O(k * alpha(m*n))` ≈ near `O(1)` per operation, `O(m * n)` space."
   },
   {
     "id": "dsa-serialize-deserialize-binary-tree",
@@ -181,7 +181,7 @@
       "recursion"
     ],
     "difficulty": "hard",
-    "short": "Preorder traversal recording null children with a sentinel marker, joined by commas; deserialize by consuming tokens in the same preorder order with a shared cursor to rebuild left then right. O(n)."
+    "short": "**Preorder traversal with a `#` sentinel for null children encodes the tree uniquely; deserialize by consuming tokens in the same preorder order with a shared cursor.**\n\n- **Serialize:** write node value (or `#`) then recurse left, then right; join with commas.\n- **Deserialize:** consume one token — if `#` return null, else create a node and recursively build left then right using a shared index.\n- **Complexity:** `O(n)` time and space."
   },
   {
     "id": "dsa-binary-tree-max-path-sum",
@@ -196,7 +196,7 @@
       "recursion"
     ],
     "difficulty": "hard",
-    "short": "Post-order DFS returning each node's best single-branch downward gain (clamping negatives to 0); update a global max with `node.val + leftGain + rightGain` at each node. O(n)."
+    "short": "**Post-order DFS computes each node's best single-branch downward gain (clamping negative subtrees to 0) and updates a global max using both branches at each node.**\n\n- **Key idea:** `gain(node) = node.val + max(0, gain(left)) + max(0, gain(right))` for the through-path max, but only return `node.val + max(one child gain)` to the parent.\n- **Why clamp to 0:** a negative subtree always makes the path worse, so we simply ignore it.\n- **Complexity:** `O(n)` time, `O(h)` space for the recursion stack."
   },
   {
     "id": "dsa-largest-rectangle-histogram",
@@ -210,7 +210,7 @@
       "arrays"
     ],
     "difficulty": "hard",
-    "short": "Monotonic increasing stack of indices; when a shorter bar appears, pop and compute area with the popped bar as the limiting height and width spanning to the new top, using a trailing 0 sentinel to flush. O(n)."
+    "short": "**Monotonic increasing stack of indices: when a shorter bar is encountered, pop and compute the rectangle area using the popped bar's height and the distance to the new stack top.**\n\n- **Width formula:** `stack.length ? i - stack.top() - 1 : i` — handles bars extending to the left edge.\n- **Flush trick:** append a sentinel height `0` to force all remaining bars to be popped at the end.\n- **Complexity:** `O(n)` time, `O(n)` space — each index is pushed and popped at most once."
   },
   {
     "id": "dsa-maximal-rectangle",
@@ -225,7 +225,7 @@
       "matrix"
     ],
     "difficulty": "hard",
-    "short": "Reduce to largest-rectangle-in-histogram per row: maintain column heights of consecutive 1's (reset on 0) and run the monotonic-stack histogram algorithm each row, tracking the global max. O(rows*cols)."
+    "short": "**Reduce to the largest-rectangle-in-histogram problem row by row: maintain column heights of consecutive 1's and run the monotonic-stack algorithm on each row.**\n\n- **Height update:** `heights[c] = cell === '1' ? heights[c] + 1 : 0` — resets on any '0'.\n- **Key idea:** each row's histogram captures all rectangles whose bottom edge is on that row.\n- **Complexity:** `O(rows * cols)` time, `O(cols)` space."
   },
   {
     "id": "dsa-sliding-window-maximum",
@@ -240,7 +240,7 @@
       "arrays"
     ],
     "difficulty": "hard",
-    "short": "Monotonic decreasing deque of indices; pop smaller-or-equal values from the back before pushing `i`, drop front indices that slid out of the window, and the front is each window's max. O(n)."
+    "short": "**Monotonic decreasing deque of indices: pop smaller-or-equal values from the back before pushing the current index, so the front is always the window's maximum.**\n\n- **Evict stale:** if `deque.front <= i - k`, remove it — it has slid out of the window.\n- **Key idea:** values smaller than the incoming element can never be a future window max while that element is present.\n- **Complexity:** `O(n)` time, `O(k)` space — each index is added and removed at most once."
   },
   {
     "id": "dsa-minimum-window-substring",
@@ -255,7 +255,7 @@
       "two pointers"
     ],
     "difficulty": "hard",
-    "short": "Sliding window with char-count matching: expand right to satisfy all required counts (`formed == required`), then contract left to shrink while still valid, recording the smallest window. O(|s|+|t|)."
+    "short": "**Sliding window with character-count matching: expand right until all required characters are satisfied, then contract left to find the smallest valid window.**\n\n- **`formed` counter:** tracks how many distinct characters in `t` are fully satisfied in the current window; target is `need.size`.\n- **Contract phase:** shrink from the left as long as `formed == required`, recording the window length each time.\n- **Complexity:** `O(|s| + |t|)` time, `O(|t|)` space."
   },
   {
     "id": "dsa-word-search-ii",
@@ -270,7 +270,7 @@
       "matrix"
     ],
     "difficulty": "hard",
-    "short": "Build a Trie of the words and DFS each board cell in lockstep with the Trie, marking visited cells temporarily; emit a word at terminal nodes and clear its marker to dedupe, pruning dead prefixes early."
+    "short": "**Build a Trie of all words, then DFS from every board cell in lockstep with the Trie, pruning immediately when no word shares the current prefix.**\n\n- **Visited marking:** temporarily set the cell to `'#'` during DFS and restore on backtrack to prevent reuse within one word.\n- **Deduplication:** when a terminal node is found, emit the word and clear its `.word` marker so it can't be added again.\n- **Complexity:** `O(m * n * 4^L)` worst case, `O(total word chars)` Trie space."
   },
   {
     "id": "dsa-find-median-from-data-stream",
@@ -285,6 +285,6 @@
       "two heaps"
     ],
     "difficulty": "hard",
-    "short": "Two heaps: a max-heap for the lower half and a min-heap for the upper; on add push-and-rebalance to keep sizes balanced, so the median is the larger heap's top or the average of both tops. O(log n) per add."
+    "short": "**Two heaps — a max-heap for the lower half and a min-heap for the upper half — stay balanced so the median is either the larger heap's top or the average of both tops.**\n\n- **Add strategy:** always push to `lo`, move `lo`'s top to `hi` to maintain ordering, then rebalance sizes so `lo` holds the extra element on odd counts.\n- **Median lookup:** `O(1)` — just peek at heap tops.\n- **Complexity:** `O(log n)` per `addNum`, `O(n)` space."
   }
 ]

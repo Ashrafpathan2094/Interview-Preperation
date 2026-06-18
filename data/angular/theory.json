@@ -9,7 +9,7 @@
       "zone.js",
       "performance"
     ],
-    "short": "Angular walks a top-down tree of per-component change detectors when async events fire (via zone.js). `Default` checks every component each cycle; `OnPush` checks only on `@Input` reference change, local events, `async` emissions, or `markForCheck()` — so mutating in place won't update it."
+    "short": "**Angular uses a tree of per-component change detectors, walking top-down when async events fire via `zone.js`, to keep the DOM in sync.**\n\n- **Default strategy:** every component is checked on every cycle regardless of data change — correct but potentially wasteful.\n- **OnPush strategy:** a component is skipped unless an `@Input` reference changes, a local event fires, an `async` pipe emits, or `markForCheck()` is called.\n- **Mutation trap:** OnPush compares inputs by reference, so mutating an array in place (`arr.push(x)`) will NOT trigger a re-check — replace the reference instead (`arr = [...arr, x]`)."
   },
   {
     "id": "angular-zonejs-role",
@@ -23,7 +23,7 @@
       "ngzone",
       "zoneless"
     ],
-    "short": "zone.js monkey-patches async browser APIs so Angular auto-runs change detection when tasks complete, but it triggers CD on every task. Going zoneless (`provideZonelessChangeDetection()`) drops zone.js and relies on signals, the `async` pipe, and explicit notifications instead."
+    "short": "**`zone.js` monkey-patches async browser APIs so Angular automatically runs change detection after any async task completes — no manual notification needed.**\n\n- **Trade-off:** it fires a CD cycle after every patched task, even ones that didn't change state, which can hurt performance.\n- **Opt out:** use `ngZone.runOutsideAngular()` for high-frequency work (animations, `mousemove`) and `ngZone.run()` only when you need an update.\n- **Zoneless:** `provideZonelessChangeDetection()` drops `zone.js` entirely and relies on signals, `async` pipe, and `markForCheck()` for fine-grained, deterministic updates."
   },
   {
     "id": "angular-signals-explained",
@@ -37,7 +37,7 @@
       "rxjs",
       "change-detection"
     ],
-    "short": "A signal is a synchronous, auto-tracking reactive value (`signal`, `computed`, `effect`) needing no subscription. Observables are async push streams over time. They're complementary: signals for local/derived state, RxJS for events/async; bridge with `toSignal()`/`toObservable()`."
+    "short": "**A signal is a synchronous, auto-tracking reactive value that notifies consumers when it changes — no subscription required.**\n\n- **Core API:** `signal(initial)` (writable), `computed(() => ...)` (memoized derived), `effect(() => ...)` (side effects).\n- **Vs Observables:** signals are synchronous pull-based values with an initial value; observables are async push streams suited for events, HTTP, and complex operators.\n- **Complementary:** use signals for local/derived UI state, RxJS for async orchestration, and bridge them with `toSignal()`/`toObservable()`."
   },
   {
     "id": "angular-di-hierarchical-injectors",
@@ -51,7 +51,7 @@
       "providers",
       "resolution-modifiers"
     ],
-    "short": "Angular resolves a token by searching up the element/node injector tree, then the module/environment injector chain to root, throwing `NullInjectorError` if not found. Where you provide a service determines its scope; `@Self`/`@SkipSelf`/`@Optional`/`@Host` modify the search."
+    "short": "**Angular resolves a dependency by walking up the element/node injector tree, then the module/environment chain to the root, throwing `NullInjectorError` if nothing is found.**\n\n- **Scope control:** providing a service in a component's `providers` gives each instance its own copy; `providedIn: 'root'` creates a tree-shakable app-wide singleton.\n- **Resolution modifiers:** `@Self()` limits search to the current injector; `@SkipSelf()` starts at the parent; `@Optional()` returns `null` instead of throwing; `@Host()` stops at the host element.\n- **Common misconception:** services are NOT automatically global singletons — their lifetime depends entirely on where they are provided."
   },
   {
     "id": "angular-providedin-root-vs-providers",
@@ -63,7 +63,7 @@
       "tree-shaking",
       "singleton"
     ],
-    "short": "`providedIn: 'root'` makes a tree-shakable app-wide singleton. Module `providers` give a singleton when eager but a new scoped instance when lazy-loaded; component `providers` give one instance per component. Prefer `providedIn: 'root'` unless you want a scoped instance."
+    "short": "**`providedIn: 'root'` creates a single, tree-shakable app-wide singleton; component or module `providers` arrays control scope and instance lifetime differently.**\n\n- **Module providers:** eager-loaded modules merge into root (one instance); lazy-loaded modules create a NEW scoped instance — a frequent source of duplicate-service bugs.\n- **Component providers:** each component instance gets its own service instance, scoped to it and its view children.\n- **Rule of thumb:** prefer `providedIn: 'root'` for shared singletons; use component `providers` only when you deliberately need a scoped instance."
   },
   {
     "id": "angular-injection-token",
@@ -76,7 +76,7 @@
       "injection-token",
       "configuration"
     ],
-    "short": "An `InjectionToken` is a unique, type-safe DI key for non-class values like config, primitives, functions, or interfaces (which don't exist at runtime). Provide via `useValue`/`useFactory` and inject with `inject(TOKEN)`; common for config, feature flags, and mockable browser globals."
+    "short": "**An `InjectionToken` is a unique, type-safe DI key for non-class values — primitives, config objects, functions, or interfaces (which vanish at runtime).**\n\n- **Usage:** create once, provide via `useValue`/`useFactory`, and inject with `inject(TOKEN)` or `@Inject(TOKEN)`.\n- **Tree-shakable:** pair with a `factory` and `providedIn: 'root'` so unused tokens are dropped from the bundle.\n- **Common uses:** app config, feature flags, base URLs, swapping implementations behind an interface, and mockable browser globals like `window`."
   },
   {
     "id": "angular-standalone-components",
@@ -90,7 +90,7 @@
       "architecture",
       "bootstrapping"
     ],
-    "short": "Standalone components (`standalone: true`, now default) declare their own template dependencies in `imports` instead of an NgModule, bootstrapping via `bootstrapApplication` with `provide*` functions. NgModules still exist but are no longer mandatory; dependencies are declared per-component."
+    "short": "**Standalone components (`standalone: true`, the modern default) declare their own template dependencies in `imports` instead of relying on an NgModule.**\n\n- **Bootstrapping:** use `bootstrapApplication(AppComponent, { providers: [...] })` with `provideRouter`, `provideHttpClient`, etc. instead of a root `AppModule`.\n- **Lazy loading:** simpler with `loadComponent` pointing directly at the component file — no feature module needed.\n- **NgModules not gone:** they still exist for grouping and library compatibility, but are no longer the mandatory organizing unit."
   },
   {
     "id": "angular-lifecycle-hooks",
@@ -102,7 +102,7 @@
       "ngoninit",
       "ngondestroy"
     ],
-    "short": "Order: `ngOnChanges` (on `@Input` ref change) -> `ngOnInit` -> `ngDoCheck` -> `ngAfterContentInit/Checked` -> `ngAfterViewInit/Checked` -> `ngOnDestroy`. Initialize in `ngOnInit`, access `@ViewChild` in `ngAfterViewInit`, and clean up subscriptions/timers in `ngOnDestroy`."
+    "short": "**Angular lifecycle hooks let you tap into key moments of a component's life, running in a fixed order from creation to destruction.**\n\n- **Creation order:** `ngOnChanges` → `ngOnInit` → `ngDoCheck` → `ngAfterContentInit/Checked` → `ngAfterViewInit/Checked`.\n- **Key timings:** initialize in `ngOnInit` (inputs are set); access `@ViewChild` results in `ngAfterViewInit` (view is built); clean up subscriptions/timers in `ngOnDestroy`.\n- **`ngOnChanges`:** only fires for `@Input` properties and only on reference changes — not value mutations."
   },
   {
     "id": "angular-rxjs-subject-types",
@@ -116,7 +116,7 @@
       "behaviorsubject",
       "state"
     ],
-    "short": "All are multicast Observer+Observable. `Subject` has no initial value and late subscribers miss prior emissions; `BehaviorSubject` requires/stores the latest value; `ReplaySubject(n)` replays the last n; `AsyncSubject` emits only the final value on completion. `BehaviorSubject` is the state workhorse."
+    "short": "**All Subject types are both Observable and Observer (multicast), but they differ in whether they store and replay a value to new subscribers.**\n\n- **`Subject`:** no initial value; late subscribers miss all prior emissions.\n- **`BehaviorSubject`:** requires an initial value and immediately emits the latest value to every new subscriber — the standard for shared state.\n- **`ReplaySubject(n)`:** buffers and replays the last *n* values; **`AsyncSubject`** emits only the final value on completion."
   },
   {
     "id": "angular-rxjs-flattening-operators",
@@ -130,7 +130,7 @@
       "switchmap",
       "mergemap"
     ],
-    "short": "Higher-order mapping operators differ in handling overlap: `switchMap` cancels the previous inner (best for type-ahead), `mergeMap` runs concurrently (unordered parallel work), `concatMap` queues sequentially in order, and `exhaustMap` ignores new values while busy (prevents duplicate submits)."
+    "short": "**Higher-order mapping operators all project source values to an inner Observable but differ critically in how they handle overlapping inner streams.**\n\n- **`switchMap`:** cancels the previous inner when a new source value arrives — correct for type-ahead search (only latest result matters).\n- **`mergeMap`:** runs all inner Observables concurrently with no order guarantee — good for independent parallel work.\n- **`concatMap`:** queues inner Observables one at a time in order — use when sequence must be preserved.\n- **`exhaustMap`:** ignores new source values while an inner is active — ideal for preventing duplicate form submissions."
   },
   {
     "id": "angular-subscription-memory-leaks",
@@ -144,7 +144,7 @@
       "subscription",
       "async-pipe"
     ],
-    "short": "Manual subscriptions to long-lived sources prevent GC of destroyed components and keep callbacks firing. Manage teardown with the `async` pipe (best), `takeUntilDestroyed()`, `takeUntil(destroy$)`, or storing and `.unsubscribe()`-ing in `ngOnDestroy`; completing operators self-clean."
+    "short": "**Manual `.subscribe()` on a long-lived source keeps a destroyed component in memory and firing callbacks — this is the classic RxJS memory leak.**\n\n- **Best fix:** use the `async` pipe in the template — it subscribes and auto-unsubscribes, and calls `markForCheck()` for OnPush components.\n- **Modern alternative:** `takeUntilDestroyed()` ties teardown to the component's `DestroyRef` with no boilerplate.\n- **Classic pattern:** `takeUntil(destroy$)` emitting in `ngOnDestroy`, or storing a `Subscription` and calling `.unsubscribe()`; completing operators like `take(1)` self-clean automatically."
   },
   {
     "id": "angular-async-pipe",
@@ -158,7 +158,7 @@
       "onpush",
       "templates"
     ],
-    "short": "The `async` pipe subscribes in the template, returns the latest value, auto-unsubscribes on destroy, and calls `markForCheck()` so it's OnPush-friendly with no boilerplate. Watch out: using it multiple times on one source causes multiple subscriptions — share via `@if as` or `shareReplay`."
+    "short": "**The `async` pipe subscribes to an Observable or Promise in the template, returns the latest value, and auto-unsubscribes when the component is destroyed.**\n\n- **OnPush-friendly:** when the observable emits, the pipe calls `markForCheck()`, so OnPush components update without manual plumbing.\n- **Multiple subscriptions pitfall:** using `| async` on the same source in multiple places creates multiple subscriptions (e.g. multiple HTTP calls) — fix with `@if (obs$ | async; as data)` or `shareReplay(1)`.\n- **No boilerplate:** eliminates manual subscribe/unsubscribe and intermediate component fields."
   },
   {
     "id": "angular-pure-vs-impure-pipes",
@@ -172,7 +172,7 @@
       "impure",
       "performance"
     ],
-    "short": "Pure pipes (default) re-run `transform()` only on primitive or reference changes, making them cheap and memoized; impure pipes (`pure: false`) run every CD cycle to catch mutations/async but risk performance. The `async` pipe is impure; prefer computing data in the component or a `computed` signal."
+    "short": "**Pure pipes (default) only re-run `transform()` when the input primitive changes or object reference changes; impure pipes (`pure: false`) run on every CD cycle.**\n\n- **Performance:** pure pipes are cheap and memoized; impure pipes can seriously hurt performance in large or frequently-checked views.\n- **Mutation trap:** a pure pipe WILL NOT update when you mutate an array in place — replace the reference or use a `computed` signal in the component instead.\n- **Built-in exception:** the `async` pipe is impure by necessity, since it must react to async emissions."
   },
   {
     "id": "angular-structural-vs-attribute-directives",
@@ -186,7 +186,7 @@
       "attribute",
       "custom-directives"
     ],
-    "short": "Structural directives (`*ngIf`, `*ngFor`, `@if`/`@for`) add/remove DOM elements — one per element — while attribute directives (`ngClass`, custom highlight) change appearance/behavior of an existing element, with many allowed. `*ngIf` physically removes and destroys, unlike `[hidden]`/CSS."
+    "short": "**Structural directives add or remove DOM elements; attribute directives change the behavior or appearance of an existing element without altering the DOM structure.**\n\n- **Structural (`*ngIf`, `*ngFor`, `@if`/`@for`):** use the `*` sugar (desugared to `<ng-template>`); only ONE is allowed per element; `*ngIf` physically destroys the component, unlike `[hidden]`/CSS.\n- **Attribute (`ngClass`, custom highlight):** any number can apply to the same element; implemented with `@HostBinding`/`@HostListener`.\n- **Custom structural:** inject `TemplateRef` and `ViewContainerRef` to create/clear embedded views."
   },
   {
     "id": "angular-template-vs-reactive-forms",
@@ -200,7 +200,7 @@
       "template-driven",
       "validation"
     ],
-    "short": "Template-driven forms build the model implicitly via `ngModel` directives — simple but async and harder to test. Reactive forms define `FormControl`/`FormGroup` explicitly in the class — synchronous, typed, testable, and RxJS-friendly via `valueChanges`. Use reactive for anything non-trivial."
+    "short": "**Template-driven forms build the model implicitly from `ngModel` directives; reactive forms define `FormControl`/`FormGroup` explicitly in the component class.**\n\n- **Template-driven:** simpler for small forms but async, harder to unit-test, and validation lives in directives.\n- **Reactive:** synchronous, strongly typed, composable validators, and exposes `valueChanges`/`statusChanges` Observables for RxJS integration.\n- **Rule of thumb:** use reactive forms for anything non-trivial, dynamic, or heavily validated."
   },
   {
     "id": "angular-lazy-loading-routing",
@@ -214,7 +214,7 @@
       "performance",
       "code-splitting"
     ],
-    "short": "Lazy loading uses a dynamic `import()` (`loadComponent`/`loadChildren`) so the bundler emits a feature as a separate chunk loaded on demand, shrinking the initial bundle and speeding first load. Lazy areas get their own injector; preloading strategies and `canMatch` guards complement it."
+    "short": "**Lazy loading defers downloading a feature's code until the user navigates to its route, using a dynamic `import()` that the bundler emits as a separate chunk.**\n\n- **Standalone:** `loadComponent` for a single component, `loadChildren` for a child route group pointing to a `Routes` export — no NgModule needed.\n- **Benefits:** smaller initial bundle, faster first load and Time-to-Interactive, and each lazy area gets its own injector scoping services to it.\n- **Enhancements:** preloading strategies load chunks in the background post-boot; `canMatch` guards can prevent even downloading a chunk for unauthorized users."
   },
   {
     "id": "angular-route-guards",
@@ -228,7 +228,7 @@
       "canactivate",
       "canmatch"
     ],
-    "short": "Route guards are functions returning `boolean`/`UrlTree`/async deciding if navigation or chunk loading proceeds. Types: `canActivate`, `canActivateChild`, `canDeactivate`, `canMatch` (skips loading the chunk), and `resolve` (pre-fetch data). Return a `UrlTree` to redirect idiomatically."
+    "short": "**Route guards are functions the router calls to decide if navigation or chunk loading should proceed, returning `boolean`, a `UrlTree` (redirect), or an async version of either.**\n\n- **Types:** `canActivate` (enter), `canActivateChild`, `canDeactivate` (leave), `canMatch` (match + skip chunk loading), `resolve` (prefetch data before activation).\n- **Functional guards:** modern Angular uses plain functions with `inject()` instead of class-based interfaces — composable and tree-shakable.\n- **Redirect idiom:** return `router.createUrlTree(['/login'])` instead of calling `router.navigate()` inside the guard."
   },
   {
     "id": "angular-input-output-communication",
@@ -242,7 +242,7 @@
       "component-communication",
       "two-way-binding"
     ],
-    "short": "`@Input` binds parent-to-child data; `@Output` emits events child-to-parent (modern `input()`/`output()` use signals). For distant components use a shared service with a `BehaviorSubject`/signal, a state library, router data, or `@ViewChild`. `[(banana)]` is `@Input` + `@Output propChange` sugar."
+    "short": "**`@Input()` binds data from parent to child; `@Output()` exposes an `EventEmitter` so the child sends events back up to the parent.**\n\n- **Modern signals:** `input()` and `output()` functions provide signal-based equivalents — inputs are read as signals.\n- **For distant components:** use a shared service with a `BehaviorSubject` or signal, a state library (NgRx), router data, or `@ViewChild` for direct parent-to-child API access.\n- **Two-way binding:** `[(banana)]` syntax is sugar for `@Input prop` + `@Output propChange` — it is NOT automatic two-way binding."
   },
   {
     "id": "angular-viewchild-vs-contentchild",
@@ -256,7 +256,7 @@
       "content-projection",
       "queries"
     ],
-    "short": "`@ViewChild`/`@ViewChildren` query the component's own template (ready in `ngAfterViewInit`); `@ContentChild`/`@ContentChildren` query parent-projected `<ng-content>` (ready in `ngAfterContentInit`). They don't cross over — using the wrong one is a classic bug; plurals return a `QueryList`."
+    "short": "**`@ViewChild` queries the component's own template view; `@ContentChild` queries content projected in via `<ng-content>` — they do not cross over.**\n\n- **Timing:** `@ViewChild` results are available in `ngAfterViewInit`; `@ContentChild` results are available in `ngAfterContentInit`.\n- **Selector:** use a template reference variable, component/directive type, or `InjectionToken`; `{ static: true }` resolves before CD (only for non-conditional elements).\n- **Plurals:** `@ViewChildren`/`@ContentChildren` return a `QueryList` with a subscribable `.changes` observable."
   },
   {
     "id": "angular-aot-ivy",
@@ -269,7 +269,7 @@
       "build",
       "tree-shaking"
     ],
-    "short": "AOT compiles templates to JavaScript at build time (the production default), giving faster startup, smaller bundles, and earlier error detection versus JIT. Ivy is Angular's instruction-based compile/render engine enabling better tree-shaking, locality, and debugging; AOT is the how, Ivy the engine."
+    "short": "**AOT (Ahead-of-Time) compilation converts Angular templates to JavaScript at build time, giving faster startup, smaller bundles, and earlier error detection versus JIT.**\n\n- **Ivy engine:** Angular's current compile/render engine, producing per-component instruction sets that enable better tree-shaking, locality (incremental builds), and improved debugging.\n- **Relationship:** AOT is *when and how* templates are compiled; Ivy is the *engine* that compiles and runs the result — they work together.\n- **Built on Ivy:** signals, standalone components, and zoneless change detection all rely on Ivy's instruction model."
   },
   {
     "id": "angular-expression-changed-error",
@@ -283,6 +283,6 @@
       "lifecycle",
       "debugging"
     ],
-    "short": "`ExpressionChangedAfterItHasBeenCheckedError` is a dev-only diagnostic thrown when a binding changes after Angular's second verification check — usually a child/lifecycle hook mutating already-rendered parent state. Fix by updating earlier (`ngOnInit`), deferring via `Promise.resolve().then()`, or using signals/one-way data flow."
+    "short": "**`ExpressionChangedAfterItHasBeenCheckedError` is a dev-only diagnostic thrown when a template binding changes after Angular's second verification pass in the same cycle.**\n\n- **Common cause:** a child lifecycle hook like `ngAfterViewInit` mutates a value the parent already rendered, making the view inconsistent.\n- **Fixes:** move the update earlier to `ngOnInit`, defer to the next microtask with `Promise.resolve().then(...)`, call `cdr.detectChanges()`, or use signals/one-way data flow so values stabilize.\n- **Misconception:** the second check is a diagnostic only — production skips it, so the error \"disappears\" but the underlying inconsistency remains."
   }
 ]

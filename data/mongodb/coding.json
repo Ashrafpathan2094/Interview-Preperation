@@ -12,7 +12,7 @@
       "$setOnInsert",
       "updateOne"
     ],
-    "short": "Use `updateOne` with `{ upsert: true }`: `$inc` adds 5 (starting from 0 on insert) and `$setOnInsert` sets fields like `createdAt` only when a new doc is created. Don't reference the same field in both or it conflicts."
+    "short": "**Use `updateOne` with `{ upsert: true }` to atomically increment stock or insert the product if it doesn't exist.**\n\n- **`$inc`:** increments `stock` on an existing doc; on insert, starts from 0 so the new doc gets exactly 5.\n- **`$setOnInsert`:** applies its fields **only when a new document is created**, not on updates — ideal for setting `createdAt` once.\n- **Conflict rule:** you cannot reference the same field in both `$inc` and `$setOnInsert` — MongoDB throws an error."
   },
   {
     "id": "mongodb-bulkwrite-batch",
@@ -27,7 +27,7 @@
       "ordered",
       "batch"
     ],
-    "short": "`bulkWrite` sends mixed ops in one round trip. `ordered: true` runs sequentially and stops on first error; `ordered: false` continues past errors for higher throughput. It's not a transaction, so partial writes can persist."
+    "short": "**`bulkWrite` batches mixed inserts, updates, and deletes into a single round trip, far faster than individual calls.**\n\n- **`ordered: true` (default):** runs operations sequentially and stops at the first error — use when order matters.\n- **`ordered: false`:** continues past individual errors and may parallelize ops — use for independent high-throughput writes.\n- **Not a transaction:** partial writes can persist on error; wrap in a session/transaction if you need all-or-nothing semantics."
   },
   {
     "id": "mongodb-agg-revenue-per-customer",
@@ -43,7 +43,7 @@
       "$limit",
       "optimization"
     ],
-    "short": "`$match` first (index-friendly filter), then `$group` by customer summing `amount`, then `$sort` before `$limit` so MongoDB does a top-K sort. Filter and project early to shrink the data flowing downstream."
+    "short": "**Pipeline order matters for both correctness and performance: filter early, group in the middle, then sort and limit at the end.**\n\n- **`$match` first:** filters on `status` and `createdAt` so MongoDB can use an index and reduces documents flowing downstream.\n- **`$group` next:** aggregates by `customerId` and sums `amount` into `totalRevenue`.\n- **`$sort` then `$limit`:** placing `$sort` before `$limit` lets MongoDB do a memory-efficient top-K sort, keeping only the 5 largest values."
   },
   {
     "id": "mongodb-agg-lookup-join",
@@ -58,7 +58,7 @@
       "join",
       "indexing"
     ],
-    "short": "`$lookup` is a left outer join into an array; `$unwind` flattens it. It scans the foreign collection per input doc unless `foreignField` is indexed; joining on indexed `users._id` keeps it fast."
+    "short": "**`$lookup` performs a left outer join, attaching matching documents as an array; `$unwind` flattens a single-element array into an object.**\n\n- **Index the `foreignField`:** without an index, MongoDB scans the foreign collection for every input document — an N×M scan.\n- **`_id` is already indexed:** joining on `users._id` is efficient by default; for other join fields, create an explicit index.\n- **`$unwind` after `$lookup`:** converts `[ {..} ]` to `{..}` for one-to-one relationships and drops docs with no match by default."
   },
   {
     "id": "mongodb-agg-unwind-tag-counts",
@@ -72,7 +72,7 @@
       "$group",
       "arrays"
     ],
-    "short": "`$unwind` emits one doc per tag, then `$group` by `$tags` with `$sum: 1` counts posts per tag, sorted descending. Note `$unwind` drops missing/empty arrays unless `preserveNullAndEmptyArrays` is set."
+    "short": "**`$unwind` deconstructs the `tags` array so each tag becomes its own document; then `$group` counts how many posts use each tag.**\n\n- **`$unwind` behavior:** a post with N tags produces N rows — each is counted once per tag, which is exactly what you want.\n- **`$group` + `$sum: 1`:** groups by the scalar tag value and increments a counter per document.\n- **Empty arrays:** by default `$unwind` drops documents whose array is missing or empty; pass `{ preserveNullAndEmptyArrays: true }` to keep them."
   },
   {
     "id": "mongodb-agg-second-highest-salary",
@@ -88,7 +88,7 @@
       "$limit",
       "puzzle"
     ],
-    "short": "`$group` by `$salary` to collapse duplicates into distinct values, `$sort` descending, then `$skip: 1` and `$limit: 1` to get the second-highest distinct salary. Grouping first makes it correctly distinct despite ties."
+    "short": "**Group by `$salary` first to get distinct salary values, sort descending, then skip the top one and take the next.**\n\n- **`$group` by salary:** collapses duplicate salary values and collects employee names at each level using `$push`.\n- **`$skip: 1` then `$limit: 1`:** drops the highest distinct salary and returns exactly the second-highest.\n- **Why group first:** skipping rows from the original collection would incorrectly count ties as separate rows, giving the wrong result."
   },
   {
     "id": "mongodb-agg-bucket-monthly",
@@ -103,7 +103,7 @@
       "dates",
       "reporting"
     ],
-    "short": "`$match` the year first, `$group` by `{ $month: \"$createdAt\" }` summing `amount`, then `$sort` by month. Pass a `timezone` to the date operator for timezone-correct buckets."
+    "short": "**Extract the month from a date field with `$month` inside `$group`, then sort the result chronologically.**\n\n- **`$match` first:** narrows to the year (index-friendly) before the expensive grouping stage.\n- **`$group` by `{ $month: \"$createdAt\" }`:** extracts month numbers 1–12 as the group key, summing `amount` into `revenue`.\n- **Timezone:** pass `{ date: \"$createdAt\", timezone: \"Asia/Kolkata\" }` to the date operator for timezone-correct monthly buckets."
   },
   {
     "id": "mongodb-compound-index-esr",
@@ -118,7 +118,7 @@
       "sort",
       "optimization"
     ],
-    "short": "Follow the ESR rule: equality fields (`status`, `region`) first, then the sort field (`createdAt`), then ranges. Putting the sort key after equality lets the index serve sorted results and avoid an in-memory sort."
+    "short": "**Apply the ESR rule to order compound index keys: Equality fields first, Sort field next, Range fields last.**\n\n- **Equality first:** `status` and `region` narrow the scan the most and are placed at the front.\n- **Sort next:** placing `createdAt` right after the equality fields lets the index return results already sorted, avoiding a blocking in-memory `SORT` stage.\n- **Verify with `explain()`:** look for `IXSCAN` with no `SORT` stage and `totalKeysExamined` close to `nReturned`."
   },
   {
     "id": "mongodb-ttl-index",
@@ -132,7 +132,7 @@
       "expiration",
       "sessions"
     ],
-    "short": "A TTL index is a single-field index on a Date with `expireAfterSeconds`; a ~60s background sweep deletes expired docs. The field must be a BSON Date, deletion lags up to ~60s, and `_id`/compound TTL aren't allowed."
+    "short": "**A TTL index on a `Date` field automatically deletes documents after `expireAfterSeconds`, but deletion is eventual due to the background sweep.**\n\n- **Background sweep:** runs roughly every 60 seconds, so a document can live up to ~60s past its configured expiry.\n- **Date field required:** the field must be a BSON `Date`; non-date values are ignored and those documents never expire.\n- **Constraints:** single-field only — you cannot create a compound TTL index, and you cannot apply one to the `_id` field.\n- **Absolute expiry:** use `expireAfterSeconds: 0` and store the target timestamp directly in the date field."
   },
   {
     "id": "mongodb-text-index-search",
@@ -147,7 +147,7 @@
       "full-text-search",
       "relevance"
     ],
-    "short": "Create a text index over `title`/`body` (one per collection, optional weights), then query with `$text: { $search: ... }`. Project `{ score: { $meta: \"textScore\" } }` and sort by it to rank by relevance."
+    "short": "**Create a weighted text index over `title` and `body`, then query with `$text` and sort by `textScore` for relevance ranking.**\n\n- **One text index per collection:** it can span multiple fields; use `weights` so `title` matches count more than `body`.\n- **`$text` search:** tokenizes, stems, and removes stop words; space-separated terms are OR by default; use quoted phrases for exact matches.\n- **Relevance sort:** project `{ score: { $meta: \"textScore\" } }` and sort by it to rank results by how closely they match."
   },
   {
     "id": "mongodb-transaction-transfer",
@@ -162,7 +162,7 @@
       "withTransaction",
       "atomicity"
     ],
-    "short": "Start a session, pass it to every write, then commit on success or abort on error. Use the driver's `withTransaction()` helper for automatic retries of transient errors, and keep transactions short since they hold locks."
+    "short": "**Multi-document transactions require a session; pass the session to every operation, commit on success, and abort on error.**\n\n- **`withTransaction()` helper:** automatically retries the callback on `TransientTransactionError` or `UnknownTransactionCommitResult` — use it over manual `startTransaction`/`commitTransaction` in production.\n- **Guard the debit:** check `modifiedCount === 1` after the debit update and throw to abort if funds are insufficient.\n- **Keep transactions short:** they hold locks and have a default 60-second lifetime; long-running transactions increase conflict risk."
   },
   {
     "id": "mongodb-explain-covered-query",
@@ -177,7 +177,7 @@
       "indexing",
       "projection"
     ],
-    "short": "A covered query is served entirely from an index (no document fetch): all queried and projected fields are in the index and `_id` is excluded. In `explain`, it shows an IXSCAN with no FETCH and `totalDocsExamined: 0`."
+    "short": "**A covered query is answered entirely from one index — MongoDB never touches the actual documents, making it extremely fast.**\n\n- **Requirements:** all filter *and* projected fields must be in the same index; exclude `_id` from the projection unless it's part of the index.\n- **`explain()` confirmation:** the winning plan shows `IXSCAN` with **no `FETCH` stage** and `totalDocsExamined === 0`.\n- **Common trap:** forgetting to exclude `_id` breaks coverage because `_id` is returned by default but is not in a secondary index."
   },
   {
     "id": "mongodb-explain-regex-anchor",
@@ -192,7 +192,7 @@
       "indexing",
       "bug-fix"
     ],
-    "short": "Indexes only help start-anchored, case-sensitive regexes (`/^.../`). The end-anchored `/gmail\\.com$/` forces a full scan; fix by storing and indexing an exact `domain` field (or using a text index)."
+    "short": "**A B-tree index on a string can only accelerate regexes anchored at the start (`/^.../`); an end-anchored or contains regex falls back to a full scan.**\n\n- **Why:** the index is sorted by prefix, so only prefix-anchored patterns can be used as a range scan — end-anchored patterns must test every key.\n- **End-anchored `/gmail\\.com$/`:** even with an index on `email`, `explain()` shows a high `totalKeysExamined` or `COLLSCAN`.\n- **Fix:** store a dedicated `domain` field, index it, and query with an exact match — or use a **text index** for token-based matching."
   },
   {
     "id": "mongodb-schema-embed-vs-reference",
@@ -206,7 +206,7 @@
       "referencing",
       "data-modeling"
     ],
-    "short": "Embed when data is read together, bounded, and small; reference when the child set grows unbounded (16MB limit), is large/shared, or queried independently. Comments usually favor referencing or the bucket pattern."
+    "short": "**Embed when data is read together and bounded; reference when it is unbounded, shared, or queried independently.**\n\n- **Embed:** one query retrieves the post and comments together; data is bounded and changes with the parent.\n- **Reference:** comments can grow unbounded, risking the **16 MB document limit**; they are often paginated and need their own index.\n- **Hybrid subset pattern:** embed the latest 3 comments on the post doc (for fast display) while storing the full set in a separate `comments` collection."
   },
   {
     "id": "mongodb-capped-collection",
@@ -220,7 +220,7 @@
       "createCollection",
       "data-modeling"
     ],
-    "short": "A capped collection is a fixed-size, insertion-ordered ring buffer that overwrites the oldest docs when full. You can't delete docs or grow them, `size` is required, it can't be sharded; a TTL index is the modern alternative."
+    "short": "**A capped collection is a fixed-size, insertion-ordered ring buffer that automatically overwrites the oldest documents when it reaches its size cap.**\n\n- **Ideal for:** high-throughput log streams, recent-event feeds, or caches — reads in natural order need no sort index.\n- **Constraints:** individual deletes are forbidden, updates must not grow a document's size, `size` (bytes) is required, and it cannot be sharded.\n- **Modern alternative:** a **TTL index** on a normal collection offers more flexible time-based expiry than a fixed size cap."
   },
   {
     "id": "mongodb-output-array-positional-update",
@@ -235,7 +235,7 @@
       "arrayFilters",
       "output"
     ],
-    "short": "The positional `$` updates only the first array element matched by the query, so `B`'s qty goes 2 to 3 and `A` is unchanged. Use `$[elem]` with `arrayFilters` (or `$[]`) to update all matching elements."
+    "short": "**The positional `$` operator targets the first array element matched by the query filter, leaving all others untouched.**\n\n- **Result:** `B`'s `qty` increments from 2 to 3; `A` is unchanged because it wasn't matched by `'items.sku': 'B'`.\n- **First match only:** `$` updates only the *first* element that satisfies the query — not all matches.\n- **Update all matches:** use `$[elem]` with `arrayFilters` to target specific elements, or `$[]` to update every element in the array."
   },
   {
     "id": "mongodb-output-projection-elemmatch",
@@ -250,6 +250,6 @@
       "query",
       "output"
     ],
-    "short": "Returns docs with at least one `scores` element that is *both* `subject: 'math'` and `score >= 90`. Without `$elemMatch`, the two conditions could match across different elements — the classic trap. It also works in projection to return the first matching element."
+    "short": "**`$elemMatch` requires a single array element to satisfy ALL listed conditions simultaneously, not conditions spread across different elements.**\n\n- **What it returns:** documents with at least one `scores` entry that is *both* `subject: 'math'` AND `score >= 90` in the same element.\n- **Classic trap:** without `$elemMatch`, `{ 'scores.subject': 'math', 'scores.score': { $gte: 90 } }` matches if different elements each satisfy one condition — giving false positives.\n- **In projection:** `$elemMatch` in the projection field returns only the first matching array element instead of the full array."
   }
 ]

@@ -12,7 +12,7 @@
       "salary",
       "classic"
     ],
-    "short": "Use `DENSE_RANK() OVER (ORDER BY salary DESC)` in a derived table and filter `rnk = N` for the Nth highest distinct salary, or a correlated subquery counting distinct greater salaries (`N-1`)."
+    "short": "**Use `DENSE_RANK() OVER (ORDER BY salary DESC)` in a CTE and filter `rnk = N` to find the Nth highest distinct salary, or use a correlated subquery counting distinct greater values.**\n\n- **Why `DENSE_RANK` not `ROW_NUMBER`:** ties share the same rank without gaps, so two employees at the top salary both get rank 1 and the real 2nd-highest salary correctly gets rank 2.\n- **Correlated subquery alternative:** `WHERE (SELECT COUNT(DISTINCT salary) FROM Employee e2 WHERE e2.salary > e.salary) = N-1` — portable but can be slow on large tables.\n- **Window function trick:** you cannot filter on `DENSE_RANK()` directly in `WHERE` — wrap the ranking in a CTE or derived table first."
   },
   {
     "id": "sql-find-duplicates",
@@ -26,7 +26,7 @@
       "duplicates",
       "aggregate"
     ],
-    "short": "Group by `email` and keep groups with `HAVING COUNT(*) > 1`. The aggregate filter must go in `HAVING`, not `WHERE`, since `WHERE` runs before grouping."
+    "short": "**Group by `email` and keep groups with `HAVING COUNT(*) > 1` to find duplicated values and their occurrence counts.**\n\n- **Why `HAVING` not `WHERE`:** `WHERE` runs before grouping so aggregates don't exist yet; `HAVING` filters after `GROUP BY` and can reference `COUNT(*)`.\n- **Result:** each row shows the duplicated email and how many times it appears — only emails with 2+ rows are returned.\n- **Extension:** to see all duplicate rows (not just the counts), join this result back to the original table on the email column."
   },
   {
     "id": "sql-delete-duplicates-keep-one",
@@ -40,7 +40,7 @@
       "duplicates",
       "cte"
     ],
-    "short": "Number rows per email with `ROW_NUMBER() OVER (PARTITION BY email ORDER BY id)`, then delete rows where `rn > 1`, keeping the smallest id. A self-join variant also works."
+    "short": "**Use `ROW_NUMBER() OVER (PARTITION BY email ORDER BY id)` in a CTE and delete rows where `rn > 1`, keeping only the smallest-id row per email.**\n\n- **`PARTITION BY email`:** restarts the row counter for each unique email group.\n- **`ORDER BY id`:** assigns `rn = 1` to the smallest id (the keeper); all others get `rn > 1` and are deleted.\n- **Why not `RANK()`:** `RANK()` gives ties the same number so both duplicates would get rank 1 and nothing would be deleted — `ROW_NUMBER()` guarantees a unique sequence."
   },
   {
     "id": "sql-employees-earning-more-than-manager",
@@ -54,7 +54,7 @@
       "comparison",
       "classic"
     ],
-    "short": "Self-join the table (employee `e` to manager `m` on `e.manager_id = m.id`) and filter `e.salary > m.salary`. INNER JOIN naturally excludes top-level managerless employees."
+    "short": "**Self-join the Employee table — alias one copy as the employee (`e`) and another as the manager (`m`) — then filter where `e.salary > m.salary`.**\n\n- **Join condition:** `e.manager_id = m.id` links each employee to their manager row in the same table.\n- **INNER JOIN behavior:** naturally excludes top-level employees with `manager_id IS NULL` since they have no matching manager row.\n- **Result:** returns each employee whose salary exceeds their direct manager's salary, along with the manager's name and salary for comparison."
   },
   {
     "id": "sql-second-highest-various",
@@ -69,7 +69,7 @@
       "dense_rank",
       "edge-cases"
     ],
-    "short": "Returns the second-highest distinct salary (or `NULL` if none exists), and it's safe because it compares against `MAX`, correctly handling duplicate top salaries. Use `DENSE_RANK()` for ties per group."
+    "short": "**The query returns the second-highest distinct salary, or `NULL` if no second salary exists (empty table or all rows share one salary).**\n\n- **Why it is safe for ties:** the inner subquery finds the max; the outer `MAX` of everything below that is the true second-distinct value, regardless of how many employees share the top salary.\n- **Edge case:** when no salary is below the max, `MAX` over an empty set returns `NULL` (a single row) rather than 0 rows.\n- **Better for per-group or tie-preserving needs:** prefer `DENSE_RANK() OVER (ORDER BY salary DESC)` and filter `rnk = 2`."
   },
   {
     "id": "sql-running-total",
@@ -83,7 +83,7 @@
       "frame-clause",
       "sum"
     ],
-    "short": "Use `SUM(amount) OVER (PARTITION BY account_id ORDER BY txn_date)` for a cumulative total per account. Add `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` to avoid `RANGE` summing same-date ties together."
+    "short": "**Use `SUM(amount) OVER (PARTITION BY account_id ORDER BY txn_date)` to compute a cumulative total that resets per account.**\n\n- **`PARTITION BY account_id`:** restarts the running total independently for each account.\n- **`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`:** explicitly specifies a row-by-row frame; without it the default `RANGE` frame can over-count rows sharing the same `txn_date`.\n- **Why not a self-join:** `JOIN ... ON t2.txn_date <= t1.txn_date` re-scans the table per row (O(N^2)); the window function does a single ordered pass."
   },
   {
     "id": "sql-top-n-per-group",
@@ -97,7 +97,7 @@
       "top-n-per-group",
       "partition-by"
     ],
-    "short": "Rank within each partition (`PARTITION BY dept_id ORDER BY salary DESC`) and filter the rank in an outer query. `ROW_NUMBER` gives exactly 3 rows; `DENSE_RANK` gives the top 3 salary tiers."
+    "short": "**Rank rows within each department using a window function, then filter on the rank in an outer CTE — you cannot use a window function result directly in `WHERE`.**\n\n- **`PARTITION BY dept_id ORDER BY salary DESC`:** ranks salaries independently within each department, restarting at 1 per group.\n- **Ranking choice:** `ROW_NUMBER` gives exactly 3 rows (ties broken arbitrarily); `DENSE_RANK` gives the top 3 distinct salary tiers; `RANK` could return more than 3 rows due to skipping.\n- **Pattern:** this CTE + outer filter is the standard \"top-N per group\" template reusable for any table and any N."
   },
   {
     "id": "sql-month-over-month-lag",
@@ -111,7 +111,7 @@
       "month-over-month",
       "nullif"
     ],
-    "short": "Use `LAG(revenue) OVER (ORDER BY month_start)` for the previous month, then compute percentage change guarding divide-by-zero and first-row NULL with `NULLIF(prev, 0)`."
+    "short": "**Use `LAG(revenue) OVER (ORDER BY month_start)` to access the previous month's revenue without a self-join, then divide to get the percentage change.**\n\n- **`LAG` behavior:** returns the value from the prior row in the specified order; the first row has no prior row and returns `NULL` by default.\n- **Divide-by-zero guard:** wrap the denominator with `NULLIF(prev_revenue, 0)` so a zero prior month returns `NULL` instead of an error.\n- **Why not a self-join:** joining on `month = month - 1` is fragile for non-continuous month sequences; `LAG` is simpler and handles gaps correctly."
   },
   {
     "id": "sql-join-types-output",
@@ -126,7 +126,7 @@
       "null",
       "output"
     ],
-    "short": "INNER = 3 rows, LEFT = 4 (adds empty dept 3), RIGHT = 4 (adds NULL-dept employee), FULL OUTER = 5 (adds both unmatched). NULL join keys never match, appearing only via OUTER joins on their own side."
+    "short": "**With D = {1,2,3} and E = {(101,1),(102,1),(103,2),(104,NULL)}: INNER = 3 rows, LEFT = 4, RIGHT = 4, FULL OUTER = 5.**\n\n- **INNER:** only matched rows; both unmatched dept 3 and NULL-dept emp 104 are excluded.\n- **LEFT / RIGHT:** LEFT keeps all departments (adds dept 3 with NULL emp); RIGHT keeps all employees (adds emp 104 with NULL dept); each gives 4 rows.\n- **NULL key trap:** `NULL = anything` is never true, so emp 104 never matches any department row and only appears via an outer join on the employee side."
   },
   {
     "id": "sql-union-vs-union-all",
@@ -141,7 +141,7 @@
       "output",
       "performance"
     ],
-    "short": "`UNION` removes duplicates (extra de-dup cost) so the example yields 2 rows (`a`, `b`); `UNION ALL` keeps all rows yielding 3 (`a`, `a`, `b`) and is faster. Prefer `UNION ALL` when duplicates are acceptable."
+    "short": "**`UNION` removes duplicate rows (extra sort/hash cost) yielding 2 rows (`a`, `b`); `UNION ALL` keeps every row yielding 3 (`a`, `a`, `b`) and is faster.**\n\n- **`UNION` cost:** forces the engine to sort or hash the entire combined result to detect and eliminate duplicates.\n- **`UNION ALL` rule:** use it whenever the inputs are disjoint or duplicates are acceptable — never pay for deduplication you don't need.\n- **Both require:** the same number of columns with compatible data types; column names come from the first `SELECT`."
   },
   {
     "id": "sql-fix-where-aggregate-bug",
@@ -156,7 +156,7 @@
       "bug-fix",
       "aggregate"
     ],
-    "short": "`COUNT(*)` can't go in `WHERE` (evaluated before grouping). Move the aggregate condition to `HAVING`, which runs after `GROUP BY`. Logical order: FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY."
+    "short": "**`COUNT(*)` cannot appear in `WHERE` because aggregates don't exist at that stage — move the aggregate condition to `HAVING`, which runs after `GROUP BY`.**\n\n- **Root cause:** logical order is FROM → WHERE → GROUP BY → HAVING → SELECT; `WHERE` runs before grouping so no groups (and no aggregates) exist yet.\n- **Fix:** replace `WHERE COUNT(*) > 5` with `HAVING COUNT(*) > 5` placed after `GROUP BY`.\n- **Best practice:** use `WHERE` for row-level filters (they run early and can use indexes) and `HAVING` only when the condition genuinely depends on an aggregate."
   },
   {
     "id": "sql-cte-vs-subquery-refactor",
@@ -171,7 +171,7 @@
       "refactor",
       "readability"
     ],
-    "short": "Rewrite the derived table as a `WITH dept_avg AS (...)` CTE for readability. Prefer CTEs when a subquery is reused, recursion is needed, or for naming clarity; non-recursive CTEs are usually readability, not performance, aids."
+    "short": "**Rewrite the derived table as a `WITH dept_avg AS (SELECT dept_id, AVG(salary)... GROUP BY dept_id)` CTE so the outer query reads cleanly against a named result.**\n\n- **When to choose a CTE:** the subquery is reused multiple times in the same statement; recursion is needed; or naming the intermediate step makes the intent clearer.\n- **Performance note:** non-recursive CTEs are mostly a readability aid — most modern optimizers inline them identically to an equivalent derived table.\n- **Recursion:** only a recursive CTE (`WITH RECURSIVE`) can traverse hierarchies; a derived table cannot."
   },
   {
     "id": "sql-recursive-cte-hierarchy",
@@ -185,7 +185,7 @@
       "cte",
       "self-reference"
     ],
-    "short": "A `WITH RECURSIVE` CTE joins an anchor member (manager id = 1, depth 0) with a recursive member that joins the table to prior rows, walking the tree one level per iteration while tracking depth."
+    "short": "**A `WITH RECURSIVE` CTE walks an org tree by unioning an anchor (manager id = 1, depth 0) with a recursive member that joins the table to previously found rows, one level per iteration.**\n\n- **Structure:** anchor member provides the root row(s); the recursive member joins `Employee` to the CTE itself (`ON e.manager_id = o.id`), descending one level each pass.\n- **Depth tracking:** incrementing `o.depth + 1` in the recursive member gives each employee their level in the hierarchy.\n- **Termination:** recursion stops when the join finds no new rows; on cyclic data, add a depth limit (`WHERE depth < 100`) to prevent infinite loops."
   },
   {
     "id": "sql-pivot-conditional-aggregation",
@@ -199,7 +199,7 @@
       "case",
       "group-by"
     ],
-    "short": "Use portable conditional aggregation: `SUM(CASE WHEN sale_month = N THEN amount ELSE 0 END)` per month, grouped by product. Works in every dialect unlike the proprietary `PIVOT` operator."
+    "short": "**Use conditional aggregation — `SUM(CASE WHEN sale_month = N THEN amount ELSE 0 END)` per month, grouped by product — to pivot rows into columns portably across all SQL dialects.**\n\n- **How it works:** each `CASE` expression emits the amount for its month and 0 otherwise; `SUM` collapses all rows per product into one value per column.\n- **`GROUP BY product`:** produces one output row per product with all monthly columns filled in.\n- **Portability:** works in every SQL dialect; the proprietary `PIVOT` operator (SQL Server/Oracle) is not universally available."
   },
   {
     "id": "sql-optimize-sargable-where",
@@ -214,7 +214,7 @@
       "b-tree",
       "execution-plan"
     ],
-    "short": "`YEAR(order_date)` is non-sargable and forces a full scan. Rewrite as a range predicate (`order_date >= '2024-01-01' AND < '2025-01-01'`) so the index can do a range seek. Keep indexed columns bare."
+    "short": "**`YEAR(order_date) = 2024` is non-SARGable — the function on the column prevents index use and forces a full scan; rewrite as a bare-column range predicate to enable an index seek.**\n\n- **Non-SARGable cause:** the B-tree stores `order_date` values, not `YEAR(order_date)`, so the index cannot be navigated by the computed value.\n- **Fix:** `WHERE order_date >= '2024-01-01' AND order_date < '2025-01-01'` keeps the column bare and lets the optimizer do an efficient index range seek.\n- **General rule:** never apply functions, arithmetic, or implicit type casts to an indexed column in a `WHERE` predicate."
   },
   {
     "id": "sql-transaction-atomic-transfer",
@@ -229,7 +229,7 @@
       "rollback",
       "atomicity"
     ],
-    "short": "Wrap debit and credit in a transaction with an EXIT HANDLER that rolls back on any error, guarding against overdraft. Demonstrates ACID: atomicity (all-or-nothing), consistency, isolation, and durability after commit."
+    "short": "**Wrap both the debit and credit in a single transaction with an error handler that rolls back on any exception, guaranteeing the transfer is all-or-nothing.**\n\n- **Atomicity:** `BEGIN ... COMMIT` with `ROLLBACK` in the error handler ensures both updates succeed or neither is persisted.\n- **Consistency:** a `WHERE balance >= amt` guard prevents overdrafts; `ROW_COUNT() = 0` signals an error if the condition isn't met.\n- **ACID mapping:** the transfer demonstrates all four properties — Atomicity (all-or-nothing), Consistency (balance invariant), Isolation (concurrent transfers don't see partial state), and Durability (committed change survives crashes via WAL)."
   },
   {
     "id": "sql-deadlock-prevention-ordering",
@@ -244,7 +244,7 @@
       "concurrency",
       "lock-ordering"
     ],
-    "short": "Opposite lock ordering on rows 1 and 2 creates a circular wait, so the DB aborts a victim. Fix with consistent lock ordering (e.g. ascending id via `FOR UPDATE`), short transactions, and retry logic."
+    "short": "**Opposite lock ordering (T1 locks row 1 then 2; T2 locks row 2 then 1) creates a circular wait that the DB resolves by aborting a victim; fix with consistent ascending-id lock ordering.**\n\n- **Why it deadlocks:** T1 holds lock on account 1 and waits for account 2; T2 holds account 2 and waits for account 1 — an unbreakable cycle.\n- **Fix:** use `SELECT ... FOR UPDATE ORDER BY id` to acquire locks in a consistent ascending order before applying updates; no cycle can form when both transactions lock in the same sequence.\n- **Additional mitigations:** keep transactions short to reduce the lock window, and add retry logic to handle the deadlock error when it does occur."
   },
   {
     "id": "sql-isolation-levels-output",
@@ -259,6 +259,6 @@
       "non-repeatable-read",
       "concurrency"
     ],
-    "short": "READ COMMITTED returns the new committed value (a non-repeatable read); REPEATABLE READ returns the original value from a stable snapshot. Levels range from READ UNCOMMITTED (dirty reads) to SERIALIZABLE (strictest)."
+    "short": "**Under READ COMMITTED the second SELECT returns the new committed value (a non-repeatable read); under REPEATABLE READ it returns the original value from a stable snapshot.**\n\n- **READ COMMITTED behavior:** each statement sees the latest committed data — T2's update is visible to T1's second read, producing different values in the same transaction.\n- **REPEATABLE READ behavior:** T1's snapshot is fixed at the start of the transaction, so T2's committed change is invisible until T1 commits.\n- **Level spectrum:** READ UNCOMMITTED (dirty reads) → READ COMMITTED → REPEATABLE READ → SERIALIZABLE (prevents phantom reads too)."
   }
 ]

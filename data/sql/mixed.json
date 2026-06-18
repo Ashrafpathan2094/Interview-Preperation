@@ -11,7 +11,7 @@
       "anti-join",
       "not-exists"
     ],
-    "short": "INNER JOIN keeps only matched rows so it would drop the customers you want; use a LEFT JOIN with `WHERE orders.customer_id IS NULL` (an anti-join), or equivalently `NOT EXISTS`."
+    "short": "**INNER JOIN drops unmatched rows so it would silently discard the customers you want; use a LEFT JOIN anti-join pattern (`WHERE orders.customer_id IS NULL`) or `NOT EXISTS` instead.**\n\n- **Why INNER JOIN fails:** it only returns rows with a match in both tables — customers with no orders produce no match and are excluded.\n- **Anti-join pattern:** `LEFT JOIN orders ON ... WHERE o.customer_id IS NULL` keeps all customers and then filters to only those with NULL on the order side.\n- **`NOT EXISTS` alternative:** often the optimizer's preferred form and is NULL-safe; avoid `NOT IN` when the FK column is nullable since a single NULL makes it return no rows."
   },
   {
     "id": "sql-nth-highest-salary",
@@ -25,7 +25,7 @@
       "subqueries",
       "ranking"
     ],
-    "short": "Use `DENSE_RANK()` (handles ties as one rank, no gaps) and filter `dr = N` for the Nth highest distinct salary; the portable `COUNT(DISTINCT ...) = N-1` correlated subquery works without window functions but scales worse."
+    "short": "**Use `DENSE_RANK()` (ties share one rank, no gaps) and filter `dr = N` for the Nth highest distinct salary; the portable correlated subquery `COUNT(DISTINCT) = N-1` works without window functions but scales worse.**\n\n- **Why `DENSE_RANK` not `ROW_NUMBER`:** `ROW_NUMBER` gives each row a unique position — ties at the top would push the real 2nd-highest to rank 3+; `DENSE_RANK` treats ties as one rank and never skips.\n- **Why not `RANK`:** `RANK` skips numbers after ties (1,1,3), so filtering `rank = 2` could return zero rows.\n- **Correlated subquery trade-off:** portable to older engines but can be O(N^2) without a good index; prefer the window function on modern databases."
   },
   {
     "id": "sql-where-vs-having-group-by",
@@ -39,7 +39,7 @@
       "where",
       "aggregate-functions"
     ],
-    "short": "`WHERE` filters individual rows before grouping (no aggregates), `HAVING` filters groups after aggregation. Put the full-time filter in `WHERE` and `AVG(salary) > 80000` in `HAVING`."
+    "short": "**`WHERE` filters individual rows before grouping (cannot use aggregates); `HAVING` filters groups after aggregation — the full-time condition belongs in `WHERE` and the average salary condition in `HAVING`.**\n\n- **Logical order:** FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY; `WHERE` runs early and reduces rows before the (more expensive) grouping step.\n- **Performance reason:** putting the `employment_type` filter in `WHERE` shrinks data before aggregation; putting it in `HAVING` forces the engine to aggregate all rows first, then discard.\n- **Common mistake:** placing `AVG(salary) > 80000` in `WHERE` causes an error because aggregates do not exist at that stage."
   },
   {
     "id": "sql-running-total-window-vs-self-join",
@@ -53,7 +53,7 @@
       "frame",
       "performance"
     ],
-    "short": "Use `SUM(amount) OVER (ORDER BY sale_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` for a single-pass running total; specify ROWS to avoid the default RANGE frame over-counting ties, far faster than an O(N^2) self-join."
+    "short": "**Use `SUM(amount) OVER (ORDER BY sale_date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)` for a single-pass running total far faster than an O(N^2) self-join.**\n\n- **Frame clause:** `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW` includes all prior rows up to the current one strictly row-by-row; omitting it uses `RANGE`, which can over-count rows sharing the same date.\n- **Why not a self-join:** joining `ON s2.date <= s1.date` re-scans the table for every row — O(N^2) cost that grows rapidly with table size.\n- **`PARTITION BY` extension:** add `PARTITION BY store_id` inside `OVER` to restart the running total independently per store."
   },
   {
     "id": "sql-lag-lead-month-over-month",
@@ -67,7 +67,7 @@
       "lead",
       "time-series"
     ],
-    "short": "`LAG`/`LEAD` fetch a prior/next row's value within an ordered window; `PARTITION BY product_id` resets per product, a default of 0 avoids NULLs, and `NULLIF` guards divide-by-zero in the growth calc."
+    "short": "**`LAG(revenue, 1, 0) OVER (PARTITION BY product_id ORDER BY month)` fetches the previous month's revenue per product; divide with `NULLIF` to guard against divide-by-zero.**\n\n- **`LAG` signature:** `LAG(expr, offset, default)` — offset=1 means one row back; the default (0) avoids NULL on the first month per product.\n- **`PARTITION BY product_id`:** restarts the window per product so January of product B does not incorrectly reference December of product A.\n- **`NULLIF` guard:** `NULLIF(prev_revenue, 0)` turns a zero denominator into NULL so the division returns NULL instead of an error."
   },
   {
     "id": "sql-find-and-delete-duplicates",
@@ -81,7 +81,7 @@
       "duplicates",
       "data-cleanup"
     ],
-    "short": "Identify dupes with `GROUP BY email HAVING COUNT(*) > 1`; delete extras using `ROW_NUMBER()` partitioned by email (unique sequence keeps exactly one) and remove rows where `rn > 1`."
+    "short": "**Identify duplicates with `GROUP BY email HAVING COUNT(*) > 1`; delete extras by assigning `ROW_NUMBER()` per email group and removing rows where `rn > 1`, keeping exactly one copy.**\n\n- **Identification:** `GROUP BY` + `HAVING COUNT(*) > 1` shows which emails have duplicates and how many copies exist.\n- **Why `ROW_NUMBER()` not `RANK()`:** `RANK` gives tied rows the same number, so both copies get rank 1 and nothing is deleted; `ROW_NUMBER` guarantees a unique sequence so exactly one row per group survives.\n- **Safe practice:** always run a `SELECT` of the CTE first (`WHERE rn > 1`) to preview which rows would be deleted before executing the `DELETE`."
   },
   {
     "id": "sql-normalization-3nf-decompose",
@@ -95,7 +95,7 @@
       "transitive-dependency",
       "schema-design"
     ],
-    "short": "Storing customer_name/city on orders is a transitive dependency (order to customer to attributes) that violates 3NF, causing update/insert/delete anomalies; fix by splitting into `customers` and `orders` linked by a foreign key."
+    "short": "**Storing `customer_name` and `customer_city` on each order row is a transitive dependency (`order_id → customer_id → customer_name`) that violates 3NF; fix by splitting into `customers` and `orders` linked by a foreign key.**\n\n- **3NF violation:** non-key attributes (`customer_name`, `customer_city`) depend on `customer_id`, not directly on the order's primary key — that transitive chain breaks 3NF.\n- **Anomalies caused:** update anomaly (city change requires updating many rows); insertion anomaly (can't record a customer without an order); deletion anomaly (deleting the last order erases customer data).\n- **Fix:** move customer attributes to a `customers` table and reference it from `orders` with a foreign key; join when needed."
   },
   {
     "id": "sql-composite-index-leftmost-prefix",
@@ -109,7 +109,7 @@
       "composite-index",
       "query-plan"
     ],
-    "short": "A composite index on (tenant_id, status) is sorted by tenant_id first, so it serves leftmost prefixes but not `status` alone; order most-selective/equality columns leftmost and add a separate `(status)` index if that filter is hot."
+    "short": "**A composite B-tree index on `(tenant_id, status)` is sorted by `tenant_id` first, so it serves queries filtering on `tenant_id` or `(tenant_id, status)` but not `status` alone — a query filtering only on `status` falls back to a full scan.**\n\n- **Leftmost prefix rule:** the index can only be range-scanned starting from the leftmost column; skipping to a middle column means it is no longer globally sorted and cannot be navigated.\n- **Column ordering:** put the most selective / most equality-filtered columns leftmost; one composite index can serve multiple query shapes that match its prefixes.\n- **Fix for status-only queries:** add a separate index `(status)` if that filter pattern is frequent; confirm usage with `EXPLAIN` (look for Index Seek vs full scan)."
   },
   {
     "id": "sql-covering-index-avoid-lookup",
@@ -123,7 +123,7 @@
       "key-lookup",
       "query-optimization"
     ],
-    "short": "A covering index holds every column the query touches so it answers entirely from the index, avoiding per-row key lookups; use `INCLUDE` to store non-search columns at the leaf, trading extra storage/write cost for read speed."
+    "short": "**A covering index holds every column the query touches (filter key + returned columns) so the engine answers it entirely from the index, eliminating expensive per-row key lookups back to the table.**\n\n- **Key lookup problem:** when the index satisfies `WHERE` but the query needs extra columns not in the index, the engine does a random I/O lookup per row — thousands of these can dominate query time.\n- **`INCLUDE` clause (SQL Server/PostgreSQL):** stores extra columns at the leaf level only, covering the query without bloating the B-tree navigational keys or slowing inserts.\n- **Trade-off:** covering indexes speed reads but increase storage and write overhead — only cover the hot queries, not every column."
   },
   {
     "id": "sql-acid-transaction-fund-transfer",
@@ -137,7 +137,7 @@
       "atomicity",
       "error-handling"
     ],
-    "short": "A transfer must be one transaction so debit and credit succeed or roll back together, demonstrating Atomicity, Consistency, Isolation, and Durability; a balance guard plus rows-affected check enforces no-overdraft atomically."
+    "short": "**A bank transfer must be one transaction so debit and credit succeed or roll back together — a crash between the two `UPDATE`s without a transaction would destroy money.**\n\n- **Atomicity:** `BEGIN ... COMMIT` with `ROLLBACK` on error ensures both updates apply or neither does; no partial state is ever committed.\n- **Consistency / guard:** `WHERE balance >= amount` plus a `@@ROWCOUNT` check prevents overdrafts and enforces the business rule atomically within the transaction.\n- **ACID in full:** Atomicity (all-or-nothing), Consistency (balance invariant), Isolation (concurrent transfers don't see half-finished state), Durability (committed write survives a crash via WAL)."
   },
   {
     "id": "sql-isolation-levels-lost-update",
@@ -151,7 +151,7 @@
       "locking",
       "lost-update"
     ],
-    "short": "Higher isolation levels prevent more read phenomena (dirty, non-repeatable, phantom). Fix lost updates with an atomic `SET value = value + 1`, or `SELECT ... FOR UPDATE` / raised isolation if you must read first."
+    "short": "**A lost update occurs when two sessions read a value, compute a new one, and write back — the second write overwrites the first; fix with an atomic in-place update or pessimistic locking.**\n\n- **Best fix:** `SET value = value + 1` avoids reading first entirely; the engine serializes the write-lock automatically with no race window.\n- **If read-then-write is required:** use `SELECT ... FOR UPDATE` to take a pessimistic row lock before reading, blocking concurrent writers until commit.\n- **Isolation level context:** READ COMMITTED (default in most engines) allows non-repeatable reads and lost updates; REPEATABLE READ or SERIALIZABLE prevents them but at the cost of concurrency."
   },
   {
     "id": "sql-deadlock-cause-and-prevention",
@@ -165,7 +165,7 @@
       "locking",
       "concurrency"
     ],
-    "short": "A deadlock is a mutual lock-wait cycle the DB resolves by killing a victim, unlike plain blocking which clears on its own; prevent it with consistent lock ordering, short transactions, good indexes, and retries."
+    "short": "**A deadlock is a mutual lock-wait cycle (T1 waits for T2's lock, T2 waits for T1's) that the DB resolves by killing a victim; unlike plain blocking, it cannot resolve on its own.**\n\n- **Deadlock vs blocking:** blocking is one transaction waiting for another that will eventually release its lock; a deadlock is an unbreakable cycle requiring a forced rollback of one participant.\n- **Most effective prevention:** consistent lock ordering — always acquire row locks in the same order (e.g., ascending `account_id`); a single `UPDATE ... WHERE id IN (:src, :dst)` lets the engine lock in index order automatically.\n- **Additional mitigations:** keep transactions short, use proper indexes to avoid broad range locks, and retry the victim transaction since deadlocks are transient."
   },
   {
     "id": "sql-cte-recursive-org-hierarchy",
@@ -179,7 +179,7 @@
       "hierarchy",
       "self-join"
     ],
-    "short": "A recursive CTE (anchor UNION ALL recursive member) traverses arbitrary-depth hierarchies, unlike a self-join that only handles fixed depth; add a depth guard to prevent infinite loops on cycles."
+    "short": "**A recursive CTE (anchor `UNION ALL` recursive member) traverses an org hierarchy of unknown depth; a plain self-join only handles a fixed, known number of levels.**\n\n- **Structure:** the anchor selects the starting manager (depth 0); the recursive member joins `employees` to the CTE itself (`ON e.manager_id = s.employee_id`), walking one level down per iteration.\n- **When to use:** choose a recursive CTE for any tree or graph of unknown depth — org charts, bill-of-materials, category trees, threaded comments.\n- **Safety guard:** add `WHERE depth < 100` (or SQL Server's `OPTION (MAXRECURSION N)`) to prevent infinite loops on cyclic data."
   },
   {
     "id": "sql-union-vs-union-all-dedup",
@@ -193,7 +193,7 @@
       "set-operators",
       "query-optimization"
     ],
-    "short": "`UNION` removes duplicates via an expensive sort/hash, while `UNION ALL` just concatenates; since active and archived orders are disjoint, switch to `UNION ALL` for a free speedup."
+    "short": "**`UNION` removes duplicates via an expensive sort/hash step; `UNION ALL` simply concatenates — since active and archived orders are disjoint, switching to `UNION ALL` is a free speedup.**\n\n- **`UNION` cost:** the engine must sort or hash the entire combined output to detect duplicates — extra CPU, memory, and potential disk spills on large sets.\n- **Decision rule:** use `UNION ALL` whenever the two inputs are guaranteed disjoint or duplicates are acceptable; only pay for `UNION` when you genuinely need rows collapsed.\n- **Common mistake:** writing `UNION` out of habit on data that can never overlap — this is one of the easiest free performance wins to fix."
   },
   {
     "id": "sql-sargable-predicate-index-usage",
@@ -207,7 +207,7 @@
       "indexing",
       "predicates"
     ],
-    "short": "A predicate is SARGable when the indexed column appears bare so the engine can seek the B-tree. Wrapping it in a function like `YEAR(created_at)` forces a full scan; rewrite as a range: `created_at >= '2025-01-01' AND created_at < '2026-01-01'`."
+    "short": "**A predicate is SARGable when the indexed column appears bare, allowing a B-tree range seek; `YEAR(created_at)` is non-SARGable because the function must be computed per row, forcing a full scan.**\n\n- **Root cause:** the B-tree stores raw `created_at` values, not `YEAR(created_at)`, so the engine cannot navigate the index by the transformed value.\n- **Rewrite:** `created_at >= '2025-01-01' AND created_at < '2026-01-01'` keeps the column bare against constant comparisons — the index can do an efficient range scan.\n- **Alternative:** create a functional/computed index on the expression (`(EXTRACT(YEAR FROM created_at))`) if the function call cannot be avoided."
   },
   {
     "id": "sql-view-vs-stored-procedure",
@@ -221,6 +221,6 @@
       "encapsulation",
       "ddl"
     ],
-    "short": "A view is a named parameter-free query (a virtual table) good for abstraction and security; a stored procedure takes parameters and runs multi-statement procedural logic with side effects. Use a view for the reusable SELECT, a procedure for the parameterized report."
+    "short": "**A view is a named, parameter-free virtual query good for abstraction and security; a stored procedure takes parameters and runs multi-statement procedural logic with side effects.**\n\n- **View:** stores the query definition (not data); always reflects live data; can be JOINed or filtered like a table; ideal for a reusable, static `SELECT` shape and column/row-level security.\n- **Stored procedure:** takes input parameters, supports `IF`/loops and multiple statements, can perform DML and manage transactions; use it for parameterized or multi-step business logic.\n- **Rule of thumb:** view for the reusable static query (active premium customers); procedure for the parameterized operation (monthly report with year/month inputs)."
   }
 ]

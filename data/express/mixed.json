@@ -11,7 +11,7 @@
       "next",
       "routing"
     ],
-    "short": "Express runs a single ordered middleware stack strictly in registration order, executing the first method/path match and waiting for `next()`. A handler that sends a response without calling `next()` ends the chain, so middleware registered after it never runs."
+    "short": "**Express runs a single ordered middleware stack strictly in registration order — a handler that sends a response without calling `next()` ends the chain for that request.**\n\n- **Registration order is everything:** cross-cutting middleware (logging, auth, body parsing) must be registered before the routes that depend on them.\n- **Chain stops without `next()`:** once a handler sends a response and does not call `next()`, all layers below it are skipped for that request.\n- **Proof:** in the example, `late` middleware registered after the route never logs for `GET /` because the route already ended the chain."
   },
   {
     "id": "express-error-handling-middleware-4-arg",
@@ -25,7 +25,7 @@
       "next-err",
       "arity"
     ],
-    "short": "Express identifies error handlers by arity: a function with exactly four params `(err, req, res, next)` is treated as one. Register it last; it runs when something calls `next(err)` or throws synchronously (Express auto-forwards sync throws)."
+    "short": "**Express identifies error-handling middleware purely by arity — a function with exactly four params `(err, req, res, next)` is the error handler; three or fewer makes it regular middleware.**\n\n- **Must declare all four:** you cannot omit `next` even if unused — doing so drops the count to three, and Express treats it as a normal middleware that never fires on errors.\n- **Registration:** place the error handler last, after all routes; it runs when something calls `next(err)` or throws synchronously (Express auto-catches sync throws in handlers).\n- **`res.headersSent` guard:** if a response already started, call `next(err)` inside the error handler to let Express's default handler close the connection."
   },
   {
     "id": "express-async-error-handling-wrapper",
@@ -39,7 +39,7 @@
       "promises",
       "middleware"
     ],
-    "short": "Express only auto-catches synchronous throws, so rejected promises in `async` handlers escape and hang the request. Wrap handlers with a higher-order `asyncHandler` that does `Promise.resolve(fn(...)).catch(next)`, use `express-async-errors`, or upgrade to Express 5."
+    "short": "**Express 4 only auto-catches synchronous throws — a rejected async handler escapes the framework, becomes an unhandled rejection, and leaves the request hanging indefinitely.**\n\n- **Why it escapes:** when an `async` handler rejects, the rejection happens in a future microtask after Express has already returned from calling the handler — it never sees it.\n- **`asyncHandler` fix:** `(fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)` wraps the handler so any rejection is forwarded to `next(err)` automatically.\n- **Express 5:** the router awaits handler return values natively — rejected promises auto-forward to the error handler without any wrapper."
   },
   {
     "id": "express-app-use-vs-app-method",
@@ -53,7 +53,7 @@
       "routing",
       "path-matching"
     ],
-    "short": "`app.use()` mounts middleware that matches any method via prefix matching (`/api` also matches `/api/users`). `app.METHOD()` defines a route matching only that method with exact pattern matching, so `app.get('/api')` won't match `/api/users`."
+    "short": "**`app.use()` mounts middleware matching any HTTP method via prefix matching; `app.METHOD()` defines a route matching one specific method with exact pattern matching.**\n\n- **Prefix vs exact:** `app.use('/api', fn)` fires for `/api`, `/api/users`, `/api/users/42`; `app.get('/api', fn)` fires only for `GET /api` — not `/api/users`.\n- **`req.url` stripping:** inside `app.use('/api', fn)` the mount prefix is stripped from `req.url` (though `req.originalUrl` is preserved) — important for sub-routers.\n- **Use case:** `app.use` is for cross-cutting concerns and mounting sub-routers; `app.METHOD` is for terminal endpoint handlers."
   },
   {
     "id": "express-route-params-vs-query-strings",
@@ -67,7 +67,7 @@
       "req.query",
       "validation"
     ],
-    "short": "Route params (`/users/:id`, on `req.params`) identify which resource and are required; query strings (`?page=2`, on `req.query`) are optional and describe how to filter/sort/paginate. Both yield strings (query can be arrays/objects), so always validate and coerce."
+    "short": "**Route params (`/users/:id` → `req.params`) identify which resource; query strings (`?page=2` → `req.query`) describe how to filter, sort, or paginate — and both require coercion and validation.**\n\n- **`req.params`:** required by the route pattern, always strings — coerce with `Number()` and guard against `NaN` before use.\n- **`req.query`:** optional, can be string, array (repeated keys), or nested object depending on the query parser — never trust the type; always check.\n- **Portable multi-segment capture:** prefix-mount middleware (`app.use('/files', fn)`) and read `req.path` to capture a multi-segment trailing path — works the same in Express 4 and 5."
   },
   {
     "id": "express-body-parsing-json-urlencoded",
@@ -81,7 +81,7 @@
       "express.urlencoded",
       "middleware"
     ],
-    "short": "`req.body` is undefined until opt-in body parser consumes the stream by `Content-Type`. `express.json()` parses JSON; `express.urlencoded()` parses form posts, with `extended:true` (qs) allowing nested objects vs `false` (querystring) flat only. Always set a `limit`."
+    "short": "**`req.body` is `undefined` by default because Express does not read the request stream — body parsing is opt-in middleware that buffers, decodes, and populates `req.body` by `Content-Type`.**\n\n- **`express.json()`:** parses `application/json`; the parser only activates when the request sends a matching content-type header.\n- **`express.urlencoded({ extended })`:** parses `application/x-www-form-urlencoded` form posts; `extended: true` (uses `qs`) supports nested objects/arrays, `false` (uses `querystring`) is flat key/values only.\n- **Always set `limit`:** e.g. `express.json({ limit: '100kb' })` — prevents large-payload DoS attacks; register parsers before routes that read `req.body`."
   },
   {
     "id": "express-serve-static-files",
@@ -95,7 +95,7 @@
       "caching",
       "spa"
     ],
-    "short": "`express.static(root, options)` maps request paths to files under root, safely blocking `..` traversal. Mount under a virtual prefix, set `maxAge`/`immutable` for caching, place API routes before a SPA `index.html` fallback, and mind registration order."
+    "short": "**`express.static(root, options)` maps request paths to files under root, safely blocking `..` traversal, and calls `next()` on a miss without sending a 404.**\n\n- **Virtual prefix:** `app.use('/static', express.static('public'))` exposes `public/logo.png` at `/static/logo.png` — the real folder name stays private.\n- **Caching:** set `maxAge`/`immutable` for fingerprinted assets to reduce bandwidth; use `path.join(__dirname, 'public')` so the path works from any CWD.\n- **SPA fallback order:** register API routes first, then `express.static`, then a catch-all that serves `index.html` for client-side routing — wrong order shadows API routes."
   },
   {
     "id": "express-structuring-with-router",
@@ -109,7 +109,7 @@
       "modularity",
       "mounting"
     ],
-    "short": "Split large apps into modular mini-apps with `express.Router()`, organized by feature/domain and mounted via `app.use('/prefix', router)`. Routers support router-level middleware scoped to their routes and strip the mount path, keeping `app.js` thin."
+    "short": "**Split large Express apps with `express.Router()` — each router is a mountable mini-app with its own route table and middleware, organized by feature/domain.**\n\n- **Mounting:** `app.use('/users', usersRouter)` strips the mount prefix inside the router, so `router.get('/:id')` matches `GET /users/:id`.\n- **Router-level middleware:** `router.use(fn)` applies only to that router's routes — perfect for auth guards scoped to a feature, without touching the global stack.\n- **App structure:** one router file per resource (`routes/users.js`, `routes/orders.js`); `app.js` just wires up global middleware and mounts routers — stays thin and easy to navigate."
   },
   {
     "id": "express-jwt-vs-session-auth",
@@ -123,7 +123,7 @@
       "sessions",
       "middleware"
     ],
-    "short": "JWTs are self-contained signed tokens verified statelessly (great for APIs/microservices, but hard to revoke and readable); sessions store state server-side with an opaque cookie ID (easy to revoke but need shared storage and CSRF handling). Pick JWT for stateless multi-client APIs, sessions for classic server-rendered apps."
+    "short": "**JWTs are self-contained signed tokens verified statelessly (scales well, hard to revoke); sessions store state server-side with an opaque cookie (easy to revoke, needs shared storage).**\n\n- **JWT trade-offs:** stateless verification (no DB lookup), scales horizontally, works well for APIs/mobile/microservices — but the payload is readable (never put secrets in it) and tokens are valid until `exp`.\n- **Session trade-offs:** trivially revocable (delete server record), opaque to the client — but requires shared session storage (Redis) across instances and a CSRF strategy for cookie-based auth.\n- **Rule of thumb:** stateless API consumed by many clients → JWT with short expiry and refresh tokens; classic server-rendered app with a single trusted backend → sessions."
   },
   {
     "id": "express-security-helmet-cors-rate-limit",
@@ -137,7 +137,7 @@
       "cors",
       "rate-limiting"
     ],
-    "short": "helmet sets secure response headers (CSP, HSTS, removes X-Powered-By) against clickjacking/MIME-sniffing; CORS restricts which browser origins may call the API (allowlist, never `*` with credentials); express-rate-limit caps requests per IP to curb brute-force/DoS. Register them early, before routes."
+    "short": "**Three early-registered middleware layers harden an Express API: `helmet` sets secure headers, `cors` restricts browser origins, and `express-rate-limit` caps requests per IP.**\n\n- **`helmet`:** sets CSP, HSTS, `X-Content-Type-Options`, removes `X-Powered-By` — mitigates clickjacking, MIME sniffing, and downgrade attacks; register it first.\n- **`cors`:** specify an explicit `origin` allowlist (never `*` with credentials) — the spec forbids wildcard origins when `credentials: true`.\n- **`express-rate-limit`:** cap requests per IP per time window; apply globally and add a stricter limit to sensitive endpoints (login, password reset) to blunt brute-force attacks."
   },
   {
     "id": "express-input-validation-sanitization",
@@ -151,7 +151,7 @@
       "security",
       "express-validator"
     ],
-    "short": "Validate and sanitize at the route boundary to block injection/XSS and keep handlers clean: run validators as middleware that short-circuits with 400 on errors, sanitize (trim, normalizeEmail, escape, cast), and whitelist expected fields. express-validator's chainable validators implement this."
+    "short": "**Validate and sanitize input at the route boundary so handlers only receive well-formed, trusted data — never inside the handler itself.**\n\n- **Why it matters:** unvalidated input enables NoSQL/SQL injection, XSS, and type-confusion bugs; Express has no built-in validation so you must add it.\n- **`express-validator` pattern:** chain rules (`body('email').isEmail().normalizeEmail()`), then a middleware checks `validationResult(req)` and short-circuits with 400 if any rule fails.\n- **Sanitization:** `trim()`, `escape()`, `normalizeEmail()`, and `toInt()` transform input into a safe canonical form; whitelist expected fields to prevent mass assignment."
   },
   {
     "id": "express-next-route-vs-next-err",
@@ -165,7 +165,7 @@
       "next-err",
       "control-flow"
     ],
-    "short": "`next()` advances to the next matching handler; `next('route')` skips the rest of the current route's handlers and jumps to the next matching route (only inside `app.METHOD` arrays); `next(err)` (any other truthy value) skips normal middleware and jumps to the 4-arg error handler."
+    "short": "**`next()`, `next('route')`, and `next(err)` each direct flow to a different destination in the Express stack.**\n\n- **`next()`:** pass control to the next matching middleware/handler in order — normal pipeline advancement.\n- **`next('route')`:** skip the remaining handlers of the current route and jump to the next matching route; only works inside `app.METHOD`/`router.METHOD` handler arrays, not in `app.use()`.\n- **`next(err)`:** any other truthy value is treated as an error — Express skips all remaining normal middleware and jumps straight to the next 4-arg error-handling middleware."
   },
   {
     "id": "express-req-res-lifecycle",
@@ -179,6 +179,6 @@
       "middleware",
       "finish-event"
     ],
-    "short": "A request flows from Node's HTTP server through the matching middleware stack (parsing/auth/validation), to a route handler that sends the response (or diverts to error middleware on throw/`next(err)`). Measure true completion via the `res.on('finish')` event, which fires once when the last byte is flushed."
+    "short": "**A request flows from Node's HTTP server through the middleware stack (parsing, auth, validation) to a route handler that sends the response — or diverts to error middleware on throw/`next(err)`.**\n\n- **Lifecycle stages:** Node creates `req`/`res` → Express decorates them → middleware runs top-to-bottom enriching `req` → route handler produces the terminal response → `res.on('finish')` fires.\n- **`res.on('finish')`:** fires exactly once when the last byte is flushed to the socket — the reliable way to measure true request duration from the start of middleware to end of response.\n- **Error path:** any synchronous throw or `next(err)` call diverts to the 4-arg error handler; unmatched routes fall through to the 404 catch-all."
   }
 ]

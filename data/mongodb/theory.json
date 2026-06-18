@@ -9,7 +9,7 @@
       "internals",
       "data-types"
     ],
-    "short": "BSON is MongoDB's binary storage/wire format that extends JSON with richer types (ObjectId, Date, Decimal128) and length-prefixing for fast field traversal; it isn't always smaller and the 16 MB document cap is a BSON limit."
+    "short": "**BSON is MongoDB's binary storage and wire format that extends JSON with richer types and length-prefixing for fast field traversal.**\n\n- **Richer types:** adds `ObjectId`, `Date`, `Binary`, `Decimal128`, `Int32`/`Int64`, and more that plain JSON cannot express.\n- **Length-prefixed:** every BSON doc stores byte lengths so the engine can skip directly to a field without scanning the whole document.\n- **Not always smaller:** BSON stores field names and type metadata in every document, so it can be *larger* than equivalent JSON — its goal is fast traversal and type fidelity, not minimal size.\n- **16 MB limit:** the BSON document size cap; keep field names short to save real space at scale."
   },
   {
     "id": "mongodb-objectid-structure",
@@ -23,7 +23,7 @@
       "primary-key",
       "documents"
     ],
-    "short": "`_id` is every document's unique, immutable primary key (always indexed). A default `ObjectId` is 12 bytes: 4-byte timestamp, 5-byte random per-process value, and a 3-byte counter, making it roughly monotonically increasing."
+    "short": "**`_id` is every document's unique, immutable primary key, and a default `ObjectId` packs creation time and ordering into 12 bytes.**\n\n- **Structure:** 4-byte Unix timestamp + 5-byte random (per-process) + 3-byte incrementing counter.\n- **Monotonically increasing:** new inserts land near the right edge of the B-tree, giving good insert locality; `getTimestamp()` extracts the creation time.\n- **Always indexed, never changeable:** to \"change\" `_id` you must delete and re-insert the document.\n- **Custom `_id`:** any unique value works (e.g. email), saving a separate index — but random values like UUIDv4 hurt insert locality."
   },
   {
     "id": "mongodb-embedding-vs-referencing",
@@ -35,7 +35,7 @@
       "embedding",
       "referencing"
     ],
-    "short": "Embed data accessed together with bounded one-to-few relationships for atomic single-document reads/writes; reference for large/unbounded, independently-queried, or shared data. Avoid the unbounded-array anti-pattern."
+    "short": "**Embed data that is always read together and bounded; reference data that is unbounded, independently queried, or shared.**\n\n- **Embed when:** the relationship is one-to-few, children are always fetched with the parent, and you want atomic single-document reads/writes.\n- **Reference when:** the array could grow unbounded (risks the 16 MB limit), child entities are queried/updated on their own, or they are shared across parents.\n- **Unbounded-array anti-pattern:** an ever-growing embedded array causes document moves, large reads, and eventually hits the 16 MB ceiling — reference or use the bucket pattern instead."
   },
   {
     "id": "mongodb-document-size-limit",
@@ -47,7 +47,7 @@
       "limits",
       "data-modeling"
     ],
-    "short": "The 16 MB BSON limit keeps documents RAM-friendly and discourages unbounded growth. Work around it with referencing, bucket/subset patterns, or GridFS (255 KB chunks) for files exceeding the limit."
+    "short": "**The 16 MB BSON document limit keeps docs RAM-friendly and prevents any single document from consuming excessive bandwidth or growing unbounded.**\n\n- **Referencing:** move large or unbounded child data to a separate collection instead of embedding.\n- **Bucket/subset patterns:** split a huge array across multiple documents (e.g. one bucket per time interval).\n- **GridFS:** splits files >16 MB into 255 KB chunks stored in `fs.chunks` with metadata in `fs.files` — for large binaries only, not a performance feature."
   },
   {
     "id": "mongodb-index-fundamentals",
@@ -60,7 +60,7 @@
       "b-tree",
       "performance"
     ],
-    "short": "Indexes are sorted B-trees that turn collection scans (COLLSCAN) into efficient IXSCANs. Types include single-field, compound, multikey, text, hashed, geospatial, TTL, wildcard, and partial/sparse; they speed reads but slow writes and use RAM."
+    "short": "**Indexes are sorted B-tree structures that turn slow collection scans (`COLLSCAN`) into efficient `IXSCAN` lookups.**\n\n- **Main types:** single-field, compound (ESR rule), multikey (auto-created for arrays, one entry per element), text (one per collection), hashed (equality/shard keys), geospatial, TTL (auto-expire), wildcard, and partial/sparse.\n- **Trade-off:** indexes speed up reads but slow writes (every insert/update/delete must maintain them) and consume RAM and disk.\n- **Working set:** ideally all frequently used indexes fit in RAM; a working set that exceeds available memory causes heavy I/O."
   },
   {
     "id": "mongodb-compound-index-prefix-esr",
@@ -74,7 +74,7 @@
       "esr",
       "prefix"
     ],
-    "short": "A compound index sorts by keys in declared order and only serves left-justified prefixes. Order fields by ESR (Equality, Sort, Range) so the index also satisfies sorts and avoids a blocking SORT stage."
+    "short": "**A compound index sorts by its keys in declared order and can only be used via a left-justified prefix; order the fields by ESR to avoid a blocking in-memory sort.**\n\n- **Prefix rule:** an index `{a,b,c}` serves queries on `{a}`, `{a,b}`, or `{a,b,c}` — a query on just `{b}` cannot use it.\n- **ESR order:** put **Equality** fields first, then **Sort** fields (lets the index return pre-sorted results), then **Range** fields last.\n- **Range before sort:** placing a range field ahead of a sort field forces an expensive blocking `SORT` stage on large result sets."
   },
   {
     "id": "mongodb-covered-query",
@@ -88,7 +88,7 @@
       "performance",
       "projection"
     ],
-    "short": "A covered query is answered entirely from one index because all filter and projected fields live in it; it requires excluding `_id` and no array fields, showing an IXSCAN with no FETCH and `totalDocsExamined: 0`."
+    "short": "**A covered query is answered entirely from one index — MongoDB never reads the actual documents, making it significantly faster.**\n\n- **Requirements:** all filter *and* projected fields must live in the same index, `_id` must be excluded from the projection (unless it's in the index), and no multikey (array) fields.\n- **`explain()` signature:** `IXSCAN` with **no `FETCH` stage** and `totalDocsExamined: 0`.\n- **Common mistake:** having an index on the filter fields alone is not enough — the projected fields must also be in the index."
   },
   {
     "id": "mongodb-ttl-index",
@@ -101,7 +101,7 @@
       "ttl",
       "expiration"
     ],
-    "short": "A TTL index auto-deletes documents based on a Date field after `expireAfterSeconds`. A background thread runs roughly every 60s so deletion is eventual, not precise; it's single-field only and unavailable on capped collections."
+    "short": "**A TTL index automatically deletes documents after a set number of seconds based on a `Date` field, but deletion is eventual, not real-time.**\n\n- **Background thread:** runs roughly every 60 seconds, so a document can live up to ~60s past its expiry.\n- **Date field required:** the indexed field must be a BSON `Date` (or array of dates, using the earliest); missing or non-date values are ignored and never expire.\n- **Constraints:** single-field index only; does not work on capped collections; use `expireAfterSeconds: 0` to expire at an exact stored timestamp."
   },
   {
     "id": "mongodb-aggregation-pipeline",
@@ -115,7 +115,7 @@
       "$match",
       "$group"
     ],
-    "short": "The aggregation pipeline streams documents through ordered stages ($match, $group, $sort, $unwind, $lookup, etc.). Place $match/$sort early to use indexes; blocking stages ($group, $sort) are limited to 100 MB RAM unless spilling to disk."
+    "short": "**The aggregation pipeline processes documents through an ordered sequence of stages, each transforming the stream and feeding into the next.**\n\n- **Key stages:** `$match` (filter early to use indexes), `$group` (aggregate with accumulators like `$sum`/`$avg`), `$sort`, `$unwind` (flatten arrays), `$lookup` (left outer join), `$out`/`$merge` (write results).\n- **Index usage:** only the first `$match`/`$sort`/`$geoNear` can use an index; once documents are transformed, later stages run in memory.\n- **Blocking stages:** `$group` and `$sort` are limited to 100 MB of RAM; since MongoDB 6.0 they spill to disk automatically when exceeded."
   },
   {
     "id": "mongodb-lookup-joins",
@@ -129,7 +129,7 @@
       "joins",
       "performance"
     ],
-    "short": "`$lookup` is a left outer join attaching matches as an array; index the `foreignField` to avoid N×M scans and pair with `$unwind` for one-to-one. Heavy reliance often signals data that should be embedded."
+    "short": "**`$lookup` performs a left outer join to another collection, attaching matching documents as an array field.**\n\n- **Index the `foreignField`:** without an index, `$lookup` does a full scan of the foreign collection per input document — an N×M scan.\n- **Use `$unwind` for one-to-one:** the result is always an array; flatten it with `$unwind` when you expect a single match.\n- **Subquery form:** the `let` + `pipeline` syntax lets you add filters and conditions beyond simple equality.\n- **Design signal:** heavy reliance on `$lookup` often means the schema should embed the data instead."
   },
   {
     "id": "mongodb-explain-query-plans",
@@ -143,7 +143,7 @@
       "performance",
       "indexing"
     ],
-    "short": "Use `explain('executionStats')` to inspect the plan: prefer IXSCAN over COLLSCAN, avoid blocking SORT, and aim for a ~1:1:1 ratio of keysExamined to docsExamined to nReturned. Fix slow queries with ESR-ordered compound indexes."
+    "short": "**Use `explain('executionStats')` to diagnose slow queries by reading the plan stages and examined-to-returned ratios.**\n\n- **Bad signals:** `COLLSCAN` (no index used), a blocking `SORT` stage (in-memory sort, fails past 100 MB), or a high `totalDocsExamined`-to-`nReturned` ratio (poor index selectivity).\n- **Good signals:** `IXSCAN`, no `SORT` stage, and `totalKeysExamined` / `totalDocsExamined` / `nReturned` all near **1:1:1**.\n- **Fix:** add or reorder a compound index using the **ESR** rule; re-run `explain()` to confirm the plan improved."
   },
   {
     "id": "mongodb-replica-set",
@@ -155,7 +155,7 @@
       "high-availability",
       "oplog"
     ],
-    "short": "A replica set is mongod instances holding the same data: one primary takes writes recorded in the oplog (a capped collection), while secondaries asynchronously tail and replay it. Members elect a new primary on failure and need a majority."
+    "short": "**A replica set is a group of `mongod` instances that maintain the same data — one primary accepts all writes, secondaries replicate asynchronously, and a new primary is elected automatically on failure.**\n\n- **Oplog:** every write on the primary is recorded in the oplog (a capped collection in the `local` database); secondaries tail and replay it.\n- **Elections:** Raft-like protocol, needs a majority of voting members to choose a new primary and prevent split-brain.\n- **Special members:** priority-0 (never primary), hidden (analytics/backup), and delayed (recovery from human error) members are supported."
   },
   {
     "id": "mongodb-elections-oplog",
@@ -167,7 +167,7 @@
       "oplog",
       "high-availability"
     ],
-    "short": "Raft-based elections promote a new primary (needing a voting majority to avoid split-brain) after the ~10s election timeout. The oplog is a capped collection of idempotent ops that drives replication; falling off it forces a full initial sync."
+    "short": "**Elections use a Raft-like protocol to promote a new primary when the current one is unreachable; the oplog is the capped collection that drives all replication.**\n\n- **Election trigger:** heartbeats every 2s; if a secondary can't reach the primary within ~10s it calls for an election, needing a majority of voting members to avoid split-brain.\n- **Oplog role:** a capped collection (`local.oplog.rs`) of idempotent write ops that secondaries tail continuously; it also powers change streams.\n- **Replication window:** the oplog's capped size bounds how long a secondary can be offline; falling off the oplog forces a full **initial sync**."
   },
   {
     "id": "mongodb-sharding-overview",
@@ -179,7 +179,7 @@
       "mongos",
       "shard-key"
     ],
-    "short": "Sharding scales horizontally by splitting a collection by shard key into chunks across shards (each a replica set), with mongos routers and config servers. Shard-key choice is critical; queries without it become scatter-gather."
+    "short": "**Sharding distributes a collection's data across multiple machines by splitting it via a shard key, enabling horizontal scaling beyond a single server.**\n\n- **Components:** shards (each a replica set holding a data subset), `mongos` routers (application entry point, routes and merges), and config servers (replica set storing chunk-to-shard metadata).\n- **Targeted vs scatter-gather:** queries that include the shard key hit one/few shards; queries without it broadcast to all shards and don't scale well.\n- **Shard key is critical:** it's the most consequential design decision — choose carefully before sharding as changing it is costly."
   },
   {
     "id": "mongodb-shard-key-selection",
@@ -193,7 +193,7 @@
       "hashed",
       "ranged"
     ],
-    "short": "A good shard key has high cardinality, low frequency, and (for ranged) is non-monotonic. Ranged sharding aids range queries but risks hot shards on monotonic keys; hashed sharding distributes writes evenly but scatters range queries."
+    "short": "**A good shard key has high cardinality, low frequency, and non-monotonic write patterns to avoid hot shards and jumbo chunks.**\n\n- **Ranged sharding:** nearby values on the same shard — efficient for range queries, but a monotonically increasing key (timestamp, ObjectId) creates a write hotspot.\n- **Hashed sharding:** hashes the key for even write distribution — fixes the monotonic-key problem, but range queries become scatter-gather.\n- **Compound shard keys:** combine a low-cardinality grouping field with a high-cardinality one for both locality and even distribution."
   },
   {
     "id": "mongodb-write-concern",
@@ -207,7 +207,7 @@
       "replication",
       "consistency"
     ],
-    "short": "Write concern sets the acknowledgement a write needs, trading durability for latency: `w:0` fire-and-forget, `w:1` primary only, `w:'majority'` (default since 5.0) survives failover. `j:true` forces a journal write; `wtimeout` caps the wait."
+    "short": "**Write concern specifies how many replica-set members must acknowledge a write before the driver considers it successful, trading durability for latency.**\n\n- **`w` levels:** `w:0` fire-and-forget, `w:1` primary only (can be rolled back on failover), `w:'majority'` (default since 5.0) — acknowledged by a majority, survives failover and is never rolled back.\n- **`j:true`:** requires the write to reach the on-disk journal, making it crash-safe on the acknowledging node(s).\n- **`wtimeout`:** a millisecond cap to avoid blocking forever if not enough members acknowledge."
   },
   {
     "id": "mongodb-read-concern-preference",
@@ -219,7 +219,7 @@
       "consistency",
       "replication"
     ],
-    "short": "Read preference picks WHICH member serves a read (primary, secondary, nearest); read concern sets WHAT consistency the data meets (local, majority, linearizable, snapshot, available). Secondary + majority can still return stale data."
+    "short": "**Read preference controls WHICH replica-set member serves a read; read concern controls WHAT consistency guarantee the returned data must meet.**\n\n- **Read preference options:** `primary` (default), `primaryPreferred`, `secondary`, `secondaryPreferred`, `nearest` — secondaries offload the primary but may return stale data.\n- **Read concern options:** `local` (may be rolled back), `majority` (won't be rolled back), `linearizable` (strongest, single-doc/primary only), `snapshot` (used in transactions), `available` (lowest latency on sharded clusters).\n- **Key nuance:** combining `secondary` read preference with `majority` read concern still risks stale data — the secondary may simply lag behind."
   },
   {
     "id": "mongodb-transactions-acid",
@@ -233,7 +233,7 @@
       "atomicity",
       "sessions"
     ],
-    "short": "MongoDB supports multi-document ACID transactions (replica sets in 4.0, sharded in 4.2) using snapshot isolation and sessions, with a default 60s limit and real overhead. Prefer embedding for atomicity; treat transactions as an escape hatch."
+    "short": "**MongoDB supports multi-document ACID transactions — added for replica sets in 4.0 and sharded clusters in 4.2 — but they carry real overhead and should be used sparingly.**\n\n- **How they work:** transactions run in a session, use snapshot isolation, and all writes must pass the session object; default timeout is 60 seconds.\n- **Overhead:** hold locks and snapshots, risk write conflicts, and can raise `TransientTransactionError` — use `withTransaction()` for automatic retries.\n- **Design philosophy:** if you frequently need multi-document transactions, the schema is likely too normalized; **embedding** related data gives atomicity for free on a single document."
   },
   {
     "id": "mongodb-capped-collections",
@@ -246,7 +246,7 @@
       "oplog",
       "data-modeling"
     ],
-    "short": "A capped collection is a fixed-size circular buffer that overwrites oldest documents on overflow, preserving insertion order for fast append-and-tail use (e.g. logs, the oplog). You can't delete individual docs, shard it, or use TTL indexes."
+    "short": "**A capped collection is a fixed-size circular buffer that automatically overwrites the oldest documents when it reaches its size cap, preserving insertion order.**\n\n- **Best for:** high-throughput append-and-tail workloads like logs, recent-event feeds, and caches — the oplog itself is a capped collection.\n- **Constraints:** you cannot delete individual documents, updates must not grow a document, it cannot be sharded, and TTL indexes don't apply.\n- **Modern alternative:** a **TTL index** on a normal collection gives more flexible time-based expiry."
   },
   {
     "id": "mongodb-wiredtiger-storage-engine",
@@ -258,7 +258,7 @@
       "internals",
       "concurrency"
     ],
-    "short": "WiredTiger (default since 3.2) provides document-level concurrency, data/index compression, MVCC snapshots, and crash-safe checkpoints plus journaling. Its internal cache (~50% of RAM minus 1 GB) should hold the working set for good performance."
+    "short": "**WiredTiger is MongoDB's default storage engine (since 3.2), providing document-level concurrency, compression, MVCC, and crash-safe durability.**\n\n- **Document-level concurrency:** multiple writers can modify different documents simultaneously — a major improvement over the old collection-level locking of MMAPv1.\n- **MVCC:** readers see a consistent snapshot without blocking writers; this underpins transactions and `majority` read concern.\n- **Compression + cache:** data and indexes are compressed (snappy by default); WiredTiger manages its own cache (~50% of RAM minus 1 GB) — the working set should fit there for good performance."
   },
   {
     "id": "mongodb-update-operators-upsert",
@@ -272,6 +272,6 @@
       "atomicity",
       "upsert"
     ],
-    "short": "Updates use operators (`$set`, `$inc`, `$push`, `$addToSet`) and are atomic per single document. `{upsert:true}` inserts when no match exists (pair with `$setOnInsert`); use `findOneAndUpdate` and positional operators with `arrayFilters` for atomic counters and array edits."
+    "short": "**MongoDB updates use operators to modify specific fields atomically on a single document without replacing the whole doc.**\n\n- **Common operators:** `$set`/`$unset`, `$inc` (atomic increment), `$push`/`$addToSet`/`$pull` for arrays (`$addToSet` prevents duplicates).\n- **Upsert:** `{ upsert: true }` inserts a new document when no match is found; pair with `$setOnInsert` to set fields only on first creation.\n- **Array targeting:** use the positional `$` operator (first match), `$[]` (all elements), or `$[identifier]` with `arrayFilters` to update specific array elements atomically."
   }
 ]

@@ -13,7 +13,7 @@
       "setImmediate",
       "timers"
     ],
-    "short": "The libuv event loop cycles through timers, pending, poll, check, and close phases; between phases it drains microtasks with `process.nextTick` first, then Promises, before any macrotask. `setTimeout(0)` vs `setImmediate` order is non-deterministic from the main module."
+    "short": "**The libuv event loop cycles through fixed phases; between each phase it drains microtasks — `process.nextTick` first, then Promise callbacks — before any macrotask runs.**\n\n- **Phase order:** timers → pending callbacks → idle/prepare → poll (I/O) → check (`setImmediate`) → close callbacks, then repeat.\n- **Microtask priority:** `process.nextTick` queue drains before the Promise/`queueMicrotask` queue, both before the loop advances to the next phase.\n- **`setTimeout(0)` vs `setImmediate`:** order is **non-deterministic** from the main module; inside an I/O callback `setImmediate` always wins because you enter the check phase next."
   },
   {
     "id": "nodejs-callback-hell-to-async-await",
@@ -28,7 +28,7 @@
       "promisify",
       "error-handling"
     ],
-    "short": "Callbacks caused nesting/duplicated error handling; Promises flatten chains with unified `.catch`; async/await reads top-to-bottom with ordinary `try/catch`. Use `util.promisify` to adapt error-first APIs and a single try/catch for one error path."
+    "short": "**Callbacks, Promises, and async/await are progressive solutions to async control flow — each removes a pain point of the previous approach.**\n\n- **Callbacks:** error-first `(err, data)` — works but causes deep nesting and duplicated error handling at each level.\n- **Promises:** flatten nesting into readable chains with a single `.catch`; compose with `Promise.all`/`race`/`allSettled`.\n- **async/await:** reads top-to-bottom like sync code with ordinary `try/catch`; use `util.promisify` to adapt error-first APIs and `Promise.all` for concurrent calls."
   },
   {
     "id": "nodejs-streams-backpressure-pipeline",
@@ -43,7 +43,7 @@
       "highWaterMark",
       "memory"
     ],
-    "short": "Streams process data in chunks to stay memory-safe; backpressure pauses a fast producer when a writable's buffer exceeds `highWaterMark`. Prefer `stream.pipeline` over `.pipe()` because it forwards errors and destroys all streams on failure, avoiding leaks."
+    "short": "**Streams process data in chunks for memory safety; backpressure is the mechanism that prevents a fast producer from overwhelming a slow consumer.**\n\n- **Backpressure signal:** `writable.write()` returns `false` when the internal buffer exceeds `highWaterMark` — pause the source and resume on `'drain'`.\n- **`pipeline` vs `.pipe()`:** `stream.pipeline` (or `stream/promises` variant) propagates errors across all streams and destroys them on failure; `.pipe()` leaks file descriptors on error.\n- **Memory-safe file copy/transform:** connect `createReadStream → Transform → createWriteStream` via `pipeline` to process files of any size with a fixed-size buffer."
   },
   {
     "id": "nodejs-transform-stream-implementation",
@@ -58,7 +58,7 @@
       "_flush",
       "buffering"
     ],
-    "short": "Use a custom Transform for incremental processing of large/unbounded data; buffering is only safe for small inputs. Implement `_transform` (call callback once per chunk for backpressure) and `_flush` for trailing data, keeping a leftover buffer for split lines."
+    "short": "**Build a custom `Transform` stream when you need to incrementally process large or unbounded data without holding it all in memory.**\n\n- **`_transform(chunk, enc, callback)`:** transform the chunk and push output, then call `callback()` exactly once — that callback is what propagates backpressure back upstream.\n- **`_flush(callback)`:** called when the input ends; use it to emit any trailing buffered data (e.g. the last partial line) before the stream closes.\n- **Line-boundary problem:** chunk boundaries don't align with line endings, so keep a `leftover` string buffer and only `push` complete lines in `_transform`."
   },
   {
     "id": "nodejs-eventemitter-custom-memory-leak",
@@ -73,7 +73,7 @@
       "observer",
       "once"
     ],
-    "short": "EventEmitter is Node's observer pattern; `emit` fires listeners synchronously. The `MaxListenersExceededWarning` (default 10) is a leak detector, usually from adding listeners in a hot path without removing them. Fix with `off`, `once`, or registering once."
+    "short": "**`EventEmitter` is Node's observer pattern: `emit` dispatches events synchronously to all registered listeners in order.**\n\n- **`MaxListenersExceededWarning`:** fires when more than 10 listeners are registered for one event — a leak detector, not a hard limit. The usual cause is adding a listener inside a hot path (e.g. per request) without removal.\n- **Fix options:** use `once` for one-shot handlers (auto-removed), call `off`/`removeListener` when done, or register listeners once outside the hot path.\n- **`'error'` events:** an emitter that fires `'error'` with no listener **throws and crashes** the process — always attach an error handler."
   },
   {
     "id": "nodejs-cluster-vs-worker-threads",
@@ -88,7 +88,7 @@
       "concurrency",
       "scaling"
     ],
-    "short": "`cluster` forks separate processes sharing a socket, ideal for scaling I/O-bound servers; `worker_threads` runs threads in one process with shared memory, ideal for CPU-bound work. Offload computation to a worker so the main event loop stays responsive."
+    "short": "**`cluster` and `worker_threads` scale Node across cores but serve different purposes — choose based on whether the bottleneck is I/O or CPU.**\n\n- **`cluster`:** forks separate processes sharing a listening socket; round-robin balances connections; no shared memory (use Redis for shared state). Best for scaling **I/O-bound HTTP servers**.\n- **`worker_threads`:** threads inside one process with optional `SharedArrayBuffer`; lower overhead than forking. Best for **CPU-bound computations** that would block the main event loop.\n- **In practice:** run the worker in a self-referencing file with `isMainThread` to keep both sides in one file; wrap the worker in a `Promise` for easy `await`."
   },
   {
     "id": "nodejs-cluster-http-server",
@@ -103,7 +103,7 @@
       "fault-tolerance",
       "load-balancing"
     ],
-    "short": "The cluster primary forks one worker per core and round-robins connections; workers are separate processes that can't share in-memory state (use Redis instead). Listen for the `exit` event and fork a replacement so crashes don't reduce capacity."
+    "short": "**The cluster primary forks one worker per CPU core, round-robins incoming connections, and restarts any worker that crashes to maintain full capacity.**\n\n- **Load balancing:** the primary accepts connections and distributes them round-robin (or via OS on Windows); workers are independent processes each running a full HTTP server.\n- **No shared state:** workers have isolated memory — do not store sessions, caches, or counters in-process; use Redis or an external store instead.\n- **Self-healing:** listen for `cluster.on('exit', ...)` on the primary and call `cluster.fork()` to replace a crashed worker automatically."
   },
   {
     "id": "nodejs-commonjs-vs-esm-interop",
@@ -119,7 +119,7 @@
       "interop",
       "import.meta"
     ],
-    "short": "CJS uses synchronous `require` with `__dirname` and module-scoped `this`; ESM uses static async `import`/`export` with top-level await and `this === undefined`. ESM can import CJS (as default); CJS uses dynamic `import()`; rebuild `__dirname` from `import.meta.url`."
+    "short": "**CJS and ESM are two distinct module systems; knowing their loading model, binding semantics, and interop rules is essential for modern Node.js.**\n\n- **CJS (`require`/`module.exports`):** synchronous, dynamic, exports are value copies; has `__dirname`/`__filename` and module-scoped `this`.\n- **ESM (`import`/`export`):** statically analyzed, async, exports are live bindings; supports top-level `await`; `this` is `undefined`; no `__dirname` — use `fileURLToPath(import.meta.url)`.\n- **Interop:** ESM can `import` a CJS module (its `module.exports` becomes the default export); CJS must use dynamic `await import()` to load ESM."
   },
   {
     "id": "nodejs-uncaught-unhandledrejection-handling",
@@ -134,7 +134,7 @@
       "process",
       "resilience"
     ],
-    "short": "Sync errors use try/catch, callbacks use error-first args, Promises use `.catch`. Treat `uncaughtException` as corrupted state: log, flush, then `process.exit(1)` and let a supervisor restart; never resume. The real fix is handling errors at the source."
+    "short": "**Node has three error channels — sync throws, callback error args, and Promise rejections — and the global process events are a last-resort safety net, not a recovery tool.**\n\n- **Per channel:** `try/catch` for sync; error-first callback arg for async callbacks; `try/catch` around `await` or `.catch()` for Promises.\n- **`uncaughtException`:** after this fires the process is in undefined/corrupted state — log it, do minimal sync cleanup, then `process.exit(1)` and let the supervisor restart.\n- **Best practice:** handle errors at the source with local `try/catch` and `.catch()` so the global handlers never fire."
   },
   {
     "id": "nodejs-buffer-string-encoding",
@@ -149,7 +149,7 @@
       "binary",
       "alloc"
     ],
-    "short": "A Buffer is fixed-length raw binary memory outside the V8 heap for binary data. Use safe zero-filled `Buffer.alloc(n)`, avoid uninitialized `allocUnsafe` unless overwriting. Use `StringDecoder` so multi-byte UTF-8 chars split across chunks aren't corrupted."
+    "short": "**A `Buffer` is fixed-length raw binary memory outside the V8 heap — used for file I/O, network packets, crypto, and any binary data that strings can't safely represent.**\n\n- **Allocation:** `Buffer.alloc(n)` is zero-filled and safe; `Buffer.allocUnsafe(n)` is faster but contains old memory — only use it if you immediately overwrite every byte; avoid the deprecated `new Buffer()`.\n- **Multi-byte split-chunk bug:** calling `chunk.toString('utf8')` per stream chunk corrupts multi-byte characters (emoji, accented letters) split across chunk boundaries.\n- **`StringDecoder`:** buffers trailing incomplete bytes and only emits complete characters, preventing garbled output when processing UTF-8 streams."
   },
   {
     "id": "nodejs-child-process-spawn-vs-exec",
@@ -164,7 +164,7 @@
       "fork",
       "security"
     ],
-    "short": "`spawn` streams output without a shell; `exec` runs through a shell and buffers (injection risk); `execFile` runs a binary without a shell; `fork` spawns a Node process with IPC. Prefer `spawn`/`execFile` with an args array for dynamic input."
+    "short": "**`child_process` provides four APIs for running external processes, differing in shell use, output handling, and whether IPC is available.**\n\n- **`spawn`:** streams stdout/stderr, no shell by default — no buffer limit, no injection risk; ideal for large or long-running output.\n- **`exec`:** runs through a shell and buffers output — convenient but vulnerable to **shell injection** with dynamic input and capped by `maxBuffer`.\n- **`execFile` / `fork`:** `execFile` runs a file directly without a shell (safe + buffered); `fork` launches a Node module with a built-in **IPC channel** for `child.send()` / `'message'`."
   },
   {
     "id": "nodejs-memory-leak-gc-investigation",
@@ -179,7 +179,7 @@
       "WeakMap",
       "v8"
     ],
-    "short": "V8 uses generational mark-and-sweep GC reclaiming only unreachable objects, so leaks mean unintended references: unbounded caches, un-removed listeners/timers, capturing closures, growing globals. Detect via heap snapshots; fix with bounded/LRU caches or `WeakMap`/`WeakRef`."
+    "short": "**V8's generational GC reclaims only unreachable objects — so a Node 'memory leak' is always an unintentional reference keeping something alive longer than intended.**\n\n- **GC model:** new objects enter the young gen (fast scavenge); long-lived ones are promoted to the old gen (slower mark-sweep-compact); GC runs on the main thread and can add latency.\n- **Common leak patterns:** unbounded caches/Maps, event listeners never removed, closures capturing large objects, module-level growing arrays, and uncleared `setInterval` callbacks.\n- **Detect and fix:** watch `process.memoryUsage().heapUsed` trend over time; take heap snapshots in Chrome DevTools; use `WeakMap`/`WeakRef` or bounded LRU caches to let entries be GC'd."
   },
   {
     "id": "nodejs-promise-concurrency-control",
@@ -194,7 +194,7 @@
       "allSettled",
       "rate-limiting"
     ],
-    "short": "`Promise.all` rejects on first failure; `allSettled` reports every outcome; `race` settles on the first settle; `any` resolves on first fulfillment. Avoid firing everything at once by using a concurrency pool that keeps at most N promises in flight."
+    "short": "**The four Promise combinators differ in how they handle multiple concurrent promises — choose based on whether you need fail-fast, all outcomes, first result, or first success.**\n\n- **`Promise.all`:** resolves with all values; **rejects fast** on the first rejection (remaining work continues but results are discarded).\n- **`Promise.allSettled`:** never rejects; returns `{status, value|reason}` for every promise — use when all outcomes matter regardless of failures.\n- **`Promise.race` / `Promise.any`:** `race` settles on the first settle (resolve or reject); `any` resolves on the first **fulfilled** value, rejects only if all reject (`AggregateError`).\n- **Concurrency limit:** use a pool of N runners sharing an index cursor instead of `Promise.all(items.map(fn))` to avoid overwhelming downstream services."
   },
   {
     "id": "nodejs-require-cache-singleton",
@@ -209,7 +209,7 @@
       "singleton",
       "hot-reload"
     ],
-    "short": "CommonJS wraps each file in a function, runs it once, and caches `module.exports` in `require.cache` by absolute path, so modules act as singletons. Delete the cache entry via `require.resolve` to hot-reload; ESM has no mutable cache (use a query string)."
+    "short": "**CommonJS wraps each module in a function, executes it once, and caches its `module.exports` in `require.cache` by resolved absolute path — making modules natural singletons.**\n\n- **Singleton guarantee:** every `require` of the same path returns the same cached object; top-level code and side effects run exactly once per process.\n- **Cache busting:** `delete require.cache[require.resolve('./mod')]` forces re-execution on the next `require` — used by hot-reload tools, but existing references to the old exports remain.\n- **ESM has no mutable cache:** you can't bust it the same way; append a cache-busting query string to the specifier in dynamic `import()` if re-evaluation is needed."
   },
   {
     "id": "nodejs-graceful-shutdown",
@@ -224,6 +224,6 @@
       "http",
       "production"
     ],
-    "short": "On `SIGTERM`/`SIGINT`, gracefully shut down to avoid dropping in-flight requests: call `server.close()` to stop new connections, drain active ones, close DB/queue resources, add a force-exit safety timeout, then `process.exit(0)`."
+    "short": "**Graceful shutdown prevents dropped in-flight requests and leaked resources when a container orchestrator or process manager stops the service with `SIGTERM`.**\n\n- **`server.close(cb)`:** stops accepting new connections; the callback fires once all existing connections finish — the right place to then close DB pools and call `process.exit(0)`.\n- **Force-exit backstop:** add a `setTimeout(() => process.exit(1), 10_000).unref()` so a stuck long-running connection cannot block shutdown past the grace window.\n- **Close external resources:** after `server.close`, drain DB pools, flush message queues, and release any other handles before exiting so nothing is left open."
   }
 ]

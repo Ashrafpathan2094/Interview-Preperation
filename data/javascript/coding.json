@@ -12,7 +12,7 @@
       "performance",
       "timers"
     ],
-    "short": "Debounce delays `fn` until `delay` ms after the last call, resetting a closure-held timer on each invocation so only the trailing call runs. Used for search-as-you-type, resize, and autosave."
+    "short": "**Debounce delays `fn` until `delay` ms have passed since the last call, resetting the timer on every new call so only the trailing invocation executes.**\n\n- **Closure timer:** a single `timer` variable is kept alive via closure; `clearTimeout` + `setTimeout` on each call ensures only the final one fires.\n- **Preserve context:** use `fn.apply(this, args)` inside an ordinary function (not an arrow) to correctly forward the caller's `this` and arguments.\n- **Use cases:** search-as-you-type, autosave, window resize recalculation, input validation after the user stops typing."
   },
   {
     "id": "javascript-implement-throttle",
@@ -26,7 +26,7 @@
       "performance",
       "timers"
     ],
-    "short": "Throttle runs `fn` at most once per `wait` window (leading + trailing), firing regularly during activity rather than after it stops. Used for scroll, mousemove, drag, and rate-limiting."
+    "short": "**Throttle ensures `fn` runs at most once per `wait` window, firing at a steady rate during continuous activity — unlike debounce, which fires only after activity stops.**\n\n- **Leading edge:** if enough time has elapsed, invoke immediately and record the timestamp.\n- **Trailing edge:** if inside the wait window, schedule one deferred call for the remaining time so the last event isn't dropped.\n- **Use cases:** scroll position tracking, mousemove/drag, analytics events, and rate-limiting rapid button clicks."
   },
   {
     "id": "javascript-implement-curry",
@@ -40,7 +40,7 @@
       "functional",
       "rest-spread"
     ],
-    "short": "Currying collects arguments via a recursive closure until they reach `fn.length`, then invokes `fn`. This naturally supports both fully-curried `f(a)(b)(c)` and partial-application `f(a,b)(c)` styles."
+    "short": "**A generic `curry` collects arguments recursively until their count reaches `fn.length`, then invokes the original function — supporting both `f(a)(b)(c)` and partial `f(a,b)(c)` styles.**\n\n- **Key check:** `if (args.length >= fn.length)` — when enough args are gathered, call `fn`; otherwise return a function that merges and recurses.\n- **`fn.length`:** gives the declared arity of the original function, used as the target argument count.\n- **Partial application:** currying naturally enables it — e.g. `cs(1)` returns a reusable 'add-one' function waiting for the remaining args."
   },
   {
     "id": "javascript-closure-loop-var-let",
@@ -55,7 +55,7 @@
       "event-loop",
       "hoisting"
     ],
-    "short": "Logs `3, 3, 3` because function-scoped `var` makes all callbacks share one `i` that is `3` after the loop. Fix with `let` (fresh per-iteration binding), an IIFE, or passing `i` as a setTimeout argument."
+    "short": "**The loop logs `3, 3, 3` because `var` is function-scoped — all three callbacks close over the same single `i`, which is `3` by the time the timeouts fire.**\n\n- **Root cause:** `var` creates one shared binding for the whole function; closures capture the variable, not its current value.\n- **Fix with `let`:** creates a fresh binding per iteration so each callback captures its own copy — logs `0, 1, 2`.\n- **Alternative fixes:** wrap in an IIFE to capture the current value as a parameter, or pass `i` directly as a `setTimeout` third argument."
   },
   {
     "id": "javascript-event-loop-output-order",
@@ -70,7 +70,7 @@
       "promises",
       "output-prediction"
     ],
-    "short": "Output is `1, 4, 3, 2`: synchronous logs run first, then the entire microtask queue (the promise `3`) drains before any macrotask (the `setTimeout` `2`)."
+    "short": "**Output is `1, 4, 3, 2`: synchronous code runs first, then microtasks (promises) drain completely, then macrotasks (timers) run.**\n\n- **Sync first:** `console.log('1')` and `console.log('4')` run immediately on the call stack.\n- **Microtasks next:** `Promise.resolve().then(...)` queues `3` as a microtask — the entire microtask queue drains before any macrotask.\n- **Macrotask last:** `setTimeout(..., 0)` queues `2` in the macrotask queue, so it runs only after the microtask queue is empty."
   },
   {
     "id": "javascript-async-await-order",
@@ -85,7 +85,7 @@
       "promises",
       "output-prediction"
     ],
-    "short": "Output is `start, A, end, B, promise`. `f()` runs to `await` synchronously (logging `A`), queues its continuation `B` as the first microtask, so it runs before the later-registered `.then`."
+    "short": "**Output is `start, A, end, B, promise`: `f()` runs synchronously until `await`, logging `A`, then yields; after all sync code finishes, microtasks drain in FIFO order — `B` then `promise`.**\n\n- **Sync phase:** `start` → `f()` starts → `A` → `await null` suspends → `promise` callback registered → `end`.\n- **Microtask FIFO:** `f`'s continuation (`B`) was queued at `await` before the explicit `.then` registered `promise`, so `B` runs first.\n- **Engine note:** in modern V8 (Node 12+, ES2019 optimisation), `await` on an already-resolved value adds only one microtask tick, making this order reliable."
   },
   {
     "id": "javascript-implement-promise-all",
@@ -99,7 +99,7 @@
       "async",
       "implementation"
     ],
-    "short": "Resolve with results indexed by position to preserve order, count settled promises to know when done, reject on the first rejection (fail-fast), and resolve `[]` for empty input. Wrap inputs with `Promise.resolve`."
+    "short": "**Implementing `Promise.all` requires preserving result order, counting resolutions, fail-fast rejection on the first error, and handling empty input.**\n\n- **Order preservation:** write each result to `results[i]` by index, not by settlement order — don't use `.push`.\n- **Completion tracking:** increment a `count`; when `count === promises.length`, call `resolve(results)`.\n- **Fail-fast:** pass `reject` directly as the second argument to each `.then` — the first rejection short-circuits everything.\n- **Edge cases:** return `resolve([])` immediately for empty input; wrap each item in `Promise.resolve(p)` to handle non-promise values."
   },
   {
     "id": "javascript-promise-combinators",
@@ -115,7 +115,7 @@
       "any",
       "async"
     ],
-    "short": "`all` resolves when every promise resolves (rejects on first failure); `race` settles on the first to settle either way; `allSettled` waits for all and reports each outcome; `any` resolves on first fulfilled, else `AggregateError`."
+    "short": "**The four combinators differ in when they settle and how they handle failure — pick based on whether you need all, first, or every outcome.**\n\n- **`Promise.all`:** waits for all; rejects immediately on the first failure (fail-fast). Use when all results are required.\n- **`Promise.race`:** settles on the first to settle — fulfilled or rejected. Use for timeout wrappers.\n- **`Promise.allSettled`:** never rejects; waits for every promise and reports `{status, value/reason}` for each. Use for batch jobs where all outcomes matter.\n- **`Promise.any`:** resolves with the first fulfilled value; rejects with `AggregateError` only if all reject. Use for redundant sources."
   },
   {
     "id": "javascript-implement-bind",
@@ -130,7 +130,7 @@
       "prototypes",
       "closures"
     ],
-    "short": "`bind` returns a new function with `this` permanently fixed and optional pre-filled leading args (partial application). Capture `fn = this`, then concatenate bound args with call-time args via `apply`."
+    "short": "**`bind` returns a new function with `this` permanently fixed and optional pre-filled leading arguments (partial application) — implement it by capturing the original function and concatenating bound + call-time args.**\n\n- **Capture:** inside `myBind`, assign `const fn = this` to hold the original function before returning the wrapper.\n- **Arg merge:** combine bound args with call-time args: `fn.apply(ctx, [...bound, ...args])`.\n- **Production note:** a full polyfill also handles `new` on the bound function (checking `this instanceof bound` and ignoring the bound `this`), but the apply-based form above is acceptable in most interviews."
   },
   {
     "id": "javascript-this-binding-rules",
@@ -145,7 +145,7 @@
       "call-apply",
       "scope"
     ],
-    "short": "`this` depends on how a function is called: method calls bind to the object, detached calls give `undefined` (strict) or global, and arrow functions capture `this` lexically. Fix lost `this` with `bind`/`call`/`apply`."
+    "short": "**`this` is set by how a function is called: method calls bind to the object, detached calls lose the binding, and arrow functions capture `this` lexically — never from the call site.**\n\n- **Method call (`obj.method()`):** `this` is `obj`.\n- **Detached call (`const f = obj.method; f()`):** `this` is `undefined` (strict) or global — the classic 'lost `this`' bug.\n- **Arrow:** captures `this` lexically at definition time; ignores call site entirely — don't use as object methods needing `this`. Fix detached calls with `.bind(obj)`, `call`, or an arrow wrapper."
   },
   {
     "id": "javascript-prototypal-inheritance",
@@ -160,7 +160,7 @@
       "constructors",
       "classes"
     ],
-    "short": "Inherit by calling `Animal.call(this, ...)`, linking `Dog.prototype = Object.create(Animal.prototype)`, restoring `constructor`, and overriding on `Dog.prototype`. Lookups walk the prototype chain; `class extends`/`super` is the modern equivalent."
+    "short": "**Prototypal inheritance with constructor functions requires three steps: call the parent constructor, link the prototype chain, and restore the `constructor` reference.**\n\n- **Own properties:** `Animal.call(this, name)` runs the parent's initialization logic on the child instance.\n- **Prototype link:** `Dog.prototype = Object.create(Animal.prototype)` wires up the chain so instances inherit Animal's methods.\n- **Override:** define `Dog.prototype.speak` to shadow the inherited version; `class Dog extends Animal` with `super(...)` does all of the above automatically."
   },
   {
     "id": "javascript-deep-vs-shallow-copy",
@@ -175,7 +175,7 @@
       "WeakMap",
       "structuredClone"
     ],
-    "short": "Shallow copies share nested references; deep copies recurse through everything, re-creating `Date`/`RegExp` and tracking visited objects in a `WeakMap` to handle cycles. `structuredClone` is the built-in option but can't clone functions or DOM nodes."
+    "short": "**A shallow copy shares nested object references; a deep copy recursively duplicates everything, requiring special handling for `Date`, `RegExp`, and circular references.**\n\n- **Circular references:** use a `WeakMap` (`seen`) to track already-cloned objects and return the existing copy when revisited, preventing infinite recursion.\n- **Special types:** re-create `Date` with `new Date(value)` and `RegExp` with `new RegExp(source, flags)` rather than copying them as plain objects.\n- **Built-in option:** `structuredClone(obj)` handles cycles, `Date`, `Map`, and `Set` natively, but cannot clone functions or DOM nodes; the `JSON` round-trip is lossy and throws on cycles."
   },
   {
     "id": "javascript-implement-flatten",
@@ -190,7 +190,7 @@
       "flatten",
       "polyfill"
     ],
-    "short": "Using `reduce`, recurse with `depth - 1` and `concat` when an element is an array and depth remains; otherwise keep the element. When depth hits 0, stop recursing and return a copy."
+    "short": "**`flatten(arr, depth)` uses `reduce` to build a new array, recursing into nested arrays with `depth - 1` and stopping when depth reaches 0.**\n\n- **Per element:** if the element is an array and `depth > 0`, recurse with `flatten(cur, depth - 1)` and `concat` the result; otherwise append the element as-is.\n- **Base case:** when `depth` is 0, return a shallow copy (`arr.slice()`) without recursing.\n- **Depth `Infinity`:** passing `Infinity` as depth fully flattens any nesting level."
   },
   {
     "id": "javascript-implement-map-reduce-filter",
@@ -205,7 +205,7 @@
       "polyfill",
       "prototypes"
     ],
-    "short": "`myMap` returns a new array calling `cb(element, index, array)` with optional `thisArg`. `myReduce` folds to one value: start from `initialValue` or the first element, beginning at index 1, and throws `TypeError` on an empty array with no initial value."
+    "short": "**`myMap` transforms each element 1:1; `myReduce` folds the array into one value — both require careful handling of the callback signature and edge cases.**\n\n- **`myMap`:** returns a new array; callback receives `(element, index, array)` with `this` bound to optional `thisArg`; use `i in this` to skip holes.\n- **`myReduce` no initial value:** accumulator starts as `this[0]`, iteration from index 1; calling on an empty array with no initial value must throw `TypeError` to match the spec.\n- **`myReduce` with initial value:** accumulator starts at `initialValue`, iteration from index 0."
   },
   {
     "id": "javascript-tdz-hoisting",
@@ -220,7 +220,7 @@
       "scope",
       "output-prediction"
     ],
-    "short": "`var a` logs `undefined` (hoisted and initialized to undefined), while reading `let b` early throws `ReferenceError` due to the temporal dead zone. Function declarations are fully hoisted and callable before their definition."
+    "short": "**`var` is hoisted and initialized to `undefined` so early reads return `undefined`; `let` is in the temporal dead zone until its declaration line, so early access throws `ReferenceError`.**\n\n- **`var` hoisting:** the declaration is moved to the top of the function and initialized to `undefined`; only the assignment stays in place.\n- **TDZ for `let`/`const`:** the binding exists but is unreadable from the start of the block until the declaration executes — accessing it throws `ReferenceError`.\n- **Function declarations:** fully hoisted with their body — they are callable even before they appear in source code."
   },
   {
     "id": "javascript-type-coercion-equality",
@@ -235,7 +235,7 @@
       "output-prediction",
       "NaN"
     ],
-    "short": "`[]+[]`→`''`, `[]+{}`→`'[object Object]'`, `1+'2'`→`'12'`, `null==undefined`→true, `NaN===NaN`→false, `0==''`→true. `===` compares type and value without coercion; prefer it except idiomatic `x == null`."
+    "short": "**These expressions expose JS coercion rules: `===` never coerces while `==` applies the abstract equality algorithm, producing many surprises.**\n\n- **Key results:** `[] + []` → `''`; `[] + {}` → `'[object Object]'`; `1 + '2'` → `'12'` (string `+`); `null == undefined` → `true`; `NaN === NaN` → `false`; `0 == ''` → `true`.\n- **`===` rule:** compares type AND value — different types are always unequal. Always prefer `===`.\n- **Exceptions:** `x == null` idiomatically catches both `null` and `undefined`; use `Number.isNaN(x)` or `Object.is(NaN, NaN)` for `NaN` equality."
   },
   {
     "id": "javascript-generators-iterators",
@@ -250,6 +250,6 @@
       "symbol-iterator",
       "spread"
     ],
-    "short": "A generator (`function*`) returns an iterator producing values lazily; `yield` pauses and `.next()` resumes returning `{value, done}`. This enables infinite sequences like Fibonacci and works with `for...of`, spread, and `Array.from`."
+    "short": "**A generator (`function*`) returns an iterator that produces values lazily — `yield` pauses execution and returns a value; `.next()` resumes from that point.**\n\n- **Lazy evaluation:** values are produced on demand, not precomputed — infinite sequences like Fibonacci are possible without exhausting memory.\n- **Iterator protocol:** generator objects implement both the iterator and iterable protocols, so they work with `for...of`, spread `...`, and `Array.from` out of the box.\n- **State preserved:** local variables survive across `yield` pauses, making generators ideal for stateful sequences (range, ID counters, Fibonacci)."
   }
 ]

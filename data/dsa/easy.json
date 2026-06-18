@@ -11,7 +11,7 @@
       "hash-map"
     ],
     "difficulty": "easy",
-    "short": "Iterate once, storing each value's index in a hash map; for each `x` check if `target - x` was already seen and return both indices. O(n) time, O(n) space."
+    "short": "**Use a hash map to store each value's index as you scan once, checking for the complement before inserting.**\n\n- **Approach:** for each `num`, look up `target - num` in the map; if found, return both indices immediately.\n- **Complexity:** `O(n)` time, `O(n)` space — single pass.\n- **Watch out:** insert after checking so you don't match an element with itself."
   },
   {
     "id": "dsa-valid-palindrome",
@@ -24,7 +24,7 @@
       "two-pointers"
     ],
     "difficulty": "easy",
-    "short": "Use two pointers from both ends, skipping non-alphanumeric characters and comparing lowercased chars; if any mismatch, it's not a palindrome. O(n) time, O(1) space."
+    "short": "**Use two pointers from both ends, skipping non-alphanumeric characters and comparing lowercased values to check for a palindrome.**\n\n- **Approach:** left and right pointers skip non-alphanumeric chars, then compare lowercased chars; any mismatch returns false.\n- **Complexity:** `O(n)` time, `O(1)` space — no new string built.\n- **Watch out:** skip non-alphanumeric characters before each comparison, not just once."
   },
   {
     "id": "dsa-valid-anagram",
@@ -38,7 +38,7 @@
       "counting"
     ],
     "difficulty": "easy",
-    "short": "If lengths differ, return false; otherwise count char frequencies in `s` and decrement for each char in `t`, failing if any count goes negative. O(n) time."
+    "short": "**Count character frequencies in `s`, then decrement for each character in `t` — any count going negative means it's not an anagram.**\n\n- **Approach:** if lengths differ, return false early; otherwise use a hash map to count `s` chars, then decrement for each `t` char.\n- **Complexity:** `O(n)` time, `O(1)` space (bounded alphabet).\n- **Watch out:** return false immediately when a count hits zero before decrementing (char missing or over-used)."
   },
   {
     "id": "dsa-contains-duplicate",
@@ -52,7 +52,7 @@
       "hash-set"
     ],
     "difficulty": "easy",
-    "short": "Iterate while adding values to a hash set; return true the moment a value is already present, else false at the end. O(n) time, O(n) space."
+    "short": "**Track seen values in a hash set and return true immediately when a duplicate is encountered.**\n\n- **Approach:** for each element, check if it's already in the `Set`; if yes, return true, otherwise add it.\n- **Complexity:** `O(n)` time, `O(n)` space.\n- **Key idea:** early exit on the first duplicate makes this efficient in practice."
   },
   {
     "id": "dsa-best-time-buy-sell-stock",
@@ -66,7 +66,7 @@
       "sliding-window"
     ],
     "difficulty": "easy",
-    "short": "Single pass tracking the minimum price so far and the best profit of selling at the current price minus that minimum. O(n) time, O(1) space."
+    "short": "**Single pass tracking the running minimum price and the best profit achievable by selling at the current price.**\n\n- **Approach:** for each price, update `minPrice` if lower, then check if `price - minPrice` beats the current best profit.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** return 0 if no profitable trade exists (prices only fall)."
   },
   {
     "id": "dsa-maximum-subarray",
@@ -80,7 +80,7 @@
       "kadane"
     ],
     "difficulty": "easy",
-    "short": "Kadane's algorithm: at each index keep the best subarray sum ending there (extend or restart) and track the global max. O(n) time, O(1) space."
+    "short": "**Kadane's algorithm: at each position decide whether to extend the previous subarray or start fresh, tracking the global maximum.**\n\n- **Key idea:** `cur = max(nums[i], cur + nums[i])` — restart when the running sum would hurt more than help.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** initialise both `cur` and `best` to `nums[0]` to handle all-negative arrays correctly."
   },
   {
     "id": "dsa-move-zeroes",
@@ -94,7 +94,7 @@
       "in-place"
     ],
     "difficulty": "easy",
-    "short": "Use a write pointer for the next non-zero slot; scan and swap each non-zero element forward, leaving zeros at the end in place. O(n) time, O(1) space."
+    "short": "**Use a write pointer that marks the next non-zero slot; swap each non-zero element into it and advance, leaving zeros at the end.**\n\n- **Approach:** read pointer scans ahead; when a non-zero is found, swap it with position `j` and increment `j`.\n- **Complexity:** `O(n)` time, `O(1)` space — in-place.\n- **Key idea:** swapping (not shifting) preserves relative order of non-zeros and fills zeros naturally."
   },
   {
     "id": "dsa-merge-sorted-array",
@@ -108,7 +108,7 @@
       "merge"
     ],
     "difficulty": "easy",
-    "short": "Two pointers compare current elements, appending the smaller and advancing; then append the leftover tail. This is merge sort's merge step. O(n+m) time."
+    "short": "**Two pointers — one per array — compare current elements, append the smaller, and advance that pointer; then append the remaining tail.**\n\n- **Key idea:** this is the merge step at the heart of merge sort.\n- **Complexity:** `O(n + m)` time, `O(n + m)` space for the result array.\n- **Watch out:** after the main loop, one array may still have elements — always append its tail."
   },
   {
     "id": "dsa-valid-parentheses",
@@ -121,7 +121,7 @@
       "stack"
     ],
     "difficulty": "easy",
-    "short": "Push openers onto a stack; on each closer, the popped top must be its matching opener, and the stack must be empty at the end. O(n) time, O(n) space."
+    "short": "**Push every opening bracket onto a stack; on a closing bracket, the top must be its matching opener — and the stack must be empty at the end.**\n\n- **Approach:** use a map `{ ')': '(', ']': '[', '}': '{' }` to look up the expected opener for each closer.\n- **Complexity:** `O(n)` time, `O(n)` space.\n- **Watch out:** if the stack is empty when a closer arrives, or non-empty at the end, it's invalid."
   },
   {
     "id": "dsa-implement-queue-using-stacks",
@@ -135,7 +135,7 @@
       "design"
     ],
     "difficulty": "easy",
-    "short": "Use an `in` stack for pushes and an `out` stack for pops; when `out` is empty, pour `in` into it to reverse order. Amortized O(1) per operation."
+    "short": "**Two stacks — `in` for pushes, `out` for pops — where `out` is lazily refilled from `in` to reverse the order, giving amortized O(1) per operation.**\n\n- **Key idea:** each element moves from `in` to `out` at most once, so the amortized cost is constant.\n- **Complexity:** `O(1)` amortized per op, `O(n)` space.\n- **Watch out:** only pour `in` into `out` when `out` is empty — never mix the two."
   },
   {
     "id": "dsa-reverse-linked-list",
@@ -149,7 +149,7 @@
       "in-place"
     ],
     "difficulty": "easy",
-    "short": "Iterate with a `prev` pointer (initially null), repointing each node's `next` to `prev` and advancing; `prev` becomes the new head. O(n) time, O(1) space."
+    "short": "**Iteratively reverse the list by repointing each node's `next` to the previous node, advancing both pointers until `prev` becomes the new head.**\n\n- **Approach:** keep `prev = null` and `cur = head`; each step saves `cur.next`, sets `cur.next = prev`, then advances.\n- **Complexity:** `O(n)` time, `O(1)` space — in-place.\n- **Watch out:** always save `cur.next` before overwriting it or you'll lose the rest of the list."
   },
   {
     "id": "dsa-merge-two-sorted-lists",
@@ -163,7 +163,7 @@
       "merge"
     ],
     "difficulty": "easy",
-    "short": "Use a dummy head and tail pointer; attach the smaller current node and advance, then append the remaining list. O(n+m) time, O(1) space."
+    "short": "**Use a dummy head and a tail pointer; repeatedly attach the smaller current node from either list, then append the non-empty remainder.**\n\n- **Approach:** compare `l1.val` and `l2.val`, attach the smaller to `tail.next`, advance that list pointer, then advance `tail`.\n- **Complexity:** `O(n + m)` time, `O(1)` space — no new nodes created.\n- **Key idea:** the dummy head avoids a special case for the first node."
   },
   {
     "id": "dsa-linked-list-cycle",
@@ -177,7 +177,7 @@
       "fast-slow-pointers"
     ],
     "difficulty": "easy",
-    "short": "Floyd's tortoise-and-hare: slow moves one step, fast two; they meet if a cycle exists, and fast reaching null means none. O(n) time, O(1) space."
+    "short": "**Floyd's tortoise-and-hare: slow moves one step, fast two — if they ever meet, a cycle exists; if fast reaches null, it doesn't.**\n\n- **Key idea:** in a cycle the fast pointer laps the slow one; without a cycle, fast exits the list.\n- **Complexity:** `O(n)` time, `O(1)` space — no extra data structures needed.\n- **Watch out:** check `fast && fast.next` before advancing to avoid null-pointer errors."
   },
   {
     "id": "dsa-middle-of-linked-list",
@@ -191,7 +191,7 @@
       "fast-slow-pointers"
     ],
     "difficulty": "easy",
-    "short": "Advance slow by one and fast by two; when fast runs off the end, slow is at the middle (the second middle for even lengths). O(n) time, O(1) space."
+    "short": "**Fast-slow pointers: advance slow by one and fast by two — when fast runs off the end, slow is at the middle.**\n\n- **Key idea:** fast travels twice as far, so when it finishes slow is exactly halfway.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** for even-length lists this naturally returns the second of the two middle nodes."
   },
   {
     "id": "dsa-binary-search",
@@ -204,7 +204,7 @@
       "binary-search"
     ],
     "difficulty": "easy",
-    "short": "Maintain low/high bounds and inspect the middle, halving the search window toward the target each step; compute mid safely to avoid overflow. O(log n) time."
+    "short": "**Binary search maintains low/high bounds and halves the window each step by comparing the middle element to the target.**\n\n- **Approach:** if `nums[mid] == target` return `mid`; if smaller, search right half; if larger, search left half.\n- **Complexity:** `O(log n)` time, `O(1)` space.\n- **Watch out:** compute `mid` as `lo + ((hi - lo) >> 1)` to avoid integer overflow."
   },
   {
     "id": "dsa-first-bad-version",
@@ -217,7 +217,7 @@
       "search-space"
     ],
     "difficulty": "easy",
-    "short": "Binary search for the leftmost bad version: if mid is bad move high to mid, else low to mid+1; low points to the first bad version. O(log n) time."
+    "short": "**Binary search for the leftmost bad version: if `mid` is bad, the answer is at or before `mid`; otherwise it's strictly after.**\n\n- **Approach:** `if isBadVersion(mid)` set `hi = mid`, else set `lo = mid + 1`; when the window collapses `lo` is the answer.\n- **Complexity:** `O(log n)` time, `O(1)` space — minimises API calls.\n- **Watch out:** use `lo < hi` (not `<=`) so the loop terminates with `lo == hi` at the first bad version."
   },
   {
     "id": "dsa-maximum-depth-binary-tree",
@@ -232,7 +232,7 @@
       "dfs"
     ],
     "difficulty": "easy",
-    "short": "Recursively return 1 plus the larger of the left and right subtree depths, with an empty tree being depth 0. O(n) time, O(h) space."
+    "short": "**Recursively return 1 plus the larger of the left and right subtree depths, with a null node having depth 0.**\n\n- **Approach:** `maxDepth(node) = 1 + max(maxDepth(left), maxDepth(right))`; base case returns 0 for null.\n- **Complexity:** `O(n)` time (visits every node), `O(h)` space for the recursion stack.\n- **Key idea:** every node is visited exactly once, so no redundant work."
   },
   {
     "id": "dsa-invert-binary-tree",
@@ -247,7 +247,7 @@
       "dfs"
     ],
     "difficulty": "easy",
-    "short": "Recursively swap each node's left and right children (null returns null), mirroring the entire tree. O(n) time, O(h) stack space."
+    "short": "**Recursively swap each node's left and right children, mirroring the entire tree bottom-up.**\n\n- **Approach:** recurse into both subtrees first, then swap `root.left` and `root.right` at the current node.\n- **Complexity:** `O(n)` time, `O(h)` space for the recursion stack.\n- **Watch out:** return null immediately for a null node — it is the base case."
   },
   {
     "id": "dsa-same-tree",
@@ -262,7 +262,7 @@
       "dfs"
     ],
     "difficulty": "easy",
-    "short": "Recurse on both trees in lockstep: both null matches, one null or unequal values fails, otherwise both subtrees must match. O(n) time, O(h) space."
+    "short": "**Recurse both trees in lockstep: both null is a match, one null or mismatched values is a failure, otherwise both subtrees must also match.**\n\n- **Approach:** `if (!p && !q) return true; if (!p || !q || p.val !== q.val) return false;` then recurse left and right.\n- **Complexity:** `O(n)` time, `O(h)` space for the recursion stack.\n- **Key idea:** three base cases cover all mismatch scenarios before recursing."
   },
   {
     "id": "dsa-symmetric-tree",
@@ -277,7 +277,7 @@
       "dfs"
     ],
     "difficulty": "easy",
-    "short": "Check that left and right subtrees mirror via a helper comparing left's left to right's right and left's right to right's left. O(n) time, O(h) space."
+    "short": "**A tree is symmetric if its left and right subtrees are mirrors: compare outer pairs (left-left vs right-right) and inner pairs (left-right vs right-left).**\n\n- **Approach:** write a `mirror(a, b)` helper — both null matches, one null or unequal values fails, then recurse `mirror(a.left, b.right)` and `mirror(a.right, b.left)`.\n- **Complexity:** `O(n)` time, `O(h)` space.\n- **Key idea:** the cross-comparison of children is what captures the mirror property."
   },
   {
     "id": "dsa-inorder-traversal",
@@ -292,7 +292,7 @@
       "dfs"
     ],
     "difficulty": "easy",
-    "short": "Recurse left, push the current node's value, then recurse right, accumulating into a result array (sorted order for a BST). O(n) time, O(h) space."
+    "short": "**Inorder traversal visits left subtree, then the current node, then right subtree — yielding sorted order for a BST.**\n\n- **Approach:** recurse left, push `node.val`, recurse right, accumulating into a result array.\n- **Complexity:** `O(n)` time, `O(h)` space for the recursion stack.\n- **Key idea:** for a BST, inorder always produces values in ascending sorted order."
   },
   {
     "id": "dsa-search-in-bst",
@@ -306,7 +306,7 @@
       "binary-search"
     ],
     "difficulty": "easy",
-    "short": "Walk from the root using BST ordering: go left if the target is smaller, right if larger, returning the node on a match. O(h) time, O(1) space."
+    "short": "**Walk the BST from the root: go left when the target is smaller, right when larger, and return the node on an exact match.**\n\n- **Key idea:** BST ordering means each comparison discards an entire half of the remaining tree.\n- **Complexity:** `O(h)` time, `O(1)` space — follows a single root-to-node path.\n- **Watch out:** return null (not false) if the target is not found."
   },
   {
     "id": "dsa-fibonacci-number",
@@ -320,7 +320,7 @@
       "recursion"
     ],
     "difficulty": "easy",
-    "short": "Iterate with two rolling variables holding the previous two values, updating n times to avoid exponential recursion. O(n) time, O(1) space."
+    "short": "**Compute Fibonacci iteratively with two rolling variables, avoiding the exponential cost of naive recursion.**\n\n- **Approach:** keep `a = F(n-2)` and `b = F(n-1)`; each step sets `next = a + b`, then rolls `a = b`, `b = next`.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** handle base cases `n < 2` (return `n`) before the loop."
   },
   {
     "id": "dsa-climbing-stairs",
@@ -334,7 +334,7 @@
       "recursion"
     ],
     "difficulty": "easy",
-    "short": "Ways to reach step n equal ways(n-1) plus ways(n-2), the Fibonacci recurrence, computed iteratively with two rolling variables. O(n) time, O(1) space."
+    "short": "**The number of ways to reach step n is ways(n-1) + ways(n-2) — the Fibonacci recurrence — solved iteratively with two rolling variables.**\n\n- **Key idea:** you arrive at step n from either step n-1 (one step) or step n-2 (two steps), so the counts add.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** both base cases (`n=1` and `n=2`) equal 1, matching the Fibonacci seed values."
   },
   {
     "id": "dsa-fizzbuzz",
@@ -348,6 +348,6 @@
       "string"
     ],
     "difficulty": "easy",
-    "short": "Iterate 1..n, appending \"Fizz\" when divisible by 3 and \"Buzz\" when divisible by 5 (both gives \"FizzBuzz\"), else the number string. O(n) time."
+    "short": "**Iterate 1 to n, building each entry by appending \"Fizz\" (div by 3) and/or \"Buzz\" (div by 5), falling back to the number string.**\n\n- **Key idea:** build the string by concatenating conditionally — \"FizzBuzz\" falls out naturally when both conditions hold.\n- **Complexity:** `O(n)` time, `O(n)` space for the output array.\n- **Watch out:** check divisibility by 3 and 5 independently (don't use `else if`) so both can apply at once."
   }
 ]

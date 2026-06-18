@@ -11,7 +11,7 @@
       "lifecycle",
       "takeUntil"
     ],
-    "short": "Pipe long-lived streams through `takeUntil(destroy$)` (as the last operator) and call `destroy$.next()`/`complete()` in `ngOnDestroy`; or prefer the `async` pipe / `takeUntilDestroyed()`."
+    "short": "**The `takeUntil` pattern completes long-lived subscriptions automatically by emitting on a `destroy$` Subject inside `ngOnDestroy`.**\n\n- **Setup:** declare `private destroy$ = new Subject<void>()`, pipe every long-lived stream through `takeUntil(this.destroy$)` as the LAST operator.\n- **Teardown:** call `this.destroy$.next()` then `this.destroy$.complete()` in `ngOnDestroy`.\n- **Better alternatives:** the `async` pipe (auto-unsubscribes in the template) or `takeUntilDestroyed()` from `@angular/core/rxjs-interop` (no `ngOnDestroy` boilerplate needed)."
   },
   {
     "id": "angular-switchmap-typeahead",
@@ -25,7 +25,7 @@
       "http",
       "async-pipe"
     ],
-    "short": "Build the pipeline as `debounceTime` to `distinctUntilChanged` to `filter(empty)` to `switchMap`, where `switchMap` cancels the prior in-flight HTTP request since only the latest result matters."
+    "short": "**Use `switchMap` for type-ahead search because it cancels the previous in-flight HTTP request every time the user types a new value.**\n\n- **Pipeline:** `debounceTime(300)` to wait for pausing → `distinctUntilChanged()` to skip duplicates → `filter` to drop empty input → `switchMap` to cancel old and start a new request.\n- **Why not `mergeMap`:** `mergeMap` runs all requests concurrently, risking stale out-of-order results overwriting newer ones.\n- **Result:** bind `results$` with the `async` pipe — no manual subscribe/unsubscribe."
   },
   {
     "id": "angular-switchmap-vs-mergemap-vs-concatmap",
@@ -41,7 +41,7 @@
       "concatMap",
       "exhaustMap"
     ],
-    "short": "All map source values to inner observables but differ in concurrency: `switchMap` cancels previous (latest-wins), `mergeMap` runs all in parallel, `concatMap` queues in order, `exhaustMap` ignores new values while one is running (anti double-submit)."
+    "short": "**Higher-order mapping operators all flatten inner Observables but differ in how they handle a new outer emission while a previous inner is still running.**\n\n- **`switchMap`:** cancels the previous inner (latest-wins) — correct for type-ahead search.\n- **`mergeMap`:** runs all inners in parallel with no order guarantee — good for independent parallel work.\n- **`concatMap`:** queues inners and runs them strictly in order — use when sequence must be preserved.\n- **`exhaustMap`:** ignores new outer values while an inner is active — prevents duplicate form submissions."
   },
   {
     "id": "angular-behaviorsubject-state-service",
@@ -55,7 +55,7 @@
       "state",
       "dependency-injection"
     ],
-    "short": "Keep a private `BehaviorSubject` (holds and replays current value), expose a read-only stream via `.asObservable()`, and mutate only through explicit methods that call `.next()`."
+    "short": "**Keep a `BehaviorSubject` private, expose a read-only `Observable` via `.asObservable()`, and let only explicit methods call `.next()` to control state changes.**\n\n- **Why `BehaviorSubject`:** it requires an initial value and immediately emits the latest value to any new subscriber — ideal for shared app state.\n- **Encapsulation:** exposing `.asObservable()` prevents consumers from pushing values directly into the stream.\n- **Access:** read the current value synchronously via `.getValue()` (or `.value`) when needed outside the stream."
   },
   {
     "id": "angular-onpush-mutation-bug",
@@ -69,7 +69,7 @@
       "immutability",
       "bug-fix"
     ],
-    "short": "OnPush only re-renders on input reference change, internal events, async emissions, or manual trigger; mutating the array in place keeps the same reference, so assign a new array (`[...items, x]`) or call `markForCheck()`."
+    "short": "**OnPush only re-renders when an `@Input` reference changes; mutating an array in place keeps the same reference, so the view is skipped.**\n\n- **Bug:** `this.items.push(x)` mutates the array — the reference is unchanged, OnPush sees no change, the view is not updated.\n- **Fix:** assign a new array reference: `this.items = [...this.items, 'item']` — OnPush detects the new reference and re-renders.\n- **Alternative:** inject `ChangeDetectorRef` and call `markForCheck()` to force a re-check without replacing the reference."
   },
   {
     "id": "angular-signals-counter",
@@ -83,7 +83,7 @@
       "effect",
       "change-detection"
     ],
-    "short": "Use `signal()` for state (read via `count()`, update with `.set/.update`), `computed()` for memoized derived values, and `effect()` for side effects; templates read signals directly with no manual change detection."
+    "short": "**Rewrite a counter with Angular signals: use `signal()` for writable state, `computed()` for memoized derived values, and `effect()` for side effects — no manual change detection needed.**\n\n- **Reading/writing:** call `count()` to read; call `.set(val)` or `.update(fn)` to write — the template updates automatically.\n- **`computed`:** memoized and read-only; only recomputes when a dependency signal it reads actually changes.\n- **`effect`:** runs side effects (logging, sync) when read signals change; must be created in an injection context like the constructor."
   },
   {
     "id": "angular-custom-attribute-directive",
@@ -97,7 +97,7 @@
       "HostListener",
       "Input"
     ],
-    "short": "Create a `@Directive` with selector `[appHighlight]`, take a color via `@Input`, react to `@HostListener('mouseenter')`/`('mouseleave')`, and set styles through `Renderer2` for SSR safety."
+    "short": "**Build a `@Directive` with an attribute selector, accept a color via `@Input`, and toggle the background using `@HostListener` events and `Renderer2`.**\n\n- **Events:** `@HostListener('mouseenter')` and `@HostListener('mouseleave')` handle mouse events without manual `addEventListener` calls.\n- **Styling:** use `Renderer2.setStyle()`/`removeStyle()` instead of direct DOM writes — this is SSR-safe and avoids bypassing Angular's security model.\n- **Aliased input:** naming the `@Input` to match the selector (e.g. `@Input('appHighlight') color`) enables clean `<p [appHighlight]=\"'blue'\">` usage."
   },
   {
     "id": "angular-pure-vs-impure-pipe",
@@ -111,7 +111,7 @@
       "impure",
       "performance"
     ],
-    "short": "A pure filter pipe won't re-run on in-place array mutation since the reference is unchanged; making it impure (`pure: false`) fixes staleness but runs every CD cycle, so prefer immutable updates or component/RxJS filtering."
+    "short": "**A pure filter pipe won't re-run when the array is mutated in place because the reference is unchanged; marking it impure (`pure: false`) fixes staleness but runs on every CD cycle.**\n\n- **Pure (default):** re-runs `transform()` only on primitive value changes or reference changes — cheap and memoized.\n- **Impure pitfall:** runs every change-detection cycle regardless of input changes — a performance hazard in large or frequently-rendered views.\n- **Best practice:** keep pipes pure and update the array immutably, or move filtering logic to the component or an RxJS stream."
   },
   {
     "id": "angular-reactive-form-validation",
@@ -125,7 +125,7 @@
       "validators",
       "custom-validator"
     ],
-    "short": "Define a typed `FormGroup` via `FormBuilder` with `Validators.required/email/minLength`, and attach a cross-field validator at the group level that compares password and confirm, returning `null` or an error object."
+    "short": "**Build a `FormGroup` with `FormBuilder`, apply built-in validators per control, and attach a cross-field custom validator at the group level to compare related fields.**\n\n- **Built-in validators:** `Validators.required`, `Validators.email`, `Validators.minLength(n)` applied per control in the `fb.group(...)` call.\n- **Cross-field validator:** a function taking `AbstractControl` (the group) and returning `null` for valid or `{ mismatch: true }` for invalid — attached via `{ validators: matchPasswords }` on the group.\n- **Checking errors:** use `form.get('email')?.errors`, `form.valid`, and `form.errors?.['mismatch']` in the template."
   },
   {
     "id": "angular-functional-route-guard",
@@ -139,7 +139,7 @@
       "CanActivateFn",
       "inject"
     ],
-    "short": "Use a functional `CanActivateFn` that calls `inject()` for dependencies and returns `true`, or `router.createUrlTree(['/login'])` with a `returnUrl` query param to redirect declaratively."
+    "short": "**Modern Angular route guards are plain functions (`CanActivateFn`) that use `inject()` for dependencies and return `true` or a `UrlTree` to redirect.**\n\n- **Functional API:** no class or `implements CanActivate` — just a function; composable and tree-shakable.\n- **Redirect pattern:** return `router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } })` — cleaner and more declarative than calling `router.navigate()` inside the guard.\n- **Registration:** add to the route with `canActivate: [authGuard]`."
   },
   {
     "id": "angular-lazy-loaded-standalone-routes",
@@ -153,7 +153,7 @@
       "standalone",
       "loadComponent"
     ],
-    "short": "With standalone components skip feature NgModules: lazy-load a single component via `loadComponent: () => import(...)` or a route group via `loadChildren` pointing to an exported `Routes` array; the dynamic `import()` creates the chunk."
+    "short": "**With standalone components, lazy-load a single page via `loadComponent` or a whole feature via `loadChildren` pointing to an exported `Routes` array — no NgModule required.**\n\n- **`loadComponent`:** `() => import('./home.component').then(m => m.HomeComponent)` — loads a single standalone component on demand.\n- **`loadChildren`:** `() => import('./admin/admin.routes').then(m => m.ADMIN_ROUTES)` — loads a full child route config, ideal for feature areas.\n- **Chunk creation:** the dynamic `import()` is what tells the bundler to emit a separate JS chunk."
   },
   {
     "id": "angular-viewchild-afterviewinit",
@@ -167,7 +167,7 @@
       "ngAfterViewInit",
       "component-communication"
     ],
-    "short": "`@ViewChild` returns the child instance but isn't resolved until `ngAfterViewInit` (not constructor/`ngOnInit`); use `{ static: true }` only for always-present elements, or the `viewChild()` signal query in newer Angular."
+    "short": "**`@ViewChild` returns the queried child instance, but it is only resolved after the view is built — it is `undefined` in the constructor and `ngOnInit`.**\n\n- **Safe timing:** access the child in `ngAfterViewInit` (or later); this is when Angular guarantees the view is initialized.\n- **`{ static: true }`:** resolves the query before change detection (available in `ngOnInit`) but only valid when the element is never inside a structural directive like `*ngIf`.\n- **Modern alternative:** the `viewChild()` signal query (Angular 17.3+) is a reactive, type-safe alternative to the decorator."
   },
   {
     "id": "angular-input-output-communication",
@@ -181,7 +181,7 @@
       "EventEmitter",
       "component-communication"
     ],
-    "short": "`@Input` passes data down (bound via `[name]`), and `@Output` `EventEmitter` sends events up via `.emit(payload)` (listened to with `(saved)=\"...\"`); signal-based `input()`/`output()` are newer alternatives."
+    "short": "**`@Input` passes data down from parent to child via property binding; `@Output` `EventEmitter` sends events up from child to parent via event binding.**\n\n- **Binding syntax:** `[text]=\"value\"` for input, `(save)=\"onSave($event)\"` for output — the child calls `this.save.emit(payload)`.\n- **`EventEmitter` usage:** only use it for `@Output` — it is an Angular wrapper over a Subject, NOT a general event bus.\n- **Modern alternative:** signal-based `input()` and `output()` functions are available in newer Angular but `@Input`/`@Output` remain most widely asked."
   },
   {
     "id": "angular-di-providers-token",
@@ -195,7 +195,7 @@
       "providers",
       "hierarchical-injectors"
     ],
-    "short": "DI walks the hierarchical injector tree and uses the first matching provider, so component-level `providers` override the root; use an `InjectionToken` (interfaces vanish at runtime) mapped via `useClass`/`useValue`/`useFactory` to swap implementations."
+    "short": "**Use an `InjectionToken` to swap implementations at DI level; component-level `providers` override the root provider for that subtree.**\n\n- **Why `InjectionToken`:** TypeScript interfaces vanish at runtime and cannot be DI tokens — a token stands in for the interface.\n- **Provider forms:** `useClass` swaps the implementation; `useValue` provides a literal; `useFactory` builds with logic or dependencies.\n- **Hierarchical override:** a component's `providers` array wins over the root for any descendant in that subtree — the injector tree is walked upward until a match is found."
   },
   {
     "id": "angular-ngonchanges-detect-input",
@@ -209,7 +209,7 @@
       "Input",
       "SimpleChanges"
     ],
-    "short": "`ngOnChanges(changes: SimpleChanges)` runs before `ngOnInit` and on each `@Input` reference change; guard with `changes['prop']`, read `previousValue`/`currentValue`, and use `isFirstChange()` to distinguish initial binding from updates."
+    "short": "**`ngOnChanges(changes: SimpleChanges)` fires before `ngOnInit` and after every `@Input` reference change, giving you previous and current values plus a first-change flag.**\n\n- **Guard by key:** check `changes['propName']` before reading — not all inputs change on every call.\n- **`isFirstChange()`:** returns `true` on the initial binding, letting you skip expensive re-work on init.\n- **Reference-only:** `ngOnChanges` only fires when the reference changes — mutating an object in place will NOT trigger it."
   },
   {
     "id": "angular-forkjoin-vs-combinelatest",
@@ -223,7 +223,7 @@
       "combineLatest",
       "http"
     ],
-    "short": "Use `forkJoin` (the `Promise.all` analog) to emit once after all completing sources like HTTP finish; `combineLatest` instead re-emits the latest of each whenever any source emits and needs no completion, suiting live streams."
+    "short": "**Use `forkJoin` to fire multiple HTTP requests in parallel and receive a single result object after all of them complete — the RxJS equivalent of `Promise.all`.**\n\n- **`forkJoin`:** emits once, only after every source completes; if any source errors or never completes, you get no emission — perfect for one-shot HTTP loads.\n- **`combineLatest`:** emits every time any source emits (after each has emitted at least once) and never requires completion — suited for live, continuously-changing streams.\n- **Rule:** HTTP requests → `forkJoin`; reactive filters/form fields → `combineLatest`."
   },
   {
     "id": "angular-async-pipe-output",
@@ -238,6 +238,6 @@
       "performance",
       "bug-fix"
     ],
-    "short": "Each `| async` creates its own subscription, so referencing the same cold `http.get` twice fires two requests; fix by assigning the observable once with `shareReplay(1)` or unwrapping once via `*ngIf=\"data$ | async as data\"`."
+    "short": "**Each `| async` in a template creates its own subscription, so using it twice on the same cold Observable fires the HTTP request twice.**\n\n- **Root cause:** method calls or inline cold Observables in the template re-create the Observable and re-subscribe on every binding.\n- **Fix 1:** add `shareReplay(1)` to the Observable so a single underlying request is shared across all subscriptions.\n- **Fix 2:** subscribe once via `*ngIf=\"data$ | async as data\"` (or `@if`) and reference the unwrapped `data` variable throughout the block."
   }
 ]

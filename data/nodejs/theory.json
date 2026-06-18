@@ -9,7 +9,7 @@
       "internals",
       "concurrency"
     ],
-    "short": "The event loop lets single-threaded Node do non-blocking I/O via libuv, processing callbacks in fixed phases each tick: timers, pending callbacks, idle/prepare, poll, check (`setImmediate`), and close callbacks. Microtasks drain between phases."
+    "short": "**The event loop lets single-threaded Node.js perform non-blocking I/O by offloading work to libuv and processing callbacks in fixed phases each tick.**\n\n- **Phases in order:** timers → pending callbacks → idle/prepare → poll (waits for I/O) → check (`setImmediate`) → close callbacks.\n- **Microtask queues:** `process.nextTick` queue, then the Promise queue, are drained **between every phase** — not as phases of their own.\n- **Thread pool:** libuv also maintains a pool (default 4 threads) for fs, DNS, and some crypto — those aren't kernel-async."
   },
   {
     "id": "nodejs-nexttick-vs-immediate-vs-timeout",
@@ -24,7 +24,7 @@
       "setImmediate",
       "microtasks"
     ],
-    "short": "`process.nextTick` runs first (after the current op, before promises), `setImmediate` runs in the check phase, and `setTimeout(fn,0)` in the timers phase. Inside I/O callbacks `setImmediate` always beats `setTimeout`; recursive `nextTick` can starve the loop."
+    "short": "**`process.nextTick`, `setImmediate`, and `setTimeout(fn, 0)` all defer work but run at different points in the event loop with different priorities.**\n\n- **`process.nextTick`:** runs immediately after the current operation and before Promise microtasks — highest priority of the three.\n- **`setImmediate`:** runs in the **check phase**, after the poll phase; inside an I/O callback it always fires before `setTimeout(0)`.\n- **`setTimeout(fn, 0)`:** runs in the **timers phase** of a later iteration; min delay is ~1 ms. Recursive `nextTick` can starve the loop — `setImmediate` does not have this problem."
   },
   {
     "id": "nodejs-microtask-vs-macrotask",
@@ -38,7 +38,7 @@
       "promises",
       "nextTick"
     ],
-    "short": "Macrotasks are phase callbacks; microtasks (`nextTick` queue, then the Promise queue) drain fully after each macrotask and between phases. Flooding microtasks can starve timers and I/O."
+    "short": "**Microtasks are not event loop phases — they drain fully after every macrotask callback and between phases, in two queues.**\n\n- **Queue order:** `process.nextTick` queue drains first, then the Promise microtask queue (`.then`/`await`/`queueMicrotask`).\n- **Starvation risk:** microtasks spawned by microtasks run in the same drain cycle, so a flood of recursive promises or `nextTick` calls can delay timers and I/O.\n- **`await` behaviour:** code after `await` resumes as a microtask, which is why it runs before any pending `setTimeout` callback."
   },
   {
     "id": "nodejs-blocking-event-loop",
@@ -50,7 +50,7 @@
       "worker_threads",
       "concurrency"
     ],
-    "short": "Blocking the event loop means synchronous CPU-bound work holds the single JS thread, stalling all callbacks and clients. Avoid it with async APIs, chunking via `setImmediate`, `worker_threads`, or child processes; async only helps I/O-bound work."
+    "short": "**Blocking the event loop means synchronous, CPU-bound work holds the single JS thread, stalling every callback and client for the entire duration.**\n\n- **What blocks:** tight loops, large `JSON.parse`, `...Sync` APIs, heavy regexes — anything that never yields.\n- **How to avoid:** prefer async APIs, break large tasks into chunks with `setImmediate`, or move CPU work to `worker_threads` or a child process.\n- **Key misconception:** `async` functions only help with I/O-bound work; an `async` function with a 2-second `for` loop still blocks the loop for 2 seconds."
   },
   {
     "id": "nodejs-callbacks-promises-async-await",
@@ -64,7 +64,7 @@
       "async-await",
       "callbacks"
     ],
-    "short": "Callbacks (error-first) led to nesting and awkward error handling; Promises flatten control flow with chaining and `.catch`; async/await is sugar over Promises for sequential-looking code with `try/catch`. Beware serial `await` in loops and unhandled rejections."
+    "short": "**Callbacks, Promises, and async/await are three generations of async handling, each solving the problems of the previous one.**\n\n- **Callbacks:** error-first `(err, result)` — simple but causes deep nesting (callback hell) and scattered error checks.\n- **Promises:** flatten nesting into chains, unify errors in `.catch`, and compose with `Promise.all`/`allSettled`/`race`.\n- **async/await:** syntactic sugar over Promises for sequential-looking code with ordinary `try/catch`; beware `await` in a loop (serializes calls — use `Promise.all`) and unhandled rejections."
   },
   {
     "id": "nodejs-streams-types-and-why",
@@ -77,7 +77,7 @@
       "memory",
       "pipeline"
     ],
-    "short": "Streams process data incrementally in chunks (as EventEmitters), with four types: Readable, Writable, Duplex, and Transform. They give memory/time efficiency and composability; prefer `stream.pipeline()` over `.pipe()` for proper error handling and cleanup."
+    "short": "**Streams process data incrementally in chunks instead of loading it all into memory, built on top of `EventEmitter`.**\n\n- **Four types:** Readable (source), Writable (sink), Duplex (both, independent), Transform (duplex where output is a function of input, e.g. gzip).\n- **Why use them:** memory efficiency (process a 10 GB file with a small buffer), lower latency (process chunk 1 before the last arrives), and composability via `pipe`/`pipeline`.\n- **`pipeline` over `.pipe`:** `stream.pipeline()` propagates errors and destroys all streams on failure, preventing leaked file descriptors."
   },
   {
     "id": "nodejs-backpressure",
@@ -91,7 +91,7 @@
       "memory",
       "highWaterMark"
     ],
-    "short": "Backpressure occurs when a fast producer outpaces a slow consumer, growing the writable's buffer unbounded. `write()` returning `false` signals to pause until `'drain'`; `.pipe()` and `pipeline()` handle this automatically, manual handling needed otherwise."
+    "short": "**Backpressure is what happens when a fast producer outpaces a slow consumer, causing the writable's internal buffer to grow unbounded.**\n\n- **Signal:** `writable.write(chunk)` returns `false` when the buffer exceeds `highWaterMark`; stop writing and wait for the `'drain'` event.\n- **Automatic handling:** `.pipe()` and `stream.pipeline()` manage pause/resume for you — the main reason to use them over manually wiring `'data'` to `write()`.\n- **Manual handling:** only needed when writing outside a pipe; check the return value of `write()` and re-enter on `'drain'`."
   },
   {
     "id": "nodejs-eventemitter",
@@ -105,7 +105,7 @@
       "internals",
       "memory-leak"
     ],
-    "short": "`EventEmitter` powers Node's event model: listeners run synchronously in registration order on `emit`. Pitfalls include unhandled `'error'` events crashing the process, listener-leak warnings past 10 listeners, and forgetting to remove listeners."
+    "short": "**`EventEmitter` is the core class behind Node's event-driven model: `emit(event, ...args)` calls all registered listeners synchronously in registration order.**\n\n- **`'error'` is special:** emitting `'error'` with no listener causes Node to throw and typically crash the process — always attach an error listener.\n- **Leak warning:** adding more than 10 listeners for one event triggers `MaxListenersExceededWarning`, usually a sign of listeners being added in a loop without removal.\n- **Cleanup:** listeners added with `on` persist; use `once` for one-shot handlers or call `off`/`removeListener` on long-lived emitters to avoid leaks."
   },
   {
     "id": "nodejs-cluster-vs-worker-threads",
@@ -117,7 +117,7 @@
       "scaling",
       "concurrency"
     ],
-    "short": "`cluster` forks multiple processes with isolated memory to scale I/O-bound network servers across cores; `worker_threads` runs threads in one process sharing memory (via `SharedArrayBuffer`) for CPU-bound work. They are complementary, not interchangeable."
+    "short": "**`cluster` and `worker_threads` both achieve parallelism but with different models suited to different problems.**\n\n- **`cluster`:** forks multiple OS processes with isolated memory sharing a listening socket; best for scaling **I/O-bound HTTP servers** across CPU cores via IPC.\n- **`worker_threads`:** runs threads inside one process with optional `SharedArrayBuffer`; best for offloading **CPU-bound work** (hashing, image processing) off the main event loop.\n- **Rule of thumb:** scale the server with `cluster` (or PM2), offload computation with `worker_threads` — they are complementary, not interchangeable."
   },
   {
     "id": "nodejs-child-process-methods",
@@ -132,7 +132,7 @@
       "fork",
       "ipc"
     ],
-    "short": "`spawn` streams output (no shell, good for long/large output), `exec` buffers via a shell (injection risk, capped buffer), `execFile` runs a file without a shell, and `fork` launches a Node module with an IPC channel. Prefer spawn/execFile."
+    "short": "**`child_process` offers four ways to spawn subprocesses, each with different trade-offs for output handling, shell use, and IPC.**\n\n- **`spawn`:** streams stdout/stderr with no shell — no buffer limit and no injection risk; ideal for long-running or large-output commands.\n- **`exec`:** runs through a shell and buffers all output — convenient but has a `maxBuffer` cap and is vulnerable to **shell injection** with untrusted input.\n- **`execFile` / `fork`:** `execFile` runs a binary directly without a shell (safe, buffered); `fork` launches a Node.js module with a built-in **IPC channel** for `process.send()` messaging."
   },
   {
     "id": "nodejs-commonjs-vs-esm",
@@ -146,7 +146,7 @@
       "esm",
       "interop"
     ],
-    "short": "CommonJS uses synchronous, dynamic `require`/`module.exports` returning value copies; ESM uses static, async `import`/`export` with live bindings, tree-shaking, and top-level await. CJS can't synchronously require ESM; resolution and `this` semantics also differ."
+    "short": "**CommonJS and ES Modules are two distinct module systems in Node.js with different loading models, binding semantics, and interop rules.**\n\n- **CJS (`require`/`module.exports`):** synchronous, dynamic, returns a **copy of the value** at require time; gives `__dirname`, `__filename`, and module-scoped `this`.\n- **ESM (`import`/`export`):** statically analyzed, asynchronous, exports are **live read-only bindings**; supports top-level `await`; `this` is `undefined`; needs `import.meta.url` instead of `__dirname`.\n- **Interop:** ESM can `import` CJS (default export = `module.exports`); CJS cannot `require()` ESM synchronously — use dynamic `import()` instead."
   },
   {
     "id": "nodejs-require-caching",
@@ -160,7 +160,7 @@
       "caching",
       "singleton"
     ],
-    "short": "`require` executes a module once and caches its exports by resolved absolute path, making modules per-process singletons with one-time side effects. Different paths yield distinct instances; deleting `require.cache` forces a fragile reload."
+    "short": "**`require` executes a module once, then caches its `exports` object in `require.cache` keyed by the resolved absolute path — making modules singletons within a process.**\n\n- **Singleton behaviour:** all callers get the same cached object; mutating it affects everyone, and top-level side effects run only once.\n- **Two copies = two singletons:** the same package at two different `node_modules` paths has two cache entries — a common cause of `instanceof` failures.\n- **Cache busting:** `delete require.cache[require.resolve('./mod')]` forces a reload on the next `require`, but existing references to the old exports remain — use with care."
   },
   {
     "id": "nodejs-error-handling-sync-async",
@@ -174,7 +174,7 @@
       "promises",
       "callbacks"
     ],
-    "short": "Sync code uses `try/catch`, callbacks use error-first arguments, and Promises/async use `.catch` or `try/catch` with `await`. `try/catch` can't catch errors thrown asynchronously, and stream/emitter errors arrive via the `'error'` event."
+    "short": "**Node.js has three distinct error channels — using the wrong one silently loses errors.**\n\n- **Synchronous:** `try/catch` catches thrown errors normally; it cannot catch errors delivered later asynchronously.\n- **Callbacks:** errors arrive as the **first argument** (`err`) — check it in the callback; a surrounding `try/catch` won't help.\n- **Promises/async:** rejections propagate to `.catch()` or are caught by `try/catch` only when you `await`; streams/emitters deliver errors via the `'error'` event, not via throw."
   },
   {
     "id": "nodejs-uncaught-exception-unhandled-rejection",
@@ -188,7 +188,7 @@
       "unhandledRejection",
       "process"
     ],
-    "short": "`uncaughtException` fires for uncaught sync errors and `unhandledRejection` for unhandled promise rejections. Treat both as bugs leaving an undefined state: log, do minimal cleanup, and exit so a supervisor restarts a fresh process, never resume."
+    "short": "**`uncaughtException` and `unhandledRejection` are last-resort safety nets, not normal error handlers — after either, the process is in an undefined state.**\n\n- **`uncaughtException`:** fires when a synchronous error propagates all the way up; Node's guidance is to log, do minimal cleanup, and `process.exit(1)` — never resume normal operation.\n- **`unhandledRejection`:** fires for a Promise rejected with no handler; since Node 15 the default is to **terminate the process**.\n- **Correct use:** treat both as signals of a bug; let a supervisor (PM2/systemd/k8s) restart a clean process. These are for observability and graceful exit, not for swallowing errors."
   },
   {
     "id": "nodejs-buffer",
@@ -202,7 +202,7 @@
       "memory",
       "encoding"
     ],
-    "short": "A `Buffer` is fixed-length raw binary data allocated off the V8 heap (a `Uint8Array` subclass) for handling sockets, files, and crypto. Mind encodings, and prefer `Buffer.from`/`Buffer.alloc` over the unsafe `allocUnsafe` and deprecated `new Buffer()`."
+    "short": "**A `Buffer` is a fixed-length chunk of raw binary data allocated outside the V8 heap, used wherever Node handles binary data: sockets, files, crypto, image bytes.**\n\n- **Allocation safety:** `Buffer.alloc(n)` is zero-filled and safe; `Buffer.allocUnsafe(n)` is faster but may contain old memory — only use it if you immediately overwrite every byte; never use the deprecated `new Buffer()`.\n- **Encodings matter:** converting a Buffer to a string requires specifying an encoding (`utf8`, `base64`, `hex`); slicing a UTF-8 Buffer mid-character produces garbled text.\n- **Off-heap:** Buffers don't bloat the JS heap but still count toward process memory via `process.memoryUsage().arrayBuffers`."
   },
   {
     "id": "nodejs-process-env-argv",
@@ -216,7 +216,7 @@
       "argv",
       "configuration"
     ],
-    "short": "`process` is the global process object; `process.env` holds string-valued environment config (parse numbers/flags), and `process.argv` holds CLI args (user args at index 2+). Handle `SIGTERM`/`SIGINT` for graceful shutdown rather than abrupt `process.exit()`."
+    "short": "**`process` is the global Node.js object exposing runtime info and control: environment, CLI args, memory, signals, and lifecycle events.**\n\n- **`process.env`:** holds environment variables as **strings** — always parse numbers (`Number(process.env.PORT)`) and be aware `'false'` is a truthy string.\n- **`process.argv`:** index `0` = node binary, `1` = script path, `2+` = user arguments; use `util.parseArgs` or yargs for anything non-trivial.\n- **Graceful shutdown:** listen for `SIGTERM`/`SIGINT` and close servers/connections before exiting; abrupt `process.exit()` can truncate buffered writes and leave resources open."
   },
   {
     "id": "nodejs-memory-management-gc",
@@ -231,7 +231,7 @@
       "leaks",
       "performance"
     ],
-    "short": "V8 uses generational mark-and-sweep GC (fast young-gen scavenge, slower old-gen mark-sweep-compact) reclaiming only unreachable objects. Leaks come from unintentional references: unbounded caches, unremoved listeners, closures, globals, and uncleared timers."
+    "short": "**V8 uses a generational, mark-and-sweep garbage collector that only reclaims objects unreachable from the roots — so a 'leak' is always an unintentional reference keeping an object alive.**\n\n- **GC generations:** new objects go to the young gen (fast scavenge); survivors are promoted to the old gen (slower mark-sweep-compact).\n- **Common leak sources:** unbounded caches/maps, event listeners never removed, closures capturing large objects, global collections, and `setInterval` never cleared.\n- **Tooling:** watch `process.memoryUsage().heapUsed` over time, take heap snapshots in Chrome DevTools with `--inspect`, and bound caches with an LRU or use `WeakMap`/`WeakRef`."
   },
   {
     "id": "nodejs-non-blocking-io-libuv",
@@ -244,7 +244,7 @@
       "event-loop",
       "internals"
     ],
-    "short": "Node delegates I/O to libuv, registering callbacks and continuing. Network sockets use kernel async (epoll/kqueue/IOCP) picked up in the poll phase, while fs/DNS/some crypto use libuv's thread pool (default 4). This reactor pattern excels at I/O-bound concurrency."
+    "short": "**Node achieves non-blocking I/O on a single JS thread by delegating work to libuv, which uses the OS or a thread pool and posts completion callbacks back to the event loop.**\n\n- **Kernel async (network):** sockets use `epoll`/`kqueue`/IOCP — the kernel waits; the event loop's poll phase picks up ready events. No thread pool needed.\n- **Thread pool (fs/DNS/crypto):** operations without portable async kernel APIs run on libuv's worker pool (default 4 threads, tunable via `UV_THREADPOOL_SIZE`).\n- **Reactor pattern:** this is why Node excels at high-concurrency I/O-bound workloads but struggles with CPU-bound work, which blocks the one JS thread."
   },
   {
     "id": "nodejs-package-json-semver-lockfile",
@@ -259,7 +259,7 @@
       "lockfile",
       "dependencies"
     ],
-    "short": "`package.json` declares metadata, scripts, and dependency types (`dependencies`, `dev`, `peer`, `optional`). Semver ranges like `^` (minor/patch) and `~` (patch) control upgrades; the committed lock file pins exact resolved versions for reproducible installs (`npm ci`)."
+    "short": "**`package.json` is the project manifest; the lock file pins exact resolved versions to make installs reproducible across machines and CI.**\n\n- **Dependency types:** `dependencies` (runtime), `devDependencies` (build/test), `peerDependencies` (provided by host), `optionalDependencies` (failure tolerated).\n- **Semver ranges:** `^1.2.3` allows minor/patch up to `<2.0.0`; `~1.2.3` allows patch only; exact pins avoid surprises from transitive updates.\n- **Lock file:** commit it — `npm ci` installs strictly from the lock (fails if out of sync) and is what you should use in CI/production for deterministic builds."
   },
   {
     "id": "nodejs-streams-vs-readfile",
@@ -273,6 +273,6 @@
       "memory",
       "performance"
     ],
-    "short": "`fs.readFile` loads the whole file into one Buffer; `fs.createReadStream` delivers chunks. Use streams for large/unknown-size files, lower time-to-first-byte, and pipelines (bounded memory); use `readFile` for small files where simplicity wins."
+    "short": "**`fs.readFile` loads the entire file into a single Buffer; `fs.createReadStream` delivers it incrementally in chunks — the right choice for large or unknown-size files.**\n\n- **When to stream:** file is large (avoids memory blowup), you want to start processing before the file finishes reading, or you're composing transformations with `pipeline`.\n- **When to use `readFile`:** file is small and you need the whole content at once (config, templates) — simpler with no per-chunk overhead.\n- **Classic example:** `fs.createReadStream(path).pipe(res)` serves a 5 GB file with a few KB of buffer; `readFile` would load all 5 GB into memory."
   }
 ]

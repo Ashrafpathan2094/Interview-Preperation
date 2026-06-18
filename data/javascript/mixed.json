@@ -11,7 +11,7 @@
       "data-privacy",
       "factory-function"
     ],
-    "short": "A closure pairs a function with the lexical environment where it was declared, keeping captured variables alive. Each factory call makes a fresh scope, so a counter factory gives every instance truly private, independent state."
+    "short": "**A closure pairs a function with the lexical environment where it was declared, keeping captured variables alive even after the outer function returns.**\n\n- **Lexical scoping:** an inner function permanently captures references to the variables of its enclosing scope by where it was written, not where it is called.\n- **Data privacy:** variables inside the factory are not on the returned object and cannot be accessed from outside — only the methods that close over them can touch them.\n- **Independent state:** each factory call creates a fresh lexical environment, so two counter instances never share their `count`."
   },
   {
     "id": "javascript-hoisting-tdz-var-let-const",
@@ -27,7 +27,7 @@
       "const",
       "scope"
     ],
-    "short": "Hoisting processes declarations first: `var` initializes to `undefined`, `let`/`const` stay uninitialized in the temporal dead zone (TDZ) and throw `ReferenceError` if accessed early, and function declarations hoist with their body so they're callable before their line."
+    "short": "**Hoisting processes all declarations before code runs, but `var`, `let`/`const`, and function declarations behave very differently in what gets initialized.**\n\n- **`var`:** hoisted and initialized to `undefined` — reading before the assignment line returns `undefined`, not an error.\n- **`let`/`const` (TDZ):** hoisted but NOT initialized — any access before the declaration line throws `ReferenceError` (the Temporal Dead Zone exists to surface use-before-declaration bugs).\n- **Function declarations:** hoisted with their entire body — callable before they appear in source; function expressions assigned to variables are not."
   },
   {
     "id": "javascript-this-binding-call-apply-bind",
@@ -42,7 +42,7 @@
       "bind",
       "arrow-functions"
     ],
-    "short": "Ordinary functions resolve `this` at call time via new > explicit (`call`/`apply`/`bind`) > implicit (`obj.method()`) > default; arrows have no own `this` and capture it lexically. Fix a detached callback with `.bind(obj)` or an arrow wrapper."
+    "short": "**`this` in ordinary functions is resolved at call time by four rules in priority order; arrow functions ignore all rules and capture `this` lexically.**\n\n- **Priority order:** `new` binding > explicit (`call`/`apply`/`bind`) > implicit (`obj.method()`) > default (strict: `undefined`; sloppy: global).\n- **Classic bug:** extracting a method as a callback (`const f = obj.method; f()`) loses the implicit binding — `this` falls to default and becomes `undefined`.\n- **Fixes:** use `.bind(obj)` for a permanently bound copy, or wrap in an arrow `() => obj.method()` that closes over the object reference."
   },
   {
     "id": "javascript-implement-bind-polyfill",
@@ -57,7 +57,7 @@
       "partial-application",
       "prototypes"
     ],
-    "short": "`bind` returns a new function with `this` fixed and leading args partially applied. A correct polyfill concatenates preset and call-time args and, when invoked with `new`, ignores the bound `this`, using the new instance while preserving the prototype chain."
+    "short": "**`bind` returns a new function with `this` permanently fixed and optional leading arguments pre-applied (partial application); a correct polyfill must also handle being called with `new`.**\n\n- **Arg concatenation:** merge preset args with call-time args: `[...presetArgs, ...callArgs]` passed via `apply`.\n- **`new` override:** detect `this instanceof bound` — when the bound function is used as a constructor, ignore the bound `this` and use the new instance instead.\n- **Prototype chain:** set `bound.prototype = Object.create(targetFn.prototype)` so `instanceof` works correctly on instances created with `new boundFn()`."
   },
   {
     "id": "javascript-prototypal-inheritance-chain",
@@ -72,7 +72,7 @@
       "prototype-chain",
       "super"
     ],
-    "short": "Objects link via `[[Prototype]]`; property lookups walk up the chain until found or `null`, with methods shared on the prototype. ES5 uses `Object.create` plus `Parent.call(this)`; ES6 `class extends`/`super` is sugar over the same mechanism."
+    "short": "**JavaScript objects link via `[[Prototype]]`; property lookups walk up the chain until the property is found or `null` is reached — methods sit on the prototype and are shared by all instances.**\n\n- **ES5 pattern:** `Child.prototype = Object.create(Parent.prototype)` links the chains; `Parent.call(this, ...)` initializes own properties; reset `Child.prototype.constructor`.\n- **ES6 `class`:** `extends` + `super(...)` is syntactic sugar that compiles to the same prototype chain — the preferred modern form.\n- **Interview gotchas:** `instanceof` walks the chain; class methods are non-enumerable; shadowing happens when an own property hides a prototype one."
   },
   {
     "id": "javascript-event-loop-microtask-macrotask-ordering",
@@ -88,7 +88,7 @@
       "setTimeout",
       "call-stack"
     ],
-    "short": "The single-threaded event loop runs all sync code, then fully drains microtasks (Promise callbacks, `await`), then takes one macrotask (`setTimeout`, I/O) and repeats. Microtasks always run before the next macrotask, so promises log before a 0ms timeout."
+    "short": "**The event loop runs all sync code first, then fully drains the microtask queue, then picks one macrotask — and repeats; microtasks always run before the next macrotask.**\n\n- **Microtasks:** resolved `Promise` `.then`/`.catch`/`.finally` and `await` continuations — the entire queue (including newly added microtasks) runs before yielding.\n- **Macrotasks:** `setTimeout`, `setInterval`, I/O — one task per loop iteration, which is why a `Promise.resolve().then(...)` always prints before `setTimeout(..., 0)`.\n- **Output order:** synchronous first, then all microtasks in FIFO order, then macrotasks — this is the key to predicting async code output."
   },
   {
     "id": "javascript-promise-all-race-allsettled-any",
@@ -104,7 +104,7 @@
       "Promise.any",
       "async"
     ],
-    "short": "`all` resolves when all fulfill but fails fast on first rejection; `race` settles on the first to settle (fulfill or reject); `allSettled` never rejects and reports every outcome; `any` resolves on first fulfillment, rejecting with `AggregateError` only if all fail."
+    "short": "**The four combinators coordinate multiple promises with different settlement semantics — choose based on whether you need all, first, or every result.**\n\n- **`Promise.all`:** resolves with all values when every promise fulfills; rejects immediately on the first rejection. Use for all-or-nothing operations.\n- **`Promise.race`:** settles (fulfilled or rejected) on the first to settle. Use for timeout wrappers or first-response-wins.\n- **`Promise.allSettled`:** never rejects; waits for all and returns `{status, value/reason}` for each. Use for batch jobs needing every outcome.\n- **`Promise.any`:** resolves with the first fulfillment; rejects with `AggregateError` only if all fail. Use for redundant sources."
   },
   {
     "id": "javascript-debounce-implementation",
@@ -119,7 +119,7 @@
       "higher-order-functions",
       "performance"
     ],
-    "short": "Debounce delays until activity stops (act after the last call) for search/resize; throttle caps to one call per window for scroll/mousemove. A robust debounce uses a closure-held timer, a `cancel` method, and an optional leading-edge invocation."
+    "short": "**Debounce fires once after activity stops; throttle fires at a capped steady rate during continuous activity — choose based on whether you want 'done' or 'regular' updates.**\n\n- **Debounce:** resets a timer on every call; the function only runs after the quiet period elapses. Best for search-as-you-type, autosave, resize recalculation.\n- **Throttle:** allows at most one call per time window regardless of call frequency. Best for scroll, mousemove, analytics, and animation sampling.\n- **Production debounce extras:** a `cancel()` method to clear pending timers (important on unmount), and a `leading` option to fire immediately on the first call then suppress until the quiet period."
   },
   {
     "id": "javascript-currying-implementation",
@@ -133,7 +133,7 @@
       "closures",
       "higher-order-functions"
     ],
-    "short": "Currying turns `f(a,b,c)` into `f(a)(b)(c)`; partial application fixes some args now, the rest later, both via closures. A generic `curry` uses `fn.length` to gather args until it has the full arity, then invokes the function."
+    "short": "**Currying transforms `f(a,b,c)` into `f(a)(b)(c)`; partial application fixes some args now and supplies the rest later — both use closures to remember collected arguments.**\n\n- **Generic `curry`:** uses `fn.length` as the target arity; if `args.length >= fn.length`, invoke `fn`; otherwise return a function that accumulates more and recurses.\n- **Partial application:** currying naturally enables it — e.g. `curriedSum(10)` returns a reusable 'add-10' function for the remaining arguments.\n- **Use cases:** reusable specialized functions, cleaner function composition/point-free style, and configuration/dependency injection."
   },
   {
     "id": "javascript-deep-vs-shallow-copy",
@@ -148,7 +148,7 @@
       "recursion",
       "circular-references"
     ],
-    "short": "A shallow copy (spread, `Object.assign`) shares nested references; a deep copy duplicates every level. Use `structuredClone` (handles Dates, Maps, circular refs); `JSON.parse(JSON.stringify())` is lossy. A manual recursive clone uses a `WeakMap` to handle circular references."
+    "short": "**A shallow copy (`{...obj}`, `Object.assign`) shares nested object references; a deep copy recursively duplicates every level so no references are shared.**\n\n- **`structuredClone`:** the modern built-in; handles nested structures, `Date`, `Map`, `Set`, and circular references — but cannot clone functions or DOM nodes.\n- **`JSON` round-trip pitfall:** drops `undefined`, functions, and symbols; converts `Date` to a string; throws on circular references.\n- **Manual recursive clone:** handles arrays, plain objects, `Date`, and circular references via a `WeakMap` that maps original objects to their clones."
   },
   {
     "id": "javascript-type-coercion-equality",
@@ -164,7 +164,7 @@
       "NaN",
       "Object.is"
     ],
-    "short": "`===` compares type and value with no coercion; `==` coerces via Abstract Equality, yielding surprises (`null == undefined` only, string-to-number, booleans to numbers, `NaN` never equal). Prefer `===`, with `x == null` as the one idiomatic exception."
+    "short": "**`===` compares type and value with no coercion; `==` applies the Abstract Equality algorithm, producing counterintuitive results that make it unreliable.**\n\n- **Key `==` coercion rules:** `null == undefined` is the only null/undefined pair; strings compare as numbers when compared to a number; booleans are converted to numbers first; objects are converted to primitives via `valueOf`/`toString`.\n- **`NaN` special case:** `NaN` is never equal to anything including itself — use `Number.isNaN` or `Object.is(NaN, NaN)`.\n- **Best practice:** always use `===`; the one idiomatic `==` exception is `x == null` to check for both `null` and `undefined` in a single test."
   },
   {
     "id": "javascript-event-delegation",
@@ -179,7 +179,7 @@
       "performance",
       "closest"
     ],
-    "short": "Event delegation puts one listener on a common ancestor and relies on bubbling, using `event.target.closest(selector)` to identify the source. It saves memory versus per-item listeners and automatically handles dynamically added elements."
+    "short": "**Event delegation attaches one listener to a common ancestor and uses event bubbling so events from any descendant are caught, identified via `event.target.closest(selector)`.**\n\n- **Memory savings:** one listener instead of one per item — critical for large lists, tables, or menus.\n- **Dynamic content:** elements added after the listener is attached are handled automatically with no rebinding — the classic use case for delegation.\n- **`closest` vs `target`:** use `event.target.closest(selector)` so clicks on nested children (icons, spans inside the item) still match the intended element."
   },
   {
     "id": "javascript-custom-iterator-generator",
@@ -194,7 +194,7 @@
       "for-of",
       "lazy-evaluation"
     ],
-    "short": "An iterable has `[Symbol.iterator]()` returning an iterator whose `next()` yields `{value, done}`; `for...of`, spread, and destructuring consume it. A generator (`function*`) builds iterators with far less code and enables lazy/infinite sequences via `yield`."
+    "short": "**The iterable protocol requires `[Symbol.iterator]()` returning an iterator with `next()` → `{value, done}`; generators (`function*`) implement both protocols in one construct with far less code.**\n\n- **Manual iterator:** an object with `[Symbol.iterator]()` returning `{ next() { return { value, done }; } }` — explicit but verbose.\n- **Generator shortcut:** `function*` with `yield` produces the same protocol automatically, with execution state preserved between `next()` calls.\n- **Lazy/infinite:** generators produce values on demand, making infinite sequences like natural numbers or Fibonacci safe and memory-efficient."
   },
   {
     "id": "javascript-reduce-map-filter-pipeline",
@@ -209,6 +209,6 @@
       "reduce",
       "higher-order-functions"
     ],
-    "short": "`map` transforms 1:1, `filter` keeps matches, and `reduce` folds into any shape, making it the most general (it can express both). Prefer `map`/`filter` for readability; use `reduce` with an explicit initial accumulator for aggregations like group-bys."
+    "short": "**`map` transforms 1:1, `filter` keeps matches, and `reduce` folds into any shape — making `reduce` the most general, able to express both `map` and `filter`.**\n\n- **`map` with `reduce`:** push each transformed element into the accumulator array.\n- **`filter` with `reduce`:** conditionally push elements that pass the predicate.\n- **When to use `reduce`:** reach for it when aggregating into a non-array shape (group-bys, frequency maps, sums); always provide an explicit initial accumulator to avoid edge cases on empty arrays."
   }
 ]

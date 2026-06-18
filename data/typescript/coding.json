@@ -11,7 +11,7 @@
       "constraints",
       "indexed-access"
     ],
-    "short": "Use two type params with `K extends keyof T` and return `T[K]`, so the key is constrained to real properties and each call is precisely typed; an unknown key fails at compile time."
+    "short": "**Use two type parameters with `K extends keyof T` and return `T[K]` so the key is constrained to real properties and each call is precisely typed.**\n\n- **`K extends keyof T`:** constrains the key to valid property names, making an unknown key a compile error.\n- **Return type `T[K]`:** indexed access gives the exact type for that property per call — not a union of all value types.\n- **Compile-time rejection:** passing a non-existent key like `\"missing\"` fails at compile time, not at runtime."
   },
   {
     "id": "typescript-discriminated-union-area",
@@ -25,7 +25,7 @@
       "never",
       "exhaustiveness"
     ],
-    "short": "Switch on the shared literal `kind` to narrow each branch, and assign `shape` to a `never` in `default`; adding an unhandled variant breaks that assignment, giving free exhaustiveness checking."
+    "short": "**Switch on the shared literal `kind` property to narrow each branch, and assign the value to `never` in `default` to get free exhaustiveness checking.**\n\n- **Narrowing:** each `case` narrows the union to the exact member, giving safe access to its specific fields (e.g. `shape.radius`).\n- **`never` assignment:** because the union is fully handled, the `shape` in `default` is narrowed to `never`; adding an unhandled variant breaks the assignment at compile time.\n- **Pattern:** this is TypeScript's idiomatic alternative to class hierarchies for N-variant modeling."
   },
   {
     "id": "typescript-custom-type-guard",
@@ -39,7 +39,7 @@
       "narrowing",
       "in-operator"
     ],
-    "short": "A `boolean` return tells TS nothing about the type, but a type predicate `pet is Cat` makes a user-defined guard that narrows to `Cat` when true (and `Dog` in the `else`)."
+    "short": "**A type predicate `pet is Cat` makes a user-defined guard that narrows to `Cat` when the function returns `true` — a plain `boolean` return performs no narrowing.**\n\n- **Type predicate syntax:** `function isCat(pet: Cat | Dog): pet is Cat` — the `pet is Cat` return type enables narrowing in the caller's branch.\n- **`else` branch:** when the guard returns `false`, TS narrows to the remaining union type (`Dog` here).\n- **Runtime check:** any logic works as long as the signature is `arg is Type`; here `in` checks for the `meow` method."
   },
   {
     "id": "typescript-implement-pick-mapped",
@@ -54,7 +54,7 @@
       "Omit",
       "Exclude"
     ],
-    "short": "`Pick` is a mapped type `{ [P in K]: T[P] }` over `K extends keyof T`; build `Omit` as the complement using `MyPick<T, Exclude<keyof T, K>>`."
+    "short": "**`Pick` is a mapped type `{ [P in K]: T[P] }` over `K extends keyof T`; build `Omit` as the complement using `Exclude<keyof T, K>` to remove unwanted keys.**\n\n- **Mapped type loop:** `[P in K]: T[P]` iterates the chosen keys and copies each property type via indexed access.\n- **`K extends keyof T`:** ensures you can only pick keys that actually exist on `T`.\n- **`MyOmit`:** `MyPick<T, Exclude<keyof T, K>>` computes the key set that excludes `K`, then picks the rest."
   },
   {
     "id": "typescript-infer-returntype",
@@ -68,7 +68,7 @@
       "ReturnType",
       "utility-types"
     ],
-    "short": "Use a conditional type with `infer`: `T extends (...args: any[]) => infer R ? R : never` pattern-matches the function's return type, falling back to `never`."
+    "short": "**Use a conditional type with `infer`: `T extends (...args: any[]) => infer R ? R : never` pattern-matches the function's return type into `R`, falling back to `never` for non-functions.**\n\n- **`infer R`:** declares a fresh type variable that TypeScript fills in by pattern-matching the function return position.\n- **True branch:** when `T` is callable, `R` captures the return type and is the conditional's result.\n- **`never` fallback:** when `T` is not a function type, the conditional resolves to `never`."
   },
   {
     "id": "typescript-unknown-vs-any-fix",
@@ -83,7 +83,7 @@
       "narrowing",
       "bug-fix"
     ],
-    "short": "`any` disables checking (crashes at runtime); `unknown` accepts any value but requires narrowing before use; `never` is the bottom type with no values. Prefer `unknown` and narrow via `typeof`."
+    "short": "**`any` disables type checking and lets unsafe calls compile; `unknown` forces narrowing before any operation, catching runtime crashes at compile time.**\n\n- **`any` danger:** `x.toUpperCase()` compiles even when `x` is a number — the error is only discovered at runtime.\n- **`unknown` safety:** you cannot use an `unknown` value until you narrow it via `typeof`, `instanceof`, or a type guard.\n- **`never`:** the bottom type with no values — return type of functions that always throw or infinitely loop."
   },
   {
     "id": "typescript-function-overloads",
@@ -96,7 +96,7 @@
       "generics",
       "narrowing"
     ],
-    "short": "Declare multiple typed overload signatures followed by one compatible implementation signature; callers see only the overloads, so `reverse(\"abc\")` is `string` and `reverse([1,2,3])` is `number[]`."
+    "short": "**Declare multiple typed overload signatures followed by one compatible implementation signature; callers see only the overloads, giving precise per-input return types.**\n\n- **Overload signatures:** each declares a specific input → output type relationship (e.g. `string` in → `string` out).\n- **Implementation signature:** must be compatible with all overloads but is not callable directly by outside code.\n- **Ordering:** more specific overloads must come first; the compiler picks the first matching signature."
   },
   {
     "id": "typescript-satisfies-operator",
@@ -110,7 +110,7 @@
       "literal-types",
       "const"
     ],
-    "short": "`satisfies` validates an expression against a type without widening, unlike a type annotation (which widens values) or `as` (which skips checking), so literal types like `port: 8080` are preserved."
+    "short": "**`satisfies` validates an expression against a type without widening, preserving literal types like `port: 8080` — unlike a type annotation (which widens) or `as` (which skips checking).**\n\n- **vs. annotation:** `const config: Record<string, string | number>` makes `config.port` typed as `string | number`, losing the precise `number` literal.\n- **vs. `as`:** an `as` assertion performs no real checking, so type errors like `port: true` can slip through undetected.\n- **`satisfies` advantage:** validates the shape constraint AND keeps the narrow inferred types for downstream use."
   },
   {
     "id": "typescript-interface-vs-type-merging",
@@ -124,7 +124,7 @@
       "declaration-merging",
       "comparison"
     ],
-    "short": "Same-named interfaces merge into one (great for augmentation); duplicate `type` aliases are an error. Use `interface` for extendable object shapes, `type` for unions, tuples, and mapped/conditional types."
+    "short": "**Same-named interfaces merge their members into one; duplicate type aliases are a compile error — use `interface` for extensible shapes, `type` for unions and computed types.**\n\n- **Interface merging:** two `interface User {}` blocks combine, requiring all merged members on any value assigned to `User`.\n- **Type alias no merge:** declaring the same `type` name twice is always a duplicate-identifier error.\n- **When to use each:** `interface` for object/class shapes you may augment; `type` for unions, tuples, mapped/conditional types, and function aliases."
   },
   {
     "id": "typescript-const-assertion-output",
@@ -139,7 +139,7 @@
       "literal-types",
       "output"
     ],
-    "short": "`as const` makes values deeply `readonly` and narrows to literals, so `colors` is `readonly [\"red\",\"green\",\"blue\"]` and `method` is `\"GET\"`; mutating methods like `push` then fail to compile."
+    "short": "**`as const` makes values deeply `readonly` and narrows to literals, so arrays become readonly tuples and string values become their exact literal type.**\n\n- **Readonly tuple:** `[\"red\", \"green\", \"blue\"] as const` infers `readonly [\"red\", \"green\", \"blue\"]` instead of `string[]`.\n- **Literal narrowing:** object property `method: \"GET\"` infers the literal `\"GET\"`, not `string`.\n- **Mutation blocked:** calling mutating methods like `push` on a `readonly` tuple is a compile error."
   },
   {
     "id": "typescript-partial-deep-mapped",
@@ -153,7 +153,7 @@
       "recursion",
       "conditional-types"
     ],
-    "short": "`Partial` is shallow; `DeepPartial<T>` recurses by mapping each key with `?` and, when the value is an object, applying `DeepPartial` again, otherwise keeping the type. Ideal for nested config patches."
+    "short": "**`Partial<T>` is shallow; `DeepPartial<T>` recurses by applying `?` to each key and calling itself on object-valued properties.**\n\n- **Shallow `Partial`:** only adds `?` at the top level — nested objects remain fully required.\n- **Recursive conditional:** `T[P] extends object ? DeepPartial<T[P]> : T[P]` recurses into nested object types only, keeping primitives as-is.\n- **Use case:** config overrides and patch/update payloads where only a subset of deeply nested fields is provided."
   },
   {
     "id": "typescript-record-utility",
@@ -167,7 +167,7 @@
       "literal-types",
       "mapped-types"
     ],
-    "short": "`Record<K, V>` builds `{ [P in K]: V }`; when `K` is a union of string literals every key is required, giving an exhaustive, type-checked lookup table."
+    "short": "**`Record<K, V>` builds `{ [P in K]: V }`; when `K` is a union of string literals, every key is required, giving an exhaustive compile-checked lookup table.**\n\n- **Exhaustive keys:** a `Record<Role, string[]>` with `Role = 'admin' | 'editor' | 'guest'` errors if any key is missing.\n- **Value type:** all values share the same type `V` — use a union (`string | number`) if values can differ.\n- **Dictionary use:** with `string` or `number` as `K`, `Record` acts as an open index signature for dynamic keys."
   },
   {
     "id": "typescript-enum-output",
@@ -182,7 +182,7 @@
       "output",
       "reverse-mapping"
     ],
-    "short": "Numeric enums get reverse mapping (`Direction.Up` is `0`, `Direction[0]` is `\"Up\"`); string enums have no reverse map, and `const enum` is fully inlined with no emitted object."
+    "short": "**Numeric enums emit a runtime object with reverse mapping (`Direction[0] === \"Up\"`); string enums have no reverse map; `const enum` is fully inlined with no emitted object.**\n\n- **Numeric reverse mapping:** the compiler emits a bidirectional object so both `Direction.Up` (→ `0`) and `Direction[0]` (→ `\"Up\"`) work at runtime.\n- **String enums:** no reverse mapping — you can't look up the name from the value at runtime.\n- **`const enum`:** values replaced by literals at compile time, no runtime object, but doesn't work well with `isolatedModules`/Babel and can't be iterated."
   },
   {
     "id": "typescript-union-intersection-output",
@@ -196,7 +196,7 @@
       "narrowing",
       "output"
     ],
-    "short": "`A & B` requires all members of both (fewer valid objects); `A | B` accepts either but only allows access to common properties until narrowed. The allowed-value set is smaller for `&`, larger for `|`."
+    "short": "**`A & B` requires all members of both types (fewer valid values); `A | B` accepts either but only exposes common properties until narrowed.**\n\n- **Intersection stricter:** an object for `A & B` must have both `name` and `age` — missing either is a compile error.\n- **Union looser:** an object for `A | B` only needs to satisfy one member; direct property access is limited to members common to all branches.\n- **Narrowing:** use `in` or a discriminant to safely access variant-specific properties inside a union."
   },
   {
     "id": "typescript-structural-typing",
@@ -209,7 +209,7 @@
       "compatibility",
       "excess-property-check"
     ],
-    "short": "TS uses structural (duck) typing: a `Vector` with `x`/`y` is assignable to `Point` regardless of names or inheritance. Direct object literals get stricter excess-property checks; assigning to a variable first bypasses them."
+    "short": "**TypeScript uses structural (duck) typing — a `Vector` with `x`/`y` is assignable to `Point` regardless of names or explicit inheritance.**\n\n- **Structural compatibility:** any value with at least the required members is assignable, no `implements` needed.\n- **Excess property checks:** object literals passed directly error on extra properties to catch typos; assigning to a variable first bypasses this check.\n- **Width subtyping:** the source may have *more* members than the target — the extra members are simply ignored."
   },
   {
     "id": "typescript-awaited-utility",
@@ -224,6 +224,6 @@
       "infer",
       "promises"
     ],
-    "short": "`Awaited<T>` recursively unwraps a Promise like `await` does; implement with a conditional `infer`: `T extends Promise<infer V> ? MyAwaited<V> : T`, collapsing nested promises."
+    "short": "**`Awaited<T>` recursively unwraps a `Promise` like `await` does; implement it with a recursive conditional `infer`: `T extends Promise<infer V> ? MyAwaited<V> : T`.**\n\n- **`infer V`:** captures the resolved value type of a `Promise<V>`, then recurses to unwrap nested promises.\n- **Recursion:** `Promise<Promise<User>>` collapses to `User` because each step re-applies `MyAwaited`.\n- **Non-Promise fallback:** when `T` is not a `Promise`, the conditional returns `T` unchanged."
   }
 ]

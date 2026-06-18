@@ -8,7 +8,7 @@
       "rendering",
       "internals"
     ],
-    "short": "An in-memory JS copy of the DOM; on changes React diffs a new tree against the old (reconciliation) and applies only the minimal real-DOM mutations. Its real value is the declarative model, not raw speed."
+    "short": "**The Virtual DOM is a lightweight in-memory JS copy of the real DOM that React diffs on every state change to apply only the minimal real-DOM mutations.**\n\n- **Diffing (reconciliation):** React builds a new VDOM tree, compares it to the previous one, and calculates the smallest set of real-DOM changes needed.\n- **Declarative value:** the real benefit is a declarative programming model, not raw speed — hand-tuned imperative DOM code can be faster.\n- **Re-render ≠ DOM rewrite:** if the diff finds no changes, the real DOM is left untouched."
   },
   {
     "id": "react-reconciliation-fiber",
@@ -20,7 +20,7 @@
       "internals",
       "rendering"
     ],
-    "short": "Reconciliation diffs element trees in O(n) using heuristics (type changes, same-type updates, keyed lists). Fiber rewrote it as incremental, interruptible work, enabling concurrent features via separate render and commit phases."
+    "short": "**Reconciliation diffs the element tree in O(n) using heuristics, and Fiber rewrote it as interruptible work that enables concurrent features.**\n\n- **Heuristics:** different element types destroy and rebuild the subtree; same types update in-place; lists use `key` to match children by identity, not position.\n- **Fiber:** React 16+ split work into small pauseable units so urgent updates (e.g. typing) can interrupt a heavy render.\n- **Two phases:** the render/reconcile phase can be interrupted and must be pure; the commit phase is synchronous and mutates the DOM."
   },
   {
     "id": "react-keys-in-lists",
@@ -33,7 +33,7 @@
       "lists",
       "reconciliation"
     ],
-    "short": "`key` gives list items a stable identity so React matches them across renders instead of by position. Index keys break on reorder/insert/remove, causing state and focus to attach to the wrong item; keys must be unique and stable."
+    "short": "**`key` gives each list item a stable identity so React matches items across renders by identity, not position.**\n\n- **Why it helps:** React can move, insert, and remove items while keeping their state, DOM nodes, and focus on the correct item.\n- **Index keys break:** on reorder, insert, or delete the index shifts, so state and focus jump to the wrong row.\n- **Rules:** keys must be unique among siblings and stable across renders — use a real `id`, not the array index."
   },
   {
     "id": "react-controlled-vs-uncontrolled",
@@ -47,7 +47,7 @@
       "uncontrolled",
       "refs"
     ],
-    "short": "Controlled inputs are driven by React state via `value`/`onChange` (full control, re-render per keystroke); uncontrolled inputs let the DOM own the value, read via `ref` with `defaultValue`. Don't switch between them mid-life."
+    "short": "**Controlled inputs are driven by React state via `value`/`onChange`; uncontrolled inputs let the DOM own the value, read via a `ref`.**\n\n- **Controlled:** React is the single source of truth — you get validation, formatting, and conditional disabling, at the cost of a re-render per keystroke.\n- **Uncontrolled:** the DOM holds the value; use `defaultValue` to seed it and a `ref` to read it on demand — less code, fewer renders.\n- **Don't switch mid-life:** toggling `value` between a string and `undefined` causes warnings and undefined behavior."
   },
   {
     "id": "react-rules-of-hooks",
@@ -58,7 +58,7 @@
       "rules-of-hooks",
       "internals"
     ],
-    "short": "Call hooks only at the top level and only from React functions. React tracks hook state by call order, so conditional or looped calls corrupt that mapping. The `eslint-plugin-react-hooks` linter enforces this."
+    "short": "**Hooks must only be called at the top level of a React function — never inside conditions, loops, or nested functions.**\n\n- **Why call order matters:** React tracks hook state by the order hooks are called each render (a linked list on the fiber); conditional calls shift that order and corrupt state.\n- **Only from React functions:** call hooks inside function components or other custom hooks, never in plain JS functions.\n- **Linter:** `eslint-plugin-react-hooks` enforces both rules and flags missing effect dependencies."
   },
   {
     "id": "react-usestate-closure-stale-state",
@@ -70,7 +70,7 @@
       "closures",
       "state"
     ],
-    "short": "State is a per-render snapshot captured in that render's closure; async callbacks/timers can close over stale values. Use the functional updater `setX(x => ...)` to stay safe against staleness and batching. Updates are batched and async."
+    "short": "**`useState` returns a per-render snapshot — async callbacks and timers can capture a stale value from the render that created them.**\n\n- **Stale closure:** a `setInterval` with an empty deps array closes over `count` from the first render, so it always reads `0` instead of the latest value.\n- **Functional updater:** use `setCount(c => c + 1)` — it always receives the latest state, avoiding staleness and batching surprises.\n- **Batched and async:** state updates don't take effect on the next line; React batches them and schedules a single re-render."
   },
   {
     "id": "react-useeffect-deps-cleanup",
@@ -84,7 +84,7 @@
       "cleanup",
       "dependencies"
     ],
-    "short": "`useEffect` runs after paint; the deps array controls re-runs (omitted=every render, `[]`=once, `[a,b]`=on change). The returned cleanup runs before the next effect and on unmount. Effects sync with external systems, not for data transforms or events."
+    "short": "**`useEffect` runs after the browser paints, and its cleanup function tears down the previous effect before the next one runs and on unmount.**\n\n- **Deps array:** omitted runs after every render; `[]` runs once on mount; `[a, b]` re-runs when `a` or `b` change (compared with `Object.is`).\n- **Cleanup purpose:** undo the previous effect — remove listeners, clear timers, abort fetches — to avoid leaks and stale state.\n- **Right use:** effects are for syncing with external systems, not for transforming data for render or handling user events."
   },
   {
     "id": "react-usememo-vs-usecallback",
@@ -99,7 +99,7 @@
       "memoization",
       "performance"
     ],
-    "short": "`useMemo` memoizes a computed value; `useCallback` memoizes a function reference. They matter for referential stability of props to `React.memo` children, stabilizing hook deps, and genuinely expensive work; otherwise their cost can outweigh the benefit."
+    "short": "**`useMemo` caches a computed value and `useCallback` caches a function reference across renders, both based on a dependency array.**\n\n- **`useMemo(fn, deps)`:** returns the memoized result of calling `fn` — for expensive computations or stable object/array references passed as props.\n- **`useCallback(fn, deps)`:** returns the memoized function itself — equivalent to `useMemo(() => fn, deps)`; prevents a memoized child from seeing a new reference every render.\n- **Not free:** memoization costs memory and a deps comparison each render; skip it unless there is a concrete referential-stability or performance need."
   },
   {
     "id": "react-memo-vs-usememo",
@@ -113,7 +113,7 @@
       "performance",
       "re-render"
     ],
-    "short": "`React.memo` skips re-rendering a component when props are shallow-equal; `useMemo`/`useCallback` memoize a value/function inside a component. They pair up since `React.memo` only helps when prop references are stable. It won't stop state- or context-driven re-renders."
+    "short": "**`React.memo` is a higher-order component that skips re-rendering when props are shallowly equal; `useMemo` and `useCallback` memoize values and functions inside a component.**\n\n- **They pair up:** `React.memo` only helps if prop references are stable — stabilize objects/arrays with `useMemo` and functions with `useCallback`, otherwise a new reference each render defeats it.\n- **Custom comparison:** `React.memo` does a shallow prop diff by default; pass a second `areEqual` argument for deep or selective comparison.\n- **Won't block all re-renders:** it only prevents prop-driven re-renders — internal state changes or consumed Context updates still cause a re-render."
   },
   {
     "id": "react-useref-purpose",
@@ -125,7 +125,7 @@
       "dom",
       "state"
     ],
-    "short": "`useRef` is a mutable `{current}` container that persists across renders without triggering re-renders, used for DOM access and instance-like values (timers, previous values). Unlike state, updates are synchronous and non-rendering; don't read/write it during render."
+    "short": "**`useRef` returns a mutable `{ current }` container that persists across renders without triggering re-renders.**\n\n- **DOM access:** attach to an element via the `ref` attribute to focus, measure, or integrate a non-React library after commit.\n- **Instance values:** store timers, previous values, or flags that must persist but should not cause a re-render when they change.\n- **Vs state:** `ref.current` updates are synchronous and silent; `setState` is batched, async, and schedules a render — never read or write `ref.current` during render itself."
   },
   {
     "id": "react-forwardref",
@@ -139,7 +139,7 @@
       "useImperativeHandle",
       "components"
     ],
-    "short": "`forwardRef` lets a function component receive a parent's ref and attach it to an inner DOM node, useful for reusable inputs and design-system primitives. Pair with `useImperativeHandle` to expose a custom API. In React 19, `ref` is a normal prop so it's becoming optional."
+    "short": "**`forwardRef` lets a function component receive a ref from its parent and attach it to an inner DOM node or expose a custom imperative handle.**\n\n- **When to use it:** reusable inputs, buttons, and design-system leaf components that a parent needs to focus, scroll, or measure.\n- **`useImperativeHandle`:** pair with it to expose a small custom API (e.g. `{ focus, scrollToTop }`) instead of leaking the raw DOM node.\n- **React 19:** `ref` can be passed as a regular prop to function components, so `forwardRef` is being deprecated and will become optional."
   },
   {
     "id": "react-usereducer-vs-usestate",
@@ -153,7 +153,7 @@
       "useState",
       "state"
     ],
-    "short": "Use `useReducer` when state is complex, has interdependent transitions, or many handlers update it; the pure reducer centralizes logic and `dispatch` has a stable identity. Trade-off is more boilerplate; reducers must stay pure, and it pairs well with Context."
+    "short": "**Use `useReducer` when state is complex, has interdependent transitions, or many handlers need to update it — a pure reducer centralizes all logic in one testable function.**\n\n- **Stable `dispatch`:** unlike multiple setter callbacks, `dispatch` has a stable identity across renders, so it won't break `React.memo` children or effect deps.\n- **Reducers must be pure:** return new objects, no side effects or mutation inside the reducer.\n- **Context pairing:** passing `dispatch` through Context makes a lightweight store without external libraries; `useState` is still better for a few independent primitives."
   },
   {
     "id": "react-custom-hooks",
@@ -167,7 +167,7 @@
       "reuse",
       "patterns"
     ],
-    "short": "A `use`-prefixed function that calls other hooks to extract and reuse stateful logic across components. It shares logic, not state, so each caller gets isolated state. Keep them focused, well-typed, and compliant with the Rules of Hooks."
+    "short": "**A custom hook is a `use`-prefixed function that composes built-in hooks to extract and reuse stateful logic across components.**\n\n- **Shares logic, not state:** every component calling `useCounter()` gets its own isolated counter state — custom hooks are not for sharing a single state value across the tree.\n- **Replaces older patterns:** they replace HOCs and render props for sharing behavior without coupling UI.\n- **Best practices:** keep each hook focused on one concern (e.g. `useFetch`, `useDebounce`), return a stable well-typed value, and obey the Rules of Hooks internally."
   },
   {
     "id": "react-context-vs-state-libraries",
@@ -180,7 +180,7 @@
       "zustand",
       "performance"
     ],
-    "short": "Context is dependency injection that solves prop drilling, best for low-frequency global values (theme, locale, user). Reach for a library for frequently-changing or complex state since any Context value change re-renders all consumers, while libraries allow slice-level subscriptions."
+    "short": "**Context is a dependency-injection mechanism for sharing low-frequency global values (theme, locale, current user) without prop drilling — not a general state manager.**\n\n- **Performance trap:** when a Context value changes, every consumer re-renders regardless of which part it uses; Context has no built-in selector.\n- **When to use a library:** for frequently-changing state, complex updates, or derived slices — Redux/Zustand let components subscribe to specific slices and skip unnecessary re-renders.\n- **Context mitigations:** split into multiple contexts, memoize the provider `value`, or colocate state lower in the tree."
   },
   {
     "id": "react-prevent-unnecessary-rerenders",
@@ -192,7 +192,7 @@
       "React.memo",
       "optimization"
     ],
-    "short": "Components re-render on own-state change, parent re-render, consumed Context change, or hook updates. Profile before optimizing, then use `React.memo` with stable props, move/colocate state, pass JSX via `children`, split Context/use selectors, and `useMemo` for expensive work."
+    "short": "**A component re-renders when its own state changes, its parent re-renders, a consumed Context value changes, or a hook triggers an update.**\n\n- **Profile first:** use React DevTools Profiler before optimizing — re-renders are only a problem when frequent and expensive.\n- **Key techniques:** `React.memo` with stable prop references (`useCallback`/`useMemo`), colocating state low in the tree, passing JSX via `children` to decouple subtrees, and splitting/selecting from Context.\n- **React Compiler:** React 19's compiler automates much of this memoization, reducing the need for manual optimization."
   },
   {
     "id": "react-error-boundaries",
@@ -205,7 +205,7 @@
       "error-handling",
       "lifecycle"
     ],
-    "short": "Class components (via `getDerivedStateFromError`/`componentDidCatch`) that catch render/lifecycle/constructor errors in their child tree and show a fallback. They don't catch errors in event handlers, async code, SSR, or themselves; there is still no hook equivalent."
+    "short": "**Error boundaries are class components that catch errors thrown during rendering, lifecycle methods, and constructors in their child tree and display a fallback UI.**\n\n- **Implementation:** use `static getDerivedStateFromError` to render the fallback and `componentDidCatch` to log the error.\n- **What they miss:** event handler errors (use try/catch), async code (`setTimeout`, promises), SSR errors, and errors thrown in the boundary itself.\n- **No hook equivalent:** you must use a class component or wrap a library like `react-error-boundary`; place boundaries per route or per widget for graceful degradation."
   },
   {
     "id": "react-suspense-lazy",
@@ -219,7 +219,7 @@
       "code-splitting",
       "performance"
     ],
-    "short": "`React.lazy` code-splits a component into a separate bundle loaded on demand; `Suspense` shows a `fallback` while a lazy chunk or data loads. Combine with an error boundary for failures and `useTransition` to avoid fallback flashes."
+    "short": "**`React.lazy` code-splits a component into a separate on-demand bundle, and `Suspense` shows a fallback while that chunk or data loads.**\n\n- **How they work together:** `React.lazy(() => import(...))` suspends until the chunk arrives; the nearest `<Suspense fallback={...}>` catches the suspend and shows a placeholder.\n- **Error handling:** pair with an error boundary to handle a failed chunk or data load gracefully.\n- **`useTransition`:** wrap lazy navigation in `startTransition` to keep showing the old UI instead of flashing the fallback while the new chunk loads."
   },
   {
     "id": "react-ssr-vs-csr",
@@ -232,7 +232,7 @@
       "rendering",
       "performance"
     ],
-    "short": "CSR ships an empty shell plus JS that renders in-browser (slower first paint, weaker SEO); SSR renders HTML per request (better FCP/SEO, more server load). Hydration attaches listeners/state to server HTML on the client without rebuilding the DOM; mismatches cause errors."
+    "short": "**CSR ships a JS shell the browser renders (fast navigation, weak first paint/SEO); SSR renders HTML per request on the server (better first paint/SEO, more server load).**\n\n- **Hydration:** after SSR, the client downloads the same JS and attaches event listeners to the existing HTML via `hydrateRoot` — no DOM rebuild, but server and client must render identical output or you get mismatch warnings.\n- **Related terms:** SSG (build-time HTML), ISR (incremental regeneration), streaming SSR + selective hydration (React 18 — stream HTML and hydrate interactive parts first).\n- **Frameworks:** Next.js orchestrates SSR, SSG, ISR, and React Server Components so you rarely call `renderToPipeableStream` directly."
   },
   {
     "id": "react-concurrent-features-18",
@@ -247,7 +247,7 @@
       "batching",
       "react-18"
     ],
-    "short": "Concurrent rendering lets React prepare UI in the background and interrupt heavy work. `useTransition` marks updates non-urgent with an `isPending` flag; `useDeferredValue` lags a value you don't own; automatic batching now batches updates everywhere. Transitions change priority, not speed."
+    "short": "**React 18 concurrent rendering lets React interrupt and reprioritize work so urgent updates (typing, clicking) are never blocked by heavy ones.**\n\n- **`useTransition`:** wraps a state update in `startTransition` to mark it non-urgent; provides `isPending` for a loading indicator while the deferred render catches up.\n- **`useDeferredValue`:** returns a lagging copy of a value you don't own the setter of (e.g. a prop), with the same interruptible goal as `useTransition`.\n- **Automatic batching:** React 18 now batches multiple `setState` calls into one re-render everywhere — including promises, `setTimeout`, and native event handlers, not just React events as before."
   },
   {
     "id": "react-portals",
@@ -260,7 +260,7 @@
       "modals",
       "dom"
     ],
-    "short": "`ReactDOM.createPortal` renders children into a DOM node outside the parent's hierarchy while keeping them in the React tree, so context, state, and event bubbling still work. Used for modals, tooltips, and toasts to escape CSS clipping; note events bubble through the React tree."
+    "short": "**`ReactDOM.createPortal` renders children into a DOM node outside the parent's hierarchy while keeping them in the same React tree.**\n\n- **Why use it:** modals, tooltips, dropdowns, and toasts need to escape parent CSS constraints like `overflow: hidden`, `z-index` stacking contexts, and `transform`.\n- **React tree intact:** context, state, and event bubbling all work as if the portal were a normal child — a click inside a portal still triggers React ancestor `onClick` handlers.\n- **Gotcha:** events bubble through the React tree, not the DOM tree, which can surprise code that relies on DOM-position-based delegation."
   },
   {
     "id": "react-fragments",
@@ -273,7 +273,7 @@
       "jsx",
       "dom"
     ],
-    "short": "Fragments (`<>...</>`) let a component return multiple children without adding an extra DOM node — keeping the tree clean and not breaking flex/grid or table layouts. Use `<React.Fragment key>` when a list needs keys."
+    "short": "**Fragments (`<>...</>`) let a component return multiple children without adding an extra DOM wrapper node.**\n\n- **Layout safety:** a wrapper `<div>` can break CSS layouts that require a direct parent-child relationship — flex, grid, and table elements like `<tr>`/`<td>` in particular.\n- **Cleaner DOM:** fewer meaningless nodes means a smaller, easier-to-inspect DOM tree.\n- **Keyed fragments:** the `<>` shorthand cannot take props; use `<React.Fragment key={id}>` when rendering a list of fragments that each need a `key`."
   },
   {
     "id": "react-lifting-state-prop-drilling",
@@ -285,6 +285,6 @@
       "composition",
       "state"
     ],
-    "short": "Lifting state up moves shared state to the closest common ancestor for a single source of truth, passing it down via props/callbacks; prop drilling is the resulting threading through unused intermediate layers. Manage it with Context, composition, or a store, and keep state as local as possible."
+    "short": "**Lifting state up moves shared state to the closest common ancestor so sibling components stay in sync from a single source of truth.**\n\n- **Prop drilling:** when that ancestor is several layers above consumers, you thread props through intermediate components that don't use them — verbose and fragile to refactor.\n- **Escape hatches:** use the Context API to inject values directly to consumers, component composition (`children`/render props) to skip intermediate layers, or a state library for complex global state.\n- **Balance:** lift only as high as necessary — keeping state as local and colocated as requirements allow limits re-render scope and prop noise."
   }
 ]

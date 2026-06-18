@@ -12,7 +12,7 @@
       "debounce",
       "performance"
     ],
-    "short": "Store the value in state and restart a `setTimeout` in `useEffect` on every change, clearing the prior timer in cleanup so only the last value settles after `delay` ms of quiet."
+    "short": "**A debounce hook stores the value in state and restarts a `setTimeout` in `useEffect` on every change, clearing the prior timer in cleanup so only the last value settles after the delay.**\n\n- **Effect cleanup:** returning `() => clearTimeout(id)` in the effect cancels any pending timer before the effect re-runs, so rapid changes never resolve early.\n- **Deps array:** list both `value` and `delay` so the effect re-runs correctly when either changes.\n- **Generic `<T>`:** typing the hook generically makes it reusable for any value type, not just strings."
   },
   {
     "id": "react-usefetch-hook",
@@ -27,7 +27,7 @@
       "data-fetching",
       "cleanup"
     ],
-    "short": "Track data/loading/error in one state object and use an `AbortController` whose signal is passed to `fetch`; the effect cleanup aborts stale requests, and `AbortError` is ignored."
+    "short": "**Track `data`, `loading`, and `error` in one state object and use `AbortController` to cancel in-flight requests when the URL changes or the component unmounts.**\n\n- **AbortController:** pass `controller.signal` to `fetch`; the effect cleanup calls `controller.abort()` to cancel the previous request before the next one starts.\n- **Ignore AbortError:** check `error.name === 'AbortError'` in the catch block and return early so cancelled requests don't set error state.\n- **Reset on each run:** set `loading: true` and clear `data`/`error` at the start of each effect run so the UI always reflects the current request."
   },
   {
     "id": "react-useprevious-hook",
@@ -41,7 +41,7 @@
       "useEffect",
       "custom-hook"
     ],
-    "short": "Use a `useRef` that you update inside `useEffect` (which runs after render), so the function body returns the prior render's value before the effect overwrites it."
+    "short": "**Store the value in a `useRef` and update it inside `useEffect` (which runs after render) so the function body always returns the previous render's value.**\n\n- **Timing trick:** during a render, `ref.current` still holds the old value; the effect that updates it runs after render completes, so the return value is always one step behind.\n- **No re-render:** a `ref` update is synchronous and silent — using state here would cause an unnecessary extra render.\n- **Initial render:** `ref.current` starts as `undefined`, so type the return as `T | undefined` and guard with `prev ?? '-'` in the UI."
   },
   {
     "id": "react-stale-closure-counter-bug",
@@ -56,7 +56,7 @@
       "stale-closure",
       "bug-fix"
     ],
-    "short": "A stale closure: the interval captures `count` from the first render (0). Fix with the functional updater `setCount(c => c + 1)` so it always reads the latest state."
+    "short": "**The bug is a stale closure: the interval callback captures `count` from the first render (0) and always computes `0 + 1`, so the display never goes past 1.**\n\n- **Root cause:** an empty deps array `[]` means the effect runs once and never re-creates the interval, so `count` in the callback is frozen at its initial value.\n- **Fix — functional updater:** `setCount(c => c + 1)` receives the latest state from React, bypassing the closure entirely and keeping the empty deps array valid.\n- **Always clear:** return `() => clearInterval(id)` from the effect to prevent the interval from leaking on unmount."
   },
   {
     "id": "react-useeffect-output-order",
@@ -71,7 +71,7 @@
       "output",
       "render-cycle"
     ],
-    "short": "Render runs first, then the effect after paint. On update it logs `render`, then the previous effect's `cleanup` with the old value, then the new `effect` with the new value."
+    "short": "**The component body (\"render\") logs first, then `useEffect` runs after the browser paints; on re-render the old cleanup fires before the new effect.**\n\n- **First render:** logs `render`, then after paint `effect: 0`. No cleanup yet because there is no previous effect to tear down.\n- **On click (0 → 1):** logs `render` (synchronously), then `cleanup: 0` (the old effect's cleanup with its captured value), then `effect: 1` (the new effect).\n- **Key insight:** each render has its own effect and its own cleanup; cleanup runs before the next effect, not only on unmount."
   },
   {
     "id": "react-list-keys-index-bug",
@@ -85,7 +85,7 @@
       "reconciliation",
       "bug-fix"
     ],
-    "short": "Index keys break reconciliation on reorder/insert/delete, reusing wrong DOM state (values, focus). Fix by using a stable, unique `id` from the data as the key."
+    "short": "**Using the array index as a `key` breaks reconciliation when items are reordered, inserted, or deleted, causing wrong DOM state to be reused.**\n\n- **What breaks:** deleting the first item shifts every index down by one — React thinks each row changed in-place rather than one row was removed, so input values and focus stay on the wrong items.\n- **Fix:** use a stable, unique `id` from the data (e.g. `item.id`) as the key so React matches elements by identity, not position.\n- **When index is safe:** only for static lists that never reorder, insert, or delete items."
   },
   {
     "id": "react-controlled-vs-uncontrolled",
@@ -100,7 +100,7 @@
       "useState",
       "useRef"
     ],
-    "short": "Uncontrolled inputs keep their value in the DOM (read via ref); controlled inputs drive value through React state with `value`+`onChange`, making React the source of truth for validation/transforms."
+    "short": "**Controlled inputs drive their value through React state via `value`+`onChange`; uncontrolled inputs keep the value in the DOM and are read imperatively via a `ref`.**\n\n- **Controlled:** React is the single source of truth — prefer when you need to validate, transform, or react to the value as the user types.\n- **Uncontrolled:** lighter setup with `defaultValue` and a `ref`; natural for simple submit-only forms or integrating non-React libraries.\n- **Conversion:** switching between controlled and uncontrolled mid-lifecycle (e.g. `value` going from a string to `undefined`) causes warnings and undefined behavior."
   },
   {
     "id": "react-memo-usecallback-rerender",
@@ -115,7 +115,7 @@
       "re-render",
       "bug-fix"
     ],
-    "short": "`React.memo` only helps if props are shallowly equal, but inline arrows get a new identity each render. Wrap the callback in `useCallback` (use `useMemo` for objects/arrays) to stabilize it."
+    "short": "**`React.memo` skips re-renders only when props are shallowly equal, but an inline arrow creates a new function reference every render, defeating the memo.**\n\n- **Root cause:** `React.memo(Child)` compares `onClick` by reference; a new inline `() => ...` on every parent render is never equal to the previous one.\n- **Fix:** wrap the callback in `useCallback` so its identity is stable across renders; the empty deps array is valid because it only uses the functional updater.\n- **Same pattern for objects/arrays:** stabilize them with `useMemo` — any new reference each render defeats `React.memo`."
   },
   {
     "id": "react-usememo-expensive-calc",
@@ -128,7 +128,7 @@
       "useMemo",
       "memoization"
     ],
-    "short": "`useMemo` caches an expensive computation and recomputes only when its dependencies change, avoiding re-running a sort/filter on unrelated re-renders; skip it for trivial work."
+    "short": "**`useMemo` caches an expensive computation and only recomputes when its dependencies change, so an unrelated state change doesn't re-run a costly sort or filter.**\n\n- **When to use it:** genuinely expensive calculations (e.g. sorting/filtering a large list) or when you need a referentially stable object/array to pass to a memoized child.\n- **Deps must be complete:** list every value the computation reads — a missing dep means the cache silently goes stale.\n- **Not always worth it:** the memoization itself has cost (memory + comparison); don't wrap trivial calculations where the overhead exceeds the savings."
   },
   {
     "id": "react-usereducer-counter",
@@ -142,7 +142,7 @@
       "state-management",
       "refactor"
     ],
-    "short": "Use `useReducer` when state transitions are complex or interrelated; it centralizes logic in a pure `reducer(state, action)` with dispatched typed actions. Many independent values favor `useState`."
+    "short": "**Use `useReducer` when state transitions are complex or interrelated — a pure `reducer(state, action)` centralizes logic, makes transitions predictable, and is easy to unit test.**\n\n- **When it fits:** state has multiple sub-values that change together, or many handlers update the same state object with typed actions.\n- **Stable `dispatch`:** unlike setter functions, `dispatch` has a stable identity, so you can pass it to children without causing re-renders.\n- **Rule of thumb:** a few independent primitives → `useState`; a cohesive state object with several action types → `useReducer`."
   },
   {
     "id": "react-context-theme",
@@ -157,7 +157,7 @@
       "useMemo",
       "re-render"
     ],
-    "short": "Context shares values without prop drilling via a Provider and a custom hook that throws outside it. Memoize the `value` with `useMemo` and split contexts to limit consumer re-renders."
+    "short": "**Context shares values across a component tree without prop drilling; a custom hook wrapping `useContext` adds type safety and throws a clear error when used outside the Provider.**\n\n- **Re-render pitfall:** every consumer re-renders when the Provider's `value` reference changes — memoize the value object with `useMemo` to avoid this on unrelated parent renders.\n- **Split contexts:** separate state from dispatch (or theme from auth) into different contexts so a change in one doesn't re-render consumers of the other.\n- **Scope:** Context is best for low-frequency app-wide data (theme, locale, auth); use a library for frequently-changing or selector-based state."
   },
   {
     "id": "react-forwardref-imperative",
@@ -170,7 +170,7 @@
       "forwardRef",
       "useImperativeHandle"
     ],
-    "short": "`forwardRef` passes a parent ref into a function component, and `useImperativeHandle` controls what it exposes (e.g. `focus`/`clear`) instead of the raw DOM node. React 19 allows `ref` as a plain prop."
+    "short": "**`forwardRef` lets a parent attach a ref to a function component, and `useImperativeHandle` customizes what that ref exposes instead of leaking the raw DOM node.**\n\n- **`forwardRef`:** wraps the component so the second argument receives the ref from the parent, which you can attach to an inner element or expose via `useImperativeHandle`.\n- **`useImperativeHandle`:** lets you publish a small, focused API (e.g. `{ focus, clear }`) while keeping internal DOM details encapsulated.\n- **React 19:** `ref` can be passed as a regular prop to function components, making `forwardRef` optional going forward."
   },
   {
     "id": "react-error-boundary",
@@ -183,7 +183,7 @@
       "class-component",
       "error-handling"
     ],
-    "short": "A class with `getDerivedStateFromError`/`componentDidCatch` shows fallback UI for render-time errors in descendants. It can't catch event handlers, async code, SSR, or errors in itself."
+    "short": "**An error boundary is a class component with `getDerivedStateFromError` to render a fallback and `componentDidCatch` to log — it catches render-time errors in its child tree.**\n\n- **What it catches:** errors thrown during rendering, lifecycle methods, and constructors of any descendant component.\n- **What it misses:** event handler errors (use try/catch), async code (`setTimeout`, fetch callbacks), SSR errors, and errors thrown in the boundary class itself.\n- **No hook equivalent:** must be a class component; in practice use `react-error-boundary` and place boundaries around routes or widgets for graceful degradation."
   },
   {
     "id": "react-lazy-suspense",
@@ -197,7 +197,7 @@
       "Suspense",
       "performance"
     ],
-    "short": "`React.lazy` dynamically imports a component into a separate chunk loaded on demand, with `Suspense` showing a fallback meanwhile, shrinking the initial bundle. The component must be a default export."
+    "short": "**`React.lazy(() => import(...))` splits a component into a separate chunk loaded only when first rendered, reducing the initial bundle size and speeding up first load.**\n\n- **`Suspense` fallback:** wrap the lazy component in `<Suspense fallback={<Spinner />}>` to display a placeholder while the chunk downloads.\n- **Default export required:** `React.lazy` only works with dynamic imports whose module has a default export.\n- **Error handling:** combine with an error boundary around the `Suspense` to catch chunk-load failures gracefully."
   },
   {
     "id": "react-portal-modal",
@@ -210,7 +210,7 @@
       "createPortal",
       "modal"
     ],
-    "short": "`createPortal` renders children into a different DOM node (like `document.body`) while keeping them in the React tree, escaping parent `overflow`/`transform`/`z-index` clipping for overlays. Events still bubble through the React tree."
+    "short": "**`createPortal` renders children into a different DOM node (e.g. `document.body`) while keeping them in the same React tree for context, state, and event bubbling.**\n\n- **Why portals:** modals, tooltips, and dropdowns rendered inside a positioned parent can be clipped by `overflow: hidden`, trapped by `transform`, or hidden by a low `z-index`; rendering at the body level escapes all of that.\n- **Event bubbling:** React events still bubble through the React tree, not the DOM tree — an `onClick` on a React ancestor still fires even if the child is physically elsewhere in the DOM.\n- **Accessibility:** stop click propagation on the dialog box itself with `e.stopPropagation()` so clicking inside doesn't trigger the backdrop's `onClose`."
   },
   {
     "id": "react-usetransition-filter",
@@ -225,7 +225,7 @@
       "performance",
       "react-18"
     ],
-    "short": "`useTransition` marks an update as non-urgent so the urgent input stays responsive, exposing `isPending`. Use it when you own the setter; use `useDeferredValue` when you only have a value to lag."
+    "short": "**`useTransition` marks a state update as non-urgent so the input stays responsive while the heavy list render runs in the background and can be interrupted.**\n\n- **`isPending` flag:** use it to show a subtle loading indicator while the deferred render catches up, without blocking the input.\n- **`useTransition` vs `useDeferredValue`:** use `useTransition` when you own the setter and can wrap it in `startTransition`; use `useDeferredValue` when you only have a value (e.g. a prop) and cannot touch the setter.\n- **Not a true debounce:** transitions don't delay work by time — they change priority and interruptibility so urgent updates always win."
   },
   {
     "id": "react-lift-state-up",
@@ -238,6 +238,6 @@
       "state-management",
       "refactor"
     ],
-    "short": "When siblings must share data, move the state to their closest common ancestor and pass it down as props plus a setter, giving one source of truth before reaching for Context or a state library."
+    "short": "**When siblings need to share or reflect the same data, lift the state to their closest common ancestor and pass it down as a prop plus a setter callback.**\n\n- **Single source of truth:** both inputs read from and write to one parent state value, so they stay automatically in sync without any extra coordination.\n- **Controlled by parent:** the siblings become fully controlled by the ancestor — a standard React pattern before reaching for Context or a state library.\n- **Next step:** if the common ancestor is many levels up and the prop drilling becomes noisy, then Context or a store is appropriate."
   }
 ]

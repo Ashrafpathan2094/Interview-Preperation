@@ -11,7 +11,7 @@
       "internals",
       "memory"
     ],
-    "short": "A closure is a function plus the lexical environment it was defined in, keeping those variables alive after the outer function returns. Used for data privacy, factories, and stateful callbacks; captures by reference."
+    "short": "**A closure is a function bundled with the lexical environment where it was defined, keeping those variables alive even after the outer function returns.**\n\n- **How it works:** every function stores a hidden `[[Environment]]` reference to its enclosing scope, preventing garbage collection of those variables.\n- **Common uses:** data privacy / module pattern, factory functions (e.g. `multiplier(2)`), and stateful callbacks like debounce timers.\n- **Captures by reference:** all closures share one `var` binding (classic `for` loop bug); `let` creates a fresh binding per iteration, fixing it."
   },
   {
     "id": "javascript-scope-lexical-block-function",
@@ -24,7 +24,7 @@
       "lexical-scope",
       "scope-chain"
     ],
-    "short": "Scope controls variable visibility: `var` is function-scoped, `let`/`const` are block-scoped, scope is lexical (determined by source location), and the engine resolves identifiers up the scope chain to global."
+    "short": "**Scope controls where a variable is visible: `var` is function-scoped, `let`/`const` are block-scoped, and all scope is lexical — determined by where code is written, not where it runs.**\n\n- **Lexical scope:** an inner function can read variables of its outer function because scope is fixed at write time.\n- **Scope chain:** the engine looks in the current scope, then each enclosing scope, up to global; the first match wins, or a `ReferenceError` is thrown.\n- **`this` exception:** `this` is NOT part of lexical scope for regular functions — it is set dynamically at call time (arrows capture it lexically)."
   },
   {
     "id": "javascript-hoisting",
@@ -38,7 +38,7 @@
       "let-const",
       "tdz"
     ],
-    "short": "Hoisting processes declarations before execution: `var` is initialized to `undefined`, `let`/`const` sit in the TDZ until declared, and function declarations are fully hoisted with their body."
+    "short": "**Hoisting means declarations are processed before any code runs, but the three kinds behave very differently.**\n\n- **`var`:** hoisted and initialized to `undefined` — reading it early returns `undefined`, no error.\n- **`let`/`const`:** hoisted but uninitialized (Temporal Dead Zone) — reading early throws `ReferenceError`.\n- **Function declarations:** fully hoisted with their body, so they are callable before they appear in source; function expressions are not."
   },
   {
     "id": "javascript-tdz-temporal-dead-zone",
@@ -51,7 +51,7 @@
       "let-const",
       "hoisting"
     ],
-    "short": "The TDZ is the window between entering a scope and a `let`/`const` initialization, where access throws a `ReferenceError`. It turns use-before-declaration bugs into explicit errors and is execution-order based."
+    "short": "**The Temporal Dead Zone (TDZ) is the period from entering a scope to a `let`/`const` declaration executing — any access in this window throws `ReferenceError`.**\n\n- **Why it exists:** turns the silent `undefined` bug of `var` into an explicit error, and is required for `const` to be safe.\n- **Temporal, not spatial:** it depends on execution order, not line position — a function above the `let` can still reference it safely if called after initialization.\n- **`typeof` gotcha:** `typeof x` inside the TDZ throws for `let`/`const` (unlike undeclared variables, where it returns `'undefined'`)."
   },
   {
     "id": "javascript-var-let-const",
@@ -64,7 +64,7 @@
       "let-const",
       "scope"
     ],
-    "short": "`var` is function-scoped and reassignable/redeclarable; `let` is block-scoped and reassignable; `const` is block-scoped and non-reassignable (but values stay mutable). Prefer `const`, then `let`, avoid `var`."
+    "short": "**`var`, `let`, and `const` differ in scope, hoisting, and reassignment rules — prefer `const` by default, `let` when you need reassignment, and avoid `var`.**\n\n- **`var`:** function-scoped, hoisted to `undefined`, can be re-declared and re-assigned, and leaks onto `window` at the top level.\n- **`let`:** block-scoped, in TDZ until declared, re-assignable but not re-declarable in the same scope.\n- **`const`:** block-scoped, in TDZ, no re-assignment of the binding — but the value itself (object/array) is still mutable; use `Object.freeze` for shallow immutability."
   },
   {
     "id": "javascript-this-binding-rules",
@@ -77,7 +77,7 @@
       "binding",
       "arrow-functions"
     ],
-    "short": "`this` is set at call time by precedence: `new`, explicit (`call`/`apply`/`bind`), implicit (`obj.method()`), then default (global/`undefined`). Arrow functions have no own `this` and capture it lexically."
+    "short": "**`this` is determined at call time by four rules in priority order: `new` binding, explicit binding, implicit binding, then default binding.**\n\n- **`new` / explicit / implicit:** `new Fn()` gives a fresh object; `call`/`apply`/`bind` set it manually; `obj.method()` sets it to `obj`.\n- **Default:** a bare call `fn()` gives `undefined` in strict mode, or the global object in sloppy mode.\n- **Arrow functions:** have no own `this` — they capture it lexically and cannot be rebound; do not use them as object methods that need `this`."
   },
   {
     "id": "javascript-call-apply-bind",
@@ -90,7 +90,7 @@
       "call-apply-bind",
       "binding"
     ],
-    "short": "`call` and `apply` invoke immediately with a given `this` (args individually vs. as an array), while `bind` returns a new function with `this` permanently fixed and optional preset arguments."
+    "short": "**`call`, `apply`, and `bind` all set `this` explicitly, but differ in when the function runs and how arguments are passed.**\n\n- **`call(ctx, a, b)`:** invokes immediately, arguments passed one by one.\n- **`apply(ctx, [a, b])`:** invokes immediately, arguments passed as an array — useful when args are already in an array.\n- **`bind(ctx, ...presetArgs)`:** does NOT invoke; returns a new function with `this` permanently fixed and optional pre-filled arguments (partial application)."
   },
   {
     "id": "javascript-arrow-vs-regular-functions",
@@ -103,7 +103,7 @@
       "this",
       "functions"
     ],
-    "short": "Arrow functions lack their own `this`, `arguments`, and `prototype`, capture `this` lexically, and can't be constructors. Regular functions get `this` from the call site and are hoisted. Use arrows for callbacks."
+    "short": "**Arrow functions are not just shorter syntax — they lack their own `this`, `arguments`, and `prototype`, and cannot be used as constructors.**\n\n- **`this`:** arrows capture it lexically from the enclosing scope; regular functions get it from the call site.\n- **`arguments`:** arrows have none — use rest params (`...args`) instead.\n- **Best use:** arrows excel as callbacks and array-method iteratees where you want to preserve the surrounding `this`; avoid them as object methods or prototype methods."
   },
   {
     "id": "javascript-prototypal-inheritance",
@@ -116,7 +116,7 @@
       "inheritance",
       "prototype-chain"
     ],
-    "short": "Objects delegate property lookups via the prototype chain (`[[Prototype]]` links) until found or `null`. Constructors set instances' prototype to `Fn.prototype`; ES6 `class` is sugar over this mechanism."
+    "short": "**JavaScript objects delegate property lookups up a chain of `[[Prototype]]` links until the property is found or `null` is reached.**\n\n- **Lookup:** engine checks the object itself, then its prototype, then that object's prototype, and so on — the first match wins.\n- **Constructors:** `new Fn()` sets the instance's `[[Prototype]]` to `Fn.prototype`, so all instances share methods on one object.\n- **`class` is sugar:** ES6 `class` / `extends` compiles to the same prototype chain mechanism; `Object.create(proto)` sets it directly without a constructor."
   },
   {
     "id": "javascript-event-loop",
@@ -130,7 +130,7 @@
       "macrotask",
       "async"
     ],
-    "short": "JS is single-threaded: the call stack runs sync code, then the event loop fully drains the microtask queue (promises) before taking the next macrotask (timers, I/O). Microtasks always outrank macrotasks."
+    "short": "**JavaScript is single-threaded: the event loop runs all sync code, then fully drains the microtask queue before it picks up the next macrotask.**\n\n- **Call stack:** where synchronous frames run, one at a time.\n- **Microtask queue:** promise `.then`/`catch`, `queueMicrotask`, `MutationObserver` — fully drained (including new microtasks added during draining) before any macrotask.\n- **Macrotask queue:** `setTimeout`, `setInterval`, I/O — one task per loop iteration; this is why a `Promise.resolve().then(...)` always logs before `setTimeout(..., 0)`."
   },
   {
     "id": "javascript-promises-states",
@@ -143,7 +143,7 @@
       "async",
       "error-handling"
     ],
-    "short": "A Promise represents a future async result in one of three states (pending, fulfilled, rejected), settling once and immutably. It beats callbacks via flat chaining, unified `.catch`, composability, and guaranteed async."
+    "short": "**A `Promise` represents a future async result and exists in one of three immutable states: pending, fulfilled, or rejected — settling exactly once.**\n\n- **Chaining:** `.then` returns a new promise, enabling flat chains instead of nested callback hell.\n- **Unified errors:** one `.catch` at the end handles any rejection from anywhere in the chain.\n- **Guaranteed async:** `.then` callbacks always run as microtasks, never synchronously — eliminating the 'sometimes sync, sometimes async' callback bug."
   },
   {
     "id": "javascript-async-await",
@@ -156,7 +156,7 @@
       "promises",
       "concurrency"
     ],
-    "short": "`async`/`await` is sugar over promises: an async function returns a promise and `await` pauses it (resuming via a microtask) without blocking. Use `try/catch` for errors and `Promise.all` to run awaits in parallel."
+    "short": "**`async`/`await` is syntactic sugar over promises: an `async` function always returns a promise and `await` pauses it until the awaited promise settles, resuming via a microtask.**\n\n- **Non-blocking:** `await` yields control back to the event loop while waiting — it does not block the thread.\n- **Error handling:** wrap `await` calls in `try/catch`; an unhandled rejected promise becomes an unhandled rejection.\n- **Sequential vs parallel:** awaiting in a loop is slow (serial); use `await Promise.all([...])` to start all requests concurrently."
   },
   {
     "id": "javascript-promise-combinators",
@@ -170,7 +170,7 @@
       "concurrency",
       "async"
     ],
-    "short": "`Promise.all` fails fast and returns all results; `race` settles on the first to settle (success or failure); `allSettled` returns every outcome; `any` returns the first success, rejecting only if all fail."
+    "short": "**The four promise combinators coordinate multiple promises but differ in when they settle and how they handle failures.**\n\n- **`Promise.all`:** resolves with an array of all results when every promise fulfills; rejects immediately on the first rejection (fail-fast).\n- **`Promise.race`:** settles as soon as the first promise settles — fulfilled or rejected; useful for timeout patterns.\n- **`Promise.allSettled`:** never rejects; waits for all and returns `{status, value/reason}` for every promise — use when you need every outcome.\n- **`Promise.any`:** resolves with the first fulfillment; rejects with `AggregateError` only if all reject — the mirror of `race` for success."
   },
   {
     "id": "javascript-coercion-equality",
@@ -184,7 +184,7 @@
       "==-vs-===",
       "types"
     ],
-    "short": "Coercion is implicit type conversion. `===` compares value and type without coercion; `==` coerces first (causing gotchas like `0 == ''`). Always use `===`, except `x == null` to catch null/undefined."
+    "short": "**Type coercion is JavaScript's implicit conversion between types; `===` never coerces while `==` applies the abstract equality algorithm, producing surprising results.**\n\n- **`===` (strict):** compares value AND type — `1 === '1'` is `false`. Always prefer this.\n- **`==` gotchas:** `null == undefined` is `true`; `0 == ''` is `true`; `[] == false` is `true` — easy to get wrong.\n- **Exceptions:** use `x == null` as the idiomatic check for null-or-undefined; use `Number.isNaN` for `NaN` and `Object.is` for `+0`/`-0` edge cases."
   },
   {
     "id": "javascript-deep-vs-shallow-copy",
@@ -198,7 +198,7 @@
       "objects",
       "structuredClone"
     ],
-    "short": "A shallow copy (`{...obj}`, `Object.assign`, `slice`) shares nested references; a deep copy duplicates every level. Use `structuredClone` (handles cycles, Maps) over the lossy `JSON.parse(JSON.stringify())` trick."
+    "short": "**A shallow copy duplicates only the top level — nested objects remain shared by reference; a deep copy recursively duplicates every level so the copy is fully independent.**\n\n- **Shallow methods:** `{ ...obj }`, `Object.assign({}, obj)`, `arr.slice()` — fast but nested mutation affects both copies.\n- **`structuredClone`:** the modern built-in deep copy; handles `Date`, `Map`, `Set`, `ArrayBuffer`, and circular references, but cannot clone functions or DOM nodes.\n- **JSON trick pitfall:** `JSON.parse(JSON.stringify(obj))` drops `undefined`, functions, and symbols; converts `Date` to a string; and throws on circular references."
   },
   {
     "id": "javascript-debounce-vs-throttle",
@@ -212,7 +212,7 @@
       "performance",
       "closures"
     ],
-    "short": "Both rate-limit frequent events via timers. Debounce waits until activity stops then runs once (search-as-you-type); throttle runs at most once per interval while firing (scroll, mousemove)."
+    "short": "**Debounce and throttle both rate-limit frequent events with timers, but with different strategies: debounce fires once after activity stops, throttle fires at a capped steady rate.**\n\n- **Debounce:** resets the timer on every call — function runs only after a quiet period. Use for search-as-you-type, autosave, resize-then-recalculate.\n- **Throttle:** allows at most one call per interval regardless of how often the event fires. Use for scroll, mousemove, drag, and animation sampling.\n- **Cleanup:** both should expose a `cancel` method to clear pending timers on component unmount."
   },
   {
     "id": "javascript-currying",
@@ -226,7 +226,7 @@
       "closures",
       "partial-application"
     ],
-    "short": "Currying transforms `f(a, b, c)` into `f(a)(b)(c)`, using closures to collect arguments over single-argument calls. It enables partial application, reusable specialized functions, and clean functional composition."
+    "short": "**Currying transforms a multi-argument function `f(a, b, c)` into a chain of single-argument calls `f(a)(b)(c)`, using closures to accumulate arguments.**\n\n- **Partial application:** fix some arguments now (e.g. `add(10)`) to get a specialized function callable with the rest later.\n- **Composition:** curried functions slot cleanly into functional pipelines and point-free style.\n- **vs partial application:** currying always produces unary steps; partial application pre-fills any number of args at once (`bind` is one form)."
   },
   {
     "id": "javascript-esm-vs-commonjs",
@@ -240,7 +240,7 @@
       "commonjs",
       "tree-shaking"
     ],
-    "short": "CommonJS (`require`/`module.exports`) loads synchronously at runtime with value-copy exports; ESM (`import`/`export`) is static, async, has live bindings, enables tree-shaking, and is strict by default."
+    "short": "**CommonJS and ES Modules are two distinct systems with different loading, binding, and static-analysis semantics.**\n\n- **CommonJS:** `require`/`module.exports`, loads synchronously at runtime, `require` can be conditional/dynamic, exports are value copies for primitives.\n- **ESM:** `import`/`export` are resolved at parse time (static), exports are live bindings (importers see reassignments), enables tree-shaking, strict mode by default, top-level `await` supported.\n- **Interop:** ESM can import CJS; CJS cannot `require` ESM (use dynamic `import()` instead); Node uses `.mjs`/`.cjs` extensions or `\"type\": \"module\"` to tell them apart."
   },
   {
     "id": "javascript-event-delegation",
@@ -254,7 +254,7 @@
       "dom",
       "events"
     ],
-    "short": "Event delegation attaches one listener to a common ancestor and uses `event.target` (often via `closest`), leveraging bubbling. It saves memory, handles dynamically added children, and simplifies teardown."
+    "short": "**Event delegation attaches a single listener to a common ancestor instead of many listeners on each child, relying on event bubbling to receive events from any descendant.**\n\n- **How:** use `event.target.closest(selector)` to find the intended element even when the click lands on a nested child (icon, span).\n- **Benefits:** one listener instead of hundreds (less memory), and dynamically added elements are handled automatically with no rebinding.\n- **Limitations:** events that don't bubble (`focus`, `blur`, `mouseenter`) need their bubbling equivalents (`focusin`/`focusout`) or the capture phase."
   },
   {
     "id": "javascript-generators-iterators",
@@ -268,7 +268,7 @@
       "lazy-evaluation",
       "es6"
     ],
-    "short": "An iterator has `next()` returning `{value, done}`; an iterable implements `Symbol.iterator`. Generators (`function*`) easily create iterators, using `yield` to pause/resume for lazy, even infinite, sequences."
+    "short": "**An iterator has a `next()` method returning `{value, done}`; an iterable has `[Symbol.iterator]()` returning an iterator — generators (`function*`) implement both in one construct.**\n\n- **`yield`:** pauses the generator and returns a value; calling `next()` resumes exactly where it left off, preserving local state.\n- **Lazy evaluation:** values are produced on demand, making infinite sequences (e.g. `while(true) yield id++`) safe and memory-efficient.\n- **Works with:** `for...of`, spread `...`, destructuring, and `Array.from` all consume the iterator protocol automatically."
   },
   {
     "id": "javascript-spread-rest-destructuring",
@@ -282,7 +282,7 @@
       "destructuring",
       "es6"
     ],
-    "short": "`...` spreads an iterable/object into individual items (right side / calls) or collects remaining items into one array/object (left side / params). Destructuring unpacks arrays/objects with defaults, renaming, and nesting."
+    "short": "**Spread (`...`) and rest (`...`) use the same syntax but do opposites — spread expands, rest collects — while destructuring unpacks array/object values into named variables.**\n\n- **Spread:** on the right of `=` or inside a call — expands an iterable or object into individual items (e.g. `[...a, ...b]`, `fn(...args)`).\n- **Rest:** on the left of `=` or in params — collects remaining items into one array or object (e.g. `const [head, ...tail] = arr`).\n- **Destructuring:** unpacks by position (arrays) or by key (objects), supporting defaults, renaming, and nested patterns (e.g. `const { name: userName = 'Anon' } = user`)."
   },
   {
     "id": "javascript-iife",
@@ -296,6 +296,6 @@
       "module-pattern",
       "closures"
     ],
-    "short": "An IIFE is a function expression defined and run immediately, historically used for scope isolation, private state, and capturing loop vars. ES modules and `let`/`const` made most uses obsolete, except top-level `await` workarounds."
+    "short": "**An IIFE is a function expression that is defined and immediately invoked, creating a private scope that doesn't pollute the surrounding environment.**\n\n- **Historical uses:** scope isolation (avoiding global leakage before ES modules), the module pattern for private state, and capturing `var` loop variables per-iteration.\n- **Today:** ES modules (each module has its own scope) and block-scoped `let`/`const` make most IIFE use cases unnecessary.\n- **Still useful:** the async IIFE `(async () => { await ... })()` runs top-level `await` in non-module scripts, and bundlers still emit IIFEs."
   }
 ]

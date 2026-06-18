@@ -11,7 +11,7 @@
       "performance",
       "immutability"
     ],
-    "short": "OnPush skips a component's subtree unless an `@Input` reference changes, a template event fires, an `async` pipe emits, or you call `markForCheck()`. Fix mutation bugs with immutable updates that create new references."
+    "short": "**OnPush tells Angular to skip a component's change detection subtree unless a specific trigger occurs — it is a performance optimization, not a correctness guarantee.**\n\n- **Triggers:** `@Input` reference change, a template event from the component, an `async` pipe emission, or explicit `markForCheck()`/`detectChanges()` call.\n- **Mutation bug:** mutating an input object or array in place keeps the same reference, so OnPush never re-renders — fix with immutable updates (`{ ...obj }`, `[...arr]`).\n- **Best use:** apply OnPush broadly for performance; pair with `trackBy` on lists for maximum CD tree pruning."
   },
   {
     "id": "angular-takeuntildestroyed-leak",
@@ -26,7 +26,7 @@
       "async-pipe",
       "lifecycle"
     ],
-    "short": "Manual `.subscribe()` on a long-lived source keeps the destroyed component alive, leaking memory. Fix with the `async` pipe, `takeUntilDestroyed()`, `takeUntil(destroy$)`, or manual unsubscribe; avoid nested subscribes."
+    "short": "**Manual `.subscribe()` on a long-lived source (interval, `BehaviorSubject`, router events) keeps the destroyed component referenced in memory and its callback firing.**\n\n- **Best fix:** use the `async` pipe in the template — Angular handles subscribe and unsubscribe automatically.\n- **`takeUntilDestroyed()`:** Angular 16+ ties the subscription to the component's `DestroyRef` — cleanest for imperative logic with no `ngOnDestroy` boilerplate.\n- **Classic patterns:** `takeUntil(destroy$)` with a Subject emitted in `ngOnDestroy`, or storing and calling `.unsubscribe()`; avoid nested subscribes — flatten with `switchMap`/`mergeMap`."
   },
   {
     "id": "angular-switchmap-vs-mergemap-typeahead",
@@ -42,7 +42,7 @@
       "exhaustMap",
       "operators"
     ],
-    "short": "`switchMap` cancels the previous inner, `mergeMap` runs concurrently, `concatMap` queues in order, `exhaustMap` ignores new emissions while busy. Use `switchMap` for type-ahead so stale HTTP requests are auto-cancelled."
+    "short": "**`switchMap` is correct for type-ahead search because it cancels the in-flight HTTP request when the user types again, preventing stale responses from overwriting newer ones.**\n\n- **`switchMap`:** cancels previous inner — latest-wins, correct for search/route lookups.\n- **`mergeMap`:** all inners run concurrently with no ordering — good for independent parallel saves.\n- **`concatMap`:** queues inners in strict order — use when sequence matters and drops are unacceptable.\n- **`exhaustMap`:** ignores new outer emissions while an inner runs — prevents double-submit on login/save buttons."
   },
   {
     "id": "angular-signals-vs-observables-counter",
@@ -57,7 +57,7 @@
       "rxjs",
       "state"
     ],
-    "short": "Signals model synchronous, pull-based reactive state for UI/derived state and bindings; observables model async streams with operators. Use `signal()`, `computed()` for memoized derived state, and `effect()` for side effects; bridge via `toSignal`/`toObservable`."
+    "short": "**Signals model synchronous, pull-based reactive state with an always-present current value; Observables model asynchronous push streams over time with a rich operator set.**\n\n- **Signals:** use for local UI state, derived values, and `@Input`s — `signal()` (writable), `computed()` (memoized derived), `effect()` (side effects).\n- **Observables:** use for HTTP, WebSockets, DOM events, and anything needing operators like `debounceTime`, `switchMap`, or retry logic.\n- **Bridge:** `toSignal()` converts an Observable to a signal; `toObservable()` does the reverse — they are complementary, not competing."
   },
   {
     "id": "angular-di-hierarchical-resolution",
@@ -72,7 +72,7 @@
       "providers",
       "self-skipself"
     ],
-    "short": "Angular walks up the injector tree until a provider is found. `@Optional`, `@Self`, `@SkipSelf`, `@Host` control that walk. `providedIn:'root'` is a tree-shakable app singleton; a component `providers` entry creates a new instance per component."
+    "short": "**Angular walks up the injector tree from the requesting element to the root looking for a provider; resolution modifiers let you control how that walk behaves.**\n\n- **Modifiers:** `@Optional()` returns `null` instead of throwing; `@Self()` limits search to the current injector; `@SkipSelf()` starts at the parent; `@Host()` stops at the host component.\n- **`providedIn: 'root'`:** registers a tree-shakable singleton in the root injector — shared everywhere in the app.\n- **Component `providers`:** creates a NEW instance per component instance, scoped to it and its children — how you get per-widget or per-feature state."
   },
   {
     "id": "angular-custom-structural-directive-unless",
@@ -87,7 +87,7 @@
       "templateref",
       "viewcontainerref"
     ],
-    "short": "Structural directives (`*ngIf`, `*ngFor`) add/remove DOM via `TemplateRef` and `ViewContainerRef`; attribute directives change an element's look/behavior. `*appUnless` renders the template only when its condition is false, guarding against re-creation."
+    "short": "**Structural directives add/remove DOM nodes using `TemplateRef` and `ViewContainerRef`; attribute directives change an element's look/behavior using `@HostBinding`/`@HostListener`.**\n\n- **`*appUnless`:** the inverse of `*ngIf` — renders the `<ng-template>` view when the condition is `false`, clears it when `true`.\n- **Guard against re-creation:** track a `hasView` boolean and only call `createEmbeddedView`/`clear()` when the state actually changes.\n- **Micro-syntax:** the `@Input` setter must be named to match the directive selector (`appUnless`) so the `*appUnless=\"condition\"` syntax works."
   },
   {
     "id": "angular-pure-vs-impure-pipe",
@@ -102,7 +102,7 @@
       "performance",
       "change-detection"
     ],
-    "short": "Pure pipes re-run only when the input reference changes (cheap); impure pipes run every change-detection cycle (costly). Mutating an array in place won't refresh a pure filter pipe; prefer new references or filtering in the component."
+    "short": "**Pure pipes re-run `transform()` only when the input reference changes — cheap and memoized; impure pipes (`pure: false`) run every change-detection cycle — potentially expensive.**\n\n- **Mutation trap:** a pure filter pipe WILL NOT update if you mutate the array in place — replace the reference or filter in the component/Observable.\n- **When impure is justified:** when the pipe must react to in-place mutations or async internal state (e.g. `AsyncPipe` is impure by necessity).\n- **Best practice:** keep pipes pure; prefer doing transformation in the component or a `computed` signal rather than an impure pipe."
   },
   {
     "id": "angular-reactive-vs-template-forms",
@@ -117,7 +117,7 @@
       "validators",
       "formbuilder"
     ],
-    "short": "Template-driven forms use `ngModel` with an implicit model (simple but harder to test); reactive forms use explicit `FormControl`/`FormGroup`, are synchronous and testable. Cross-field validators attach at the `FormGroup` level, e.g. password-match."
+    "short": "**Reactive forms define the model explicitly in the component class and are synchronous, testable, and scalable; template-driven forms build it implicitly from directives and suit simple cases.**\n\n- **Reactive:** `FormControl`/`FormGroup`/`FormArray` via `FormBuilder`; validators are composable functions; `valueChanges`/`statusChanges` integrate naturally with RxJS.\n- **Template-driven:** `ngModel` in the template creates the model asynchronously; validation lives in directives; harder to unit-test and to build dynamic forms.\n- **Cross-field validator:** a function attached at the `FormGroup` level (not control level) that reads multiple controls and returns `null` or an error object."
   },
   {
     "id": "angular-functional-route-guard-lazy",
@@ -133,7 +133,7 @@
       "standalone",
       "canmatch"
     ],
-    "short": "Route guards (`CanActivate`, `CanDeactivate`, `CanMatch`, `resolve`) decide navigation and are now functional with `inject()`. Lazy loading defers a feature's JS via `loadComponent`/`loadChildren`; `canMatch` both gates access and skips downloading the chunk."
+    "short": "**Functional route guards (`CanActivateFn`) are plain functions using `inject()`, deciding navigation with `true`/`false`/`UrlTree`; lazy loading defers a feature's JS until its route is visited.**\n\n- **Guard types:** `canActivate` (enter), `canActivateChild`, `canDeactivate` (leave), `canMatch` (match + skip chunk download), `resolve` (prefetch data).\n- **`canMatch` power:** returning `false` lets the router try other routes AND avoids downloading the lazy chunk — ideal for role/feature gating.\n- **Lazy syntax:** `loadComponent` for a single standalone component; `loadChildren` returning a `Routes` export for a full feature area."
   },
   {
     "id": "angular-input-output-parent-child",
@@ -148,7 +148,7 @@
       "eventemitter",
       "component-communication"
     ],
-    "short": "`@Input()` passes data parent-to-child; `@Output()` emits events child-to-parent via `EventEmitter`. Two-way binding `[(value)]` combines `@Input value` with an `@Output valueChange` (the `Change` suffix is required)."
+    "short": "**`@Input()` passes data parent-to-child via property binding; `@Output()` with `EventEmitter` sends events child-to-parent via event binding.**\n\n- **Two-way binding:** `[(value)]` is sugar for `[value]=\"x\" (valueChange)=\"x = $event\"` — the `@Output` name MUST be the `@Input` name + `Change` suffix.\n- **Signal alternative:** Angular 17.1+ offers `input()` and `model()` signal-based equivalents, but decorator `@Input`/`@Output` remain the most widely asked.\n- **`EventEmitter`:** only use it for `@Output` — it is an Angular-specific wrapper over a Subject, not a general event bus."
   },
   {
     "id": "angular-viewchild-lifecycle-timing",
@@ -163,7 +163,7 @@
       "ngAfterViewInit",
       "queries"
     ],
-    "short": "`@ViewChild` queries the component's own view; static queries resolve by `ngOnInit`, but default dynamic queries resolve only in `ngAfterViewInit`. Access the child's API there to avoid `undefined` and `ExpressionChangedAfterItHasBeenChecked` errors."
+    "short": "**`@ViewChild` queries the component's own template view and is only available after `ngAfterViewInit` — it is `undefined` in the constructor and `ngOnInit` for dynamic queries.**\n\n- **Static vs dynamic:** `{ static: true }` resolves by `ngOnInit` (only valid for always-present, non-conditional elements); the default `static: false` resolves in `ngAfterViewInit`.\n- **Vs `@ContentChild`:** `@ContentChild` queries projected content from `<ng-content>` and is available in `ngAfterContentInit` — they do not overlap.\n- **Modern API:** signal-based `viewChild()` and `contentChild()` queries (Angular 17.2+) are the reactive alternative."
   },
   {
     "id": "angular-behaviorsubject-shared-state",
@@ -178,7 +178,7 @@
       "async-pipe",
       "state-management"
     ],
-    "short": "A `Subject` has no initial value and late subscribers miss prior emissions; a `BehaviorSubject` requires an initial value and replays the latest to new subscribers. It is the standard for shared state, exposed as `state$` and consumed via the async pipe."
+    "short": "**A `BehaviorSubject` requires an initial value and replays the latest value to every new subscriber immediately — making it the standard choice for shared state in Angular services.**\n\n- **Vs `Subject`:** a plain `Subject` has no initial value and late subscribers miss prior emissions — unsuitable for representing current state.\n- **Pattern:** keep the `BehaviorSubject` private, expose `.asObservable()` as a read-only stream, and mutate only through explicit service methods calling `.next()`.\n- **Consumption:** components use the `async` pipe on the exposed stream — automatic subscribe, unsubscribe, and `markForCheck()` with no boilerplate."
   },
   {
     "id": "angular-ngfor-trackby-perf",
@@ -193,6 +193,6 @@
       "control-flow",
       "rendering"
     ],
-    "short": "`*ngFor` tracks items by reference, so a replaced array destroys and recreates every DOM node, causing jank and lost focus. A `trackBy` returning a stable id (or `track` in `@for`) lets Angular reuse nodes and apply only the diff."
+    "short": "**Without `trackBy`, `*ngFor` tracks items by object reference, so replacing the array destroys and recreates every DOM node — causing jank, lost focus, and redundant component teardown.**\n\n- **`trackBy` function:** return a stable identity like `item.id`; Angular reuses DOM nodes whose identity is unchanged and only adds/removes/moves the diff.\n- **Angular 17+ `@for`:** the built-in `@for` block makes `track` **mandatory** (`@for (item of items; track item.id)`) — enforcing good practice by default.\n- **Pairs well:** combine `trackBy` with `OnPush` for maximum change-detection efficiency on large lists."
   }
 ]

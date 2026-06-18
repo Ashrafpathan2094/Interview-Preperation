@@ -12,7 +12,7 @@
       "joins",
       "null-handling"
     ],
-    "short": "All three test for related rows; optimizers often plan them identically (semi-join). Choose by semantics: `EXISTS`/`NOT EXISTS` for NULL-safe existence checks, `JOIN` when you need the other table's columns."
+    "short": "**All three test for related rows and modern optimizers often plan them identically as a semi-join — so choose by semantics, not assumed speed.**\n\n- **`IN` trap:** if the subquery can return `NULL`, `NOT IN` silently returns no rows; prefer `NOT EXISTS` for NULL safety.\n- **`EXISTS` advantage:** short-circuits on the first match and never duplicates outer rows, making it the best default for existence checks.\n- **`JOIN` use case:** use it only when you actually need columns from the other table; it can produce duplicate outer rows if multiple inner rows match."
   },
   {
     "id": "sql-join-types-explained",
@@ -27,7 +27,7 @@
       "self-join",
       "cross-join"
     ],
-    "short": "INNER keeps only matches; LEFT/RIGHT keep all rows of one side (NULLs for the other); FULL keeps both; CROSS is the Cartesian product; SELF joins a table to itself. Put right-table filters in `ON` to preserve outer-join semantics."
+    "short": "**Each JOIN type controls how unmatched rows are handled: INNER drops them, OUTER joins keep them with NULLs, CROSS produces a Cartesian product, and SELF joins a table to itself.**\n\n- **INNER / LEFT / RIGHT / FULL:** INNER keeps only matches; LEFT keeps all left rows (right NULLs); RIGHT is the mirror; FULL keeps both sides with NULLs for non-matches.\n- **CROSS / SELF:** CROSS pairs every row of A with every row of B (no ON clause); SELF joins a table to itself via aliases, useful for hierarchies.\n- **Common trap:** a `LEFT JOIN` with a right-table filter in `WHERE` silently becomes an INNER JOIN — put right-table conditions in the `ON` clause instead."
   },
   {
     "id": "sql-where-vs-having",
@@ -41,7 +41,7 @@
       "where",
       "aggregation"
     ],
-    "short": "`WHERE` filters individual rows before grouping and can't use aggregates; `HAVING` filters groups after `GROUP BY` and can. Logical order is FROM, WHERE, GROUP BY, HAVING, SELECT, ORDER BY; push filters into WHERE for speed."
+    "short": "**`WHERE` filters individual rows before grouping and cannot use aggregates; `HAVING` filters groups after `GROUP BY` and can reference aggregates.**\n\n- **Logical order:** FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY — this is why aliases from `SELECT` are invisible in `WHERE`/`HAVING`.\n- **Performance rule:** push conditions into `WHERE` to reduce rows before aggregation; only use `HAVING` when the condition genuinely depends on an aggregate value.\n- **Common mistake:** placing a non-aggregate filter (e.g. `HAVING country = 'US'`) in `HAVING` — it works but is slower and belongs in `WHERE`."
   },
   {
     "id": "sql-normalization-forms",
@@ -56,7 +56,7 @@
       "bcnf",
       "database-design"
     ],
-    "short": "Normalization reduces redundancy/anomalies via key dependencies: 1NF atomic values, 2NF no partial dependencies, 3NF no transitive dependencies, BCNF every determinant is a superkey. Higher forms mean more joins, so OLAP often denormalizes."
+    "short": "**Normalization organizes tables to reduce redundancy and prevent update/insert/delete anomalies by enforcing key-based dependencies.**\n\n- **1NF → 2NF → 3NF:** 1NF requires atomic values; 2NF eliminates partial dependencies on composite keys; 3NF eliminates transitive dependencies (non-key attributes must depend only on the key).\n- **BCNF:** stricter than 3NF — every determinant must be a superkey, handling edge cases with overlapping candidate keys.\n- **Trade-off:** higher forms reduce redundancy but require more joins; OLAP systems often deliberately denormalize (star schemas) for read speed."
   },
   {
     "id": "sql-acid-properties",
@@ -70,7 +70,7 @@
       "atomicity",
       "isolation"
     ],
-    "short": "ACID guarantees reliable transactions: Atomicity (all-or-nothing), Consistency (constraints hold), Isolation (concurrent txns don't interfere), Durability (committed data survives crashes, via WAL). ACID's C is constraint integrity, not CAP consistency."
+    "short": "**ACID is the set of four guarantees a DBMS provides for reliable transactions: Atomicity, Consistency, Isolation, and Durability.**\n\n- **Atomicity / Durability:** all-or-nothing execution (undo logs); once committed, changes survive crashes via write-ahead logging (WAL).\n- **Consistency / Isolation:** constraints (PK, FK, CHECK) always hold; concurrent transactions don't interfere, controlled by the isolation level via locking or MVCC.\n- **Key distinction:** ACID's Consistency means constraint integrity, not the 'C' in CAP theorem — those are completely different concepts."
   },
   {
     "id": "sql-isolation-levels",
@@ -85,7 +85,7 @@
       "dirty-read",
       "phantom-read"
     ],
-    "short": "Levels control which read phenomena occur: READ UNCOMMITTED allows dirty reads, READ COMMITTED prevents them, REPEATABLE READ also stops non-repeatable reads, SERIALIZABLE prevents phantoms too. Stronger isolation costs throughput."
+    "short": "**The four isolation levels control which read phenomena (dirty read, non-repeatable read, phantom read) are permitted, trading correctness for concurrency.**\n\n- **Weakest to strongest:** READ UNCOMMITTED allows all; READ COMMITTED prevents dirty reads; REPEATABLE READ also prevents non-repeatable reads; SERIALIZABLE prevents phantoms too.\n- **Default engines:** PostgreSQL/Oracle/SQL Server default to READ COMMITTED; MySQL InnoDB defaults to REPEATABLE READ (which also blocks most phantoms via next-key locking).\n- **Trade-off:** stronger isolation reduces concurrency; use SERIALIZABLE only where strict correctness is required."
   },
   {
     "id": "sql-index-internals-btree",
@@ -99,7 +99,7 @@
       "sargable",
       "covering-index"
     ],
-    "short": "B+ trees stay balanced with data in linked leaves, giving O(log n) lookups and efficient range/ordered scans instead of full table scans. They slow writes; wrapping a column in a function makes them non-SARGable and unusable."
+    "short": "**A B+ tree index is balanced with data in linked leaf nodes, giving O(log n) lookups and efficient range/ordered scans instead of a full table scan.**\n\n- **How it helps:** internal nodes navigate to the leaf, which holds a pointer to the row; linked leaves enable range queries (`BETWEEN`, `ORDER BY`, `LIKE 'abc%'`).\n- **Non-SARGable trap:** wrapping the column in a function (`YEAR(d)`) makes the index useless — rewrite as a bare-column range predicate instead.\n- **Leftmost prefix rule:** on a composite index `(a, b, c)`, the index only helps queries that filter on `a` or `a,b` — not on `b` alone."
   },
   {
     "id": "sql-clustered-vs-nonclustered",
@@ -113,7 +113,7 @@
       "non-clustered-index",
       "storage"
     ],
-    "short": "A clustered index stores row data in physical key order (one per table); a non-clustered index is a separate structure pointing back to rows (many allowed), sometimes needing a key lookup that a covering index avoids."
+    "short": "**A clustered index physically orders the table's rows by key (one per table); a non-clustered index is a separate structure with pointers back to rows (many allowed per table).**\n\n- **Clustered:** the table itself is the index; leaf nodes hold the actual row data, making range scans very fast. SQL Server PKs and InnoDB tables default to this.\n- **Non-clustered:** leaf nodes hold the index key plus a row pointer; fetching extra columns requires a **key lookup** back to the clustered index.\n- **Covering index:** add `INCLUDE` columns to a non-clustered index to avoid key lookups entirely for hot queries, at the cost of extra storage and write overhead."
   },
   {
     "id": "sql-deadlock-explained",
@@ -126,7 +126,7 @@
       "concurrency",
       "transactions"
     ],
-    "short": "A deadlock is a cycle of transactions each waiting on a lock the other holds; the DBMS detects it and aborts a victim to retry. Prevent it mainly via consistent lock ordering, short transactions, and proper indexes. Unlike blocking, it can't resolve itself."
+    "short": "**A deadlock is a cycle of transactions each waiting on a lock held by the other; the DBMS detects the cycle and aborts a victim so the other can proceed.**\n\n- **Detection:** the engine checks for cycles in the wait-for graph and picks a victim (usually the cheapest to roll back), returning a deadlock error for the application to retry.\n- **Prevention:** consistent lock ordering (always acquire locks in the same order) is the single most effective fix; short transactions and good indexes also help.\n- **Deadlock vs blocking:** blocking is a single transaction waiting and will eventually resolve; a deadlock is an unbreakable cycle that requires forced rollback."
   },
   {
     "id": "sql-pessimistic-vs-optimistic-locking",
@@ -141,7 +141,7 @@
       "pessimistic-locking",
       "mvcc"
     ],
-    "short": "Pessimistic locking locks rows up front (`SELECT ... FOR UPDATE`), blocking writers—good for high contention. Optimistic locking reads without locks and checks a version/timestamp at write time, retrying on conflict—good for read-heavy, low-conflict workloads."
+    "short": "**Pessimistic locking acquires locks upfront (`SELECT ... FOR UPDATE`), blocking other writers; optimistic locking skips locks and checks a version column at write time, retrying if it was changed.**\n\n- **Pessimistic:** safe for high-contention hotspots (inventory, seat booking) but reduces concurrency and risks deadlocks.\n- **Optimistic:** ideal for read-heavy, low-conflict workloads (most web apps and MVCC engines); wasted retries become costly under heavy contention.\n- **Version check:** if `UPDATE ... WHERE id = 1 AND version = 7` affects 0 rows, another transaction changed the data and the application must retry."
   },
   {
     "id": "sql-window-functions-overview",
@@ -156,7 +156,7 @@
       "dense-rank",
       "lag-lead"
     ],
-    "short": "Window functions compute over a related set of rows via `OVER(PARTITION BY... ORDER BY...)` without collapsing them. ROW_NUMBER is always unique; RANK ties then skips; DENSE_RANK ties without skipping; LAG/LEAD read prior/next rows."
+    "short": "**Window functions compute over a related set of rows via `OVER(PARTITION BY... ORDER BY...)` without collapsing them the way `GROUP BY` does.**\n\n- **Ranking differences:** `ROW_NUMBER` is always unique (breaks ties arbitrarily); `RANK` ties then skips the next number (1,2,2,4); `DENSE_RANK` ties without skipping (1,2,2,3).\n- **Offset functions:** `LAG(col, n)` reads n rows before the current row; `LEAD(col, n)` reads n rows after — great for period-over-period deltas without a self-join.\n- **Filtering trick:** you cannot use a window function directly in `WHERE`; wrap the query in a CTE and filter on the result column there."
   },
   {
     "id": "sql-union-vs-union-all",
@@ -170,7 +170,7 @@
       "set-operations",
       "query-optimization"
     ],
-    "short": "`UNION` removes duplicates (requiring an extra sort/hash), while `UNION ALL` just concatenates and keeps duplicates, making it faster. Prefer `UNION ALL` unless you actually need deduplication."
+    "short": "**`UNION` removes duplicate rows via an extra sort/hash step; `UNION ALL` simply concatenates all rows including duplicates, making it faster.**\n\n- **When to use `UNION ALL`:** whenever the two result sets are disjoint or duplicates are acceptable — paying for deduplication you don't need is a common performance bug.\n- **When to use `UNION`:** only when you genuinely need duplicates eliminated across the full combined result.\n- **NULL behavior:** for deduplication purposes, `UNION` treats two `NULL` values as equal (unlike normal comparisons)."
   },
   {
     "id": "sql-subquery-vs-cte-vs-derived",
@@ -184,7 +184,7 @@
       "derived-tables",
       "recursive-cte"
     ],
-    "short": "A subquery nests inside another query; a derived table is a subquery in FROM used once; a CTE is a named `WITH` result that aids readability, can be reused, and supports recursion. CTEs aren't inherently faster—choose them for clarity, not speed."
+    "short": "**A subquery nests inside another query; a derived table is a subquery in `FROM` used once; a CTE is a named `WITH` result that can be reused and supports recursion.**\n\n- **Derived table limitation:** scoped to a single statement and must be repeated if referenced more than once; cannot be recursive.\n- **CTE advantage:** named and reusable within one statement; `WITH RECURSIVE` enables tree/graph traversal (org charts, hierarchies) that derived tables cannot do.\n- **Performance note:** CTEs are not inherently faster — most modern engines inline them identically to derived tables; choose CTEs for readability and reuse, not speed."
   },
   {
     "id": "sql-primary-vs-foreign-key",
@@ -198,7 +198,7 @@
       "constraints",
       "referential-integrity"
     ],
-    "short": "A primary key uniquely identifies rows (unique, NOT NULL, one per table) for entity integrity; a foreign key references another table's key (nullable, many allowed) for referential integrity. FKs aren't auto-indexed in some engines, causing slow joins."
+    "short": "**A primary key uniquely identifies each row (unique, NOT NULL, one per table) enforcing entity integrity; a foreign key references another table's key (nullable, many per table) enforcing referential integrity.**\n\n- **PK rules:** cannot be NULL; one per table; most engines auto-create a unique (often clustered) index on it.\n- **FK rules:** can be NULL (meaning no relationship); many FKs allowed; referential actions like `ON DELETE CASCADE` control what happens when the parent changes.\n- **Indexing trap:** FKs are not auto-indexed in SQL Server or PostgreSQL — missing FK indexes are a common cause of slow joins and slow parent-row deletes."
   },
   {
     "id": "sql-view-vs-materialized-view",
@@ -212,7 +212,7 @@
       "performance",
       "abstraction"
     ],
-    "short": "A view is a virtual, always-live stored query that caches nothing; a materialized view physically stores precomputed results for fast reads but goes stale and must be refreshed. SQL Server's indexed view is its materialized equivalent."
+    "short": "**A view is a virtual stored query that runs against live data on every call and caches nothing; a materialized view physically stores the precomputed result for fast reads but goes stale and must be refreshed.**\n\n- **View:** pure query substitution — no performance gain for expensive queries, but great for abstraction, security (column/row restrictions), and a stable schema interface.\n- **Materialized view:** ideal for expensive OLAP aggregations; trades storage and refresh cost for fast reads; must be refreshed manually or on a schedule.\n- **SQL Server note:** SQL Server's equivalent is an **indexed view**, where data is persisted via a clustered index on the view."
   },
   {
     "id": "sql-stored-procedure-vs-function",
@@ -226,7 +226,7 @@
       "udf",
       "procedural-sql"
     ],
-    "short": "A stored procedure is callable procedural code that can do DML/transactions and return result sets; a function must return a value, is used inside SQL expressions, and generally can't modify data. Watch parameter sniffing and per-row scalar UDF costs."
+    "short": "**A stored procedure is named procedural code called as a standalone statement; a function (UDF) must return a value and is embedded inside SQL expressions.**\n\n- **Side effects:** procedures can perform DML and manage transactions (`COMMIT`/`ROLLBACK`); functions generally cannot modify data and cannot be used for transaction control.\n- **Usage:** functions appear inside `SELECT`/`WHERE`; procedures are invoked with `CALL`/`EXEC` and cannot be called inside a query.\n- **Performance traps:** parameter sniffing can cause a cached plan to perform poorly for some inputs; per-row scalar UDFs are often a major bottleneck — prefer set-based logic."
   },
   {
     "id": "sql-query-execution-plan",
@@ -241,7 +241,7 @@
       "statistics",
       "join-algorithms"
     ],
-    "short": "An execution plan is the optimizer's chosen strategy (indexes, join algorithms, order, costs), inspected via `EXPLAIN`/`EXPLAIN ANALYZE`. Optimize by spotting unexpected scans, bad join choices, and estimate-vs-actual skew from stale statistics."
+    "short": "**An execution plan is the optimizer's chosen strategy — indexes, join algorithms, row estimates, and costs — inspected via `EXPLAIN` or `EXPLAIN ANALYZE`.**\n\n- **Key signals to look for:** unexpected full table scans (missing index or non-SARGable predicate), wrong join algorithm choice, and large gaps between estimated vs actual row counts (stale statistics).\n- **Optimization process:** find the slowest operator, address the root cause (add index, fix predicate, run `ANALYZE`), then re-measure.\n- **Avoid hints as a first step:** optimizer hints freeze plan decisions and age poorly as data and schema evolve."
   },
   {
     "id": "sql-aggregate-and-null-handling",
@@ -256,7 +256,7 @@
       "avg",
       "common-pitfalls"
     ],
-    "short": "Aggregates ignore NULLs except `COUNT(*)`, which counts all rows; `COUNT(col)` counts non-NULLs and `COUNT(DISTINCT col)` distinct non-NULLs. AVG divides by non-NULL count and SUM of all-NULL returns NULL, so use COALESCE."
+    "short": "**Aggregate functions ignore NULLs — except `COUNT(*)` which counts all rows; `COUNT(col)` counts non-NULLs and `COUNT(DISTINCT col)` counts distinct non-NULLs.**\n\n- **`AVG` trap:** divides by the count of non-NULL values, not total rows — if NULLs should mean zero, use `AVG(COALESCE(col, 0))`.\n- **`SUM` trap:** `SUM` over an all-NULL column returns `NULL`, not 0 — wrap with `COALESCE(SUM(col), 0)` when you need a guaranteed numeric result.\n- **Filter trap:** `WHERE col != 'x'` silently drops NULL rows because `NULL != 'x'` evaluates to UNKNOWN, not TRUE."
   },
   {
     "id": "sql-delete-truncate-drop",
@@ -270,7 +270,7 @@
       "truncate",
       "drop"
     ],
-    "short": "`DELETE` is transactional DML removing selected rows with logging and triggers; `TRUNCATE` is DDL that fast-wipes all rows, resets identity, and skips row triggers; `DROP` removes the entire table object including structure and indexes."
+    "short": "**`DELETE` removes selected rows transactionally with per-row logging and triggers; `TRUNCATE` fast-wipes all rows with minimal logging; `DROP` removes the entire table object.**\n\n- **`DELETE`:** DML — supports `WHERE`, fires triggers, is rollbackable, but slow on large tables due to per-row logging; does not reset identity.\n- **`TRUNCATE`:** DDL — deallocates pages, resets identity, skips row-level triggers, much faster; transactional in PostgreSQL/SQL Server, auto-commit in older MySQL; blocked by FK references.\n- **`DROP`:** DDL — irreversibly removes the table, its indexes, constraints, and permissions entirely."
   },
   {
     "id": "sql-having-vs-window-grouping",
@@ -285,6 +285,6 @@
       "where",
       "cte"
     ],
-    "short": "Because SELECT (where aliases and window functions are evaluated) runs after WHERE/GROUP BY/HAVING, those clauses can't reference them. Work around it by repeating the expression or wrapping the query in a CTE/derived table to filter on the result."
+    "short": "**`WHERE` and `HAVING` run before `SELECT`, so column aliases and window functions defined in `SELECT` do not exist yet and cannot be referenced in those clauses.**\n\n- **Logical order:** FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY; only `ORDER BY` (last) can see `SELECT` aliases.\n- **Window function rule:** window functions are evaluated in the `SELECT` phase, so you cannot filter on their result in `WHERE` — wrap the query in a CTE or derived table and filter in the outer query.\n- **Classic use case:** top-N-per-group queries use `ROW_NUMBER()` in an inner CTE and filter `rn <= N` in the outer `WHERE` for exactly this reason."
   }
 ]

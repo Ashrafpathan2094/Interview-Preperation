@@ -11,7 +11,7 @@
       "referencing",
       "data-modeling"
     ],
-    "short": "Embed bounded data read with its parent for atomic single-document reads/writes; reference unbounded, independently-queried data like reviews to avoid the 16 MB limit. A hybrid subset pattern (embed latest 3, reference rest) suits product reviews."
+    "short": "**Embed bounded data that is always read with the parent; reference unbounded or independently-queried data like product reviews.**\n\n- **Embed when:** data is read together, bounded in size, and changes with the parent — gives atomic single-document reads/writes with no join.\n- **Reference when:** the array can grow unbounded (risking the 16 MB limit), or reviews need pagination and independent queries.\n- **Hybrid subset pattern:** embed only the latest 3 reviews on the product doc for fast display; store the full set in a separate `reviews` collection for pagination."
   },
   {
     "id": "mongodb-compound-index-esr-rule",
@@ -25,7 +25,7 @@
       "esr",
       "query-optimization"
     ],
-    "short": "Order compound index keys as Equality, then Sort, then Range so the index both filters and returns sorted results without a blocking in-memory `SORT`. Verify with `explain()`: expect `IXSCAN`, no `SORT`, and keys examined near `nReturned`."
+    "short": "**Order compound index keys by ESR — Equality first, Sort next, Range last — so the index filters efficiently and returns pre-sorted results without a blocking in-memory sort.**\n\n- **Equality first:** exact-match fields (`status: \"active\"`) narrow the scan the most.\n- **Sort next:** the index can then serve the sort directly, avoiding a blocking `SORT` stage that fails past 100 MB.\n- **Range last:** range fields (`$gt`, `$lt`) come after the sort — placing them before the sort breaks the index's ability to deliver ordered output.\n- **Verify:** `explain()` should show `IXSCAN`, no `SORT`, and `totalKeysExamined` close to `nReturned`."
   },
   {
     "id": "mongodb-explain-diagnose-slow-query",
@@ -39,7 +39,7 @@
       "indexing",
       "performance"
     ],
-    "short": "Run `.explain(\"executionStats\")` and look for `COLLSCAN`, a high `totalDocsExamined`-to-`nReturned` ratio, or a blocking `SORT` stage signaling a missing index. Fix by adding a selective ESR-ordered index and confirm the plan switches to `IXSCAN`."
+    "short": "**Run `.explain(\"executionStats\")` and inspect the plan for `COLLSCAN`, a high examined-to-returned ratio, or a blocking `SORT` stage — all signal a missing or poor index.**\n\n- **`COLLSCAN`:** the most obvious red flag — no index is being used for this query.\n- **Examined-to-returned ratio:** if `totalDocsExamined` is much larger than `nReturned`, the index is non-selective or absent.\n- **`SORT` stage:** an in-memory blocking sort; add the sort field to the index (following ESR) to eliminate it.\n- **Fix and verify:** create an ESR-ordered compound index, then re-run `explain()` to confirm `IXSCAN` and ratios near 1:1."
   },
   {
     "id": "mongodb-aggregation-monthly-sales-report",
@@ -54,7 +54,7 @@
       "$unwind",
       "reporting"
     ],
-    "short": "Build a pipeline: `$match` the current year early (index-friendly), `$unwind` line items, `$group` revenue and order count per category, `$sort` by revenue descending, then `$project` to shape output. Keep `$match`/`$sort` up front."
+    "short": "**Build the pipeline by filtering early, flattening arrays, grouping, sorting, and shaping — in that order — for maximum efficiency.**\n\n- **`$match` first:** narrows to the current year so later stages process the fewest possible documents and the planner can use an index.\n- **`$unwind` line items:** turns each order's items array into individual documents so `$group` can aggregate by category.\n- **`$group` + `$sort` + `$project`:** accumulate `revenue` and `orders` per category, sort descending, then clean up the output shape."
   },
   {
     "id": "mongodb-lookup-join-orders-customers",
@@ -68,7 +68,7 @@
       "join",
       "performance"
     ],
-    "short": "`$lookup` does a left outer join, storing matches as an array (follow with `$unwind` for single matches). It's fastest when the foreign field is indexed and you `$match`/filter locally first; frequent joins may signal you should have embedded."
+    "short": "**`$lookup` performs a left outer join, storing matching documents as an array field; it's efficient only when the foreign field is indexed.**\n\n- **`$match` before `$lookup`:** filter the local collection first to reduce the number of lookups that need to run.\n- **Index the foreign field:** without an index on the join field, MongoDB scans the foreign collection for every input document.\n- **`$unwind` after:** flattens the single-element array for one-to-one joins; follow with a `$project` to shape the final output.\n- **Design signal:** frequent `$lookup` usage often means the data should have been embedded instead."
   },
   {
     "id": "mongodb-multi-document-transaction-transfer",
@@ -82,7 +82,7 @@
       "sessions",
       "crud"
     ],
-    "short": "Multi-document ACID transactions run in a session on a replica set or sharded cluster, giving all-or-nothing semantics. Use the driver's `withTransaction()` (auto-retries transient errors), keep them short, and prefer atomic single-document updates when possible."
+    "short": "**Multi-document ACID transactions make several writes all-or-nothing, but require a replica set or sharded cluster and carry real overhead.**\n\n- **Session required:** every operation in the transaction must receive the session object — omitting it leaves a write outside the transaction.\n- **`withTransaction()` helper:** automatically retries on `TransientTransactionError` and `UnknownTransactionCommitResult`; prefer it over manual commit/abort loops.\n- **Keep them short:** transactions hold locks and have a default 60-second lifetime; prefer single-document atomic updates whenever they suffice."
   },
   {
     "id": "mongodb-ttl-index-session-expiry",
@@ -96,7 +96,7 @@
       "expiration",
       "data-modeling"
     ],
-    "short": "A TTL index on a `Date` field lets the `TTLMonitor` (running ~every 60s) delete documents older than `expireAfterSeconds`. It must be single-field, deletion isn't precise (~60s lag), and `expireAfterSeconds: 0` expires at an absolute stored timestamp."
+    "short": "**A TTL index on a `Date` field auto-deletes documents older than `expireAfterSeconds`, but the background `TTLMonitor` runs every ~60 seconds so deletion is not real-time.**\n\n- **Date field required:** the indexed field must be a BSON `Date` (or array of dates using the earliest); non-date values are never expired.\n- **~60s lag:** expect documents to live up to a minute past their configured expiry.\n- **Single-field only:** compound TTL indexes are not allowed; use `expireAfterSeconds: 0` to expire at an absolute timestamp stored in the field."
   },
   {
     "id": "mongodb-write-read-concern-tradeoffs",
@@ -110,7 +110,7 @@
       "replication",
       "durability"
     ],
-    "short": "Write concern `w:\"majority\"` (with `j:true`) ensures writes survive failover and aren't rolled back, trading latency for durability; `w:1` is faster but loseable. Read concern `\"majority\"` returns only durable data. Use majority for order/financial writes."
+    "short": "**Write concern controls how many members must acknowledge a write; read concern controls what consistency level the returned data must meet.**\n\n- **`w:\"majority\"`:** the write is replicated to a majority of voting members before acknowledging — survives failover and is never rolled back; add `j:true` for crash-safety on the journal.\n- **`w:1`:** acknowledged by the primary only — faster but can be rolled back if the primary fails before replicating.\n- **Read concern `\"majority\"`:** returns only data that has been durably acknowledged by a majority — use this alongside `w:\"majority\"` for order/financial operations."
   },
   {
     "id": "mongodb-shard-key-selection",
@@ -124,7 +124,7 @@
       "scaling",
       "performance"
     ],
-    "short": "Choose a shard key with high cardinality, low frequency, and non-monotonic writes to avoid jumbo chunks and write hotspots; align it with queries so they're targeted, not scatter-gather. A compound key like `{tenantId:1, ts:1}` suits multi-tenant apps."
+    "short": "**A good shard key has high cardinality, low frequency, and non-monotonic writes to distribute data evenly and avoid hotspots.**\n\n- **High cardinality:** many distinct values so the balancer can split data into many chunks across shards.\n- **Non-monotonic:** a monotonically increasing key (timestamp, auto-increment) sends all new writes to one shard — use **hashed sharding** or a compound key to fix this.\n- **Query alignment:** include the shard key in queries to get targeted single-shard reads; without it, queries scatter to all shards. A compound key like `{ tenantId:1, ts:1 }` suits multi-tenant apps."
   },
   {
     "id": "mongodb-multikey-index-array-query",
@@ -138,7 +138,7 @@
       "arrays",
       "query-optimization"
     ],
-    "short": "Indexing an array field auto-creates a multikey index with one entry per element, supporting `$in`, `$all`, and element equality. A compound index may include at most one array field. Use `$all` to require all tags, `$in`/equality to match any."
+    "short": "**Indexing an array field automatically creates a multikey index — one index entry per element — enabling efficient queries on any element in the array.**\n\n- **Automatic:** you don't declare a multikey index; indexing an array field makes it multikey automatically.\n- **One array per compound index:** a compound index can include at most one array (multikey) field; two array fields would create a combinatorial explosion of entries.\n- **Query operators:** use `$in`/equality to match *any* tag, and `$all` to require *all* listed tags to be present."
   },
   {
     "id": "mongodb-text-index-search",
@@ -152,7 +152,7 @@
       "$text",
       "search"
     ],
-    "short": "A text index tokenizes, stems, and removes stop words for `$text` full-text search, with relevance via `$meta:\"textScore\"`. Only one text index per collection (can span weighted fields); it matches whole tokens, not substrings/regex. Use Atlas Search for advanced needs."
+    "short": "**A text index tokenizes, stems, and removes stop words to power `$text` full-text search with relevance scoring.**\n\n- **One per collection:** a collection can have only one text index, but it may span multiple weighted fields — use `weights` to make title matches count more than body.\n- **Token matching:** `$text` matches whole stemmed tokens, not substrings or regex patterns; it is not a prefix/wildcard search.\n- **Relevance ranking:** project `{ score: { $meta: \"textScore\" } }` and sort by it; for typo tolerance, faceting, or autocomplete use **Atlas Search** instead."
   },
   {
     "id": "mongodb-capped-collection-logging",
@@ -166,7 +166,7 @@
       "data-modeling",
       "crud"
     ],
-    "short": "A capped collection is a fixed-size circular buffer that auto-evicts oldest documents and preserves insertion order, ideal for high-throughput logs. You can't delete docs or grow them on update; read newest-first via `$natural:-1`. Use a TTL index for age-based eviction."
+    "short": "**A capped collection is a fixed-size circular buffer that auto-evicts the oldest documents on overflow and preserves insertion order for high-throughput logging.**\n\n- **Constraints:** you cannot delete individual documents, updates must not grow a document's size, and the collection cannot be sharded.\n- **Natural order reads:** documents are returned in insertion order by default; use `{ $natural: -1 }` to read newest-first with no sort index needed.\n- **Use TTL instead for age-based eviction:** capped collections evict by *size*, not by *time* — a TTL index on a normal collection is more flexible."
   },
   {
     "id": "mongodb-bulk-upsert-idempotent-ingestion",
@@ -180,7 +180,7 @@
       "bulkwrite",
       "idempotency"
     ],
-    "short": "Upserts (`upsert:true` with `$setOnInsert`) make ingestion idempotent, and `bulkWrite` batches ops in one round trip; use unordered (`ordered:false`) for faster independent ops. Match on a business key backed by a unique index to dedupe."
+    "short": "**Combine upserts with a unique index on the business key to make batch ingestion idempotent — re-running the same batch produces the same end state.**\n\n- **Upsert pattern:** `updateOne` with `{ upsert: true }` updates a matching doc or inserts a new one; `$setOnInsert` sets fields like `createdAt` only on first creation.\n- **`bulkWrite` with `ordered: false`:** batches all upserts in one round trip and continues past individual errors for maximum throughput.\n- **Unique index on the business key:** enforces deduplication at the database level so duplicate batch entries collapse to a single document."
   },
   {
     "id": "mongodb-covered-query-projection",
@@ -194,6 +194,6 @@
       "indexing",
       "projection"
     ],
-    "short": "A covered query answers entirely from one index (no `FETCH`) because all filter and projected fields live in that index; you must exclude `_id` and avoid array (multikey) fields. Verify via `explain()`: `IXSCAN`, no `FETCH`, `totalDocsExamined: 0`."
+    "short": "**A covered query is served entirely from one index — MongoDB never reads the actual documents — dramatically reducing I/O for hot read paths.**\n\n- **Requirements:** all filter *and* projected fields must be in the same index; exclude `_id` from the projection unless it's in the index; no multikey (array) fields.\n- **`explain()` confirmation:** winning plan shows `IXSCAN` with **no `FETCH` stage** and `totalDocsExamined: 0`.\n- **Common mistake:** forgetting `_id: 0` in the projection breaks coverage because `_id` is returned by default but is not part of a secondary index."
   }
 ]
