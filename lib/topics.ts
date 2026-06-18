@@ -40,6 +40,7 @@ import sysdesignTheory from "@/data/system-design/theory.json";
 import sysdesignCoding from "@/data/system-design/coding.json";
 import sysdesignMixed from "@/data/system-design/mixed.json";
 import dsaEasy from "@/data/dsa/easy.json";
+import dsaMedium from "@/data/dsa/medium.json";
 import dsaHard from "@/data/dsa/hard.json";
 
 // JSON imports are inferred as broad literal arrays; launder them through an
@@ -191,9 +192,10 @@ export const topics: Topic[] = [
   {
     slug: "dsa",
     name: "DSA",
-    blurb: "Data structures & algorithms — easy & hard only.",
+    blurb: "Data structures & algorithms — easy, medium & hard.",
     sections: [
       section("easy", "Easy", dsaEasy),
+      section("medium", "Medium", dsaMedium),
       section("hard", "Hard", dsaHard),
     ],
   },

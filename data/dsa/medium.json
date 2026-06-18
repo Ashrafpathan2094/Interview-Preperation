@@ -1,0 +1,242 @@
+[
+  {
+    "id": "dsa-group-anagrams",
+    "question": "Given an array of strings `strs`, group the anagrams together and return them as a list of lists. The answer can be returned in any order. Example: Input strs = [\"eat\",\"tea\",\"tan\",\"ate\",\"nat\",\"bat\"] -> Output [[\"eat\",\"tea\",\"ate\"],[\"tan\",\"nat\"],[\"bat\"]].",
+    "answer": "Sort each string to produce a canonical key; all anagrams share the same sorted form. Use a hash map from sorted-string to a list of original strings. Iterate the input, compute the key for each word, and append it to the corresponding bucket. Return the map's values as the result.\n\n**Time O(n * k log k), Space O(n * k)**",
+    "code": "function groupAnagrams(strs) {\n  const map = new Map();\n  for (const s of strs) {\n    const key = s.split('').sort().join('');\n    if (!map.has(key)) map.set(key, []);\n    map.get(key).push(s);\n  }\n  return Array.from(map.values());\n}",
+    "codeLang": "js",
+    "tags": ["array", "hashing", "string"],
+    "difficulty": "medium",
+    "short": "**Sort each string to form a canonical key, then bucket all original strings with the same key into the same group.**\n\n- **Approach:** for each string, sort its characters to get a key; store strings in a hash map keyed by that sorted form.\n- **Complexity:** `O(n * k log k)` time (k = max string length), `O(n * k)` space.\n- **Watch out:** return `Array.from(map.values())` — the map stores arrays, not the keys."
+  },
+  {
+    "id": "dsa-top-k-frequent-elements",
+    "question": "Given an integer array `nums` and an integer `k`, return the `k` most frequent elements. You may return the answer in any order. Example: Input nums = [1,1,1,2,2,3], k = 2 -> Output [1,2].",
+    "answer": "Count frequencies with a hash map, then use bucket sort: create an array of buckets indexed by frequency (0 to n). Place each number in the bucket matching its count. Finally, iterate buckets from high to low, collecting elements until k results are gathered. This avoids a full sort, keeping the solution linear.\n\n**Time O(n), Space O(n)**",
+    "code": "function topKFrequent(nums, k) {\n  const freq = new Map();\n  for (const n of nums) freq.set(n, (freq.get(n) || 0) + 1);\n  const buckets = Array.from({ length: nums.length + 1 }, () => []);\n  for (const [num, count] of freq) buckets[count].push(num);\n  const result = [];\n  for (let i = buckets.length - 1; i >= 0 && result.length < k; i--) {\n    for (const n of buckets[i]) {\n      result.push(n);\n      if (result.length === k) break;\n    }\n  }\n  return result;\n}",
+    "codeLang": "js",
+    "tags": ["array", "hashing", "bucket-sort"],
+    "difficulty": "medium",
+    "short": "**Count frequencies, then use bucket sort indexed by frequency to collect the top-k elements in linear time.**\n\n- **Approach:** build a frequency map, place each number in a bucket at index equal to its count, then scan buckets from high to low.\n- **Complexity:** `O(n)` time, `O(n)` space — avoids an `O(n log n)` sort.\n- **Watch out:** buckets array needs size `n + 1` because max possible frequency is `n`."
+  },
+  {
+    "id": "dsa-product-of-array-except-self",
+    "question": "Given an integer array `nums`, return an array `answer` such that `answer[i]` is equal to the product of all elements in `nums` except `nums[i]`. You must solve it without division and in O(n) time. Example: Input nums = [1,2,3,4] -> Output [24,12,8,6].",
+    "answer": "Use a two-pass approach without division. First pass (left to right): for each index store the product of all elements to its left. Second pass (right to left): multiply each position by the running product of all elements to its right. Accumulate both prefix and suffix products into a single output array using a constant extra variable for the suffix pass.\n\n**Time O(n), Space O(1)** (output array not counted)",
+    "code": "function productExceptSelf(nums) {\n  const n = nums.length;\n  const output = new Array(n).fill(1);\n  let prefix = 1;\n  for (let i = 0; i < n; i++) {\n    output[i] = prefix;\n    prefix *= nums[i];\n  }\n  let suffix = 1;\n  for (let i = n - 1; i >= 0; i--) {\n    output[i] *= suffix;\n    suffix *= nums[i];\n  }\n  return output;\n}",
+    "codeLang": "js",
+    "tags": ["array", "prefix-sum"],
+    "difficulty": "medium",
+    "short": "**Two-pass prefix/suffix product: first pass stores left products, second pass multiplies in right products — no division needed.**\n\n- **Approach:** left-to-right fills each slot with the product of everything to its left; right-to-left multiplies in the running right product.\n- **Complexity:** `O(n)` time, `O(1)` extra space (output array excluded).\n- **Watch out:** initialise the output to 1 so the first pass multiplies cleanly from the identity."
+  },
+  {
+    "id": "dsa-longest-substring-without-repeating",
+    "question": "Given a string `s`, find the length of the longest substring without repeating characters. Example: Input s = \"abcabcbb\" -> Output 3 (the substring \"abc\").",
+    "answer": "Use a sliding window with a hash map recording the most recent index of each character. Maintain a `left` pointer for the window start. When a character is seen again and its last position is inside the current window, advance `left` to one past that position. At each step update the maximum window length. This processes each character once.\n\n**Time O(n), Space O(min(n, m))** (m = alphabet size)",
+    "code": "function lengthOfLongestSubstring(s) {\n  const lastSeen = new Map();\n  let left = 0, best = 0;\n  for (let right = 0; right < s.length; right++) {\n    const c = s[right];\n    if (lastSeen.has(c) && lastSeen.get(c) >= left) {\n      left = lastSeen.get(c) + 1;\n    }\n    lastSeen.set(c, right);\n    best = Math.max(best, right - left + 1);\n  }\n  return best;\n}",
+    "codeLang": "js",
+    "tags": ["string", "sliding-window", "hashing"],
+    "difficulty": "medium",
+    "short": "**Sliding window with a map of last-seen indices: when a repeat is found inside the window, jump `left` past the previous occurrence.**\n\n- **Approach:** expand `right` each step; if `s[right]` was last seen at or after `left`, move `left` to `lastSeen + 1` to eliminate the duplicate.\n- **Complexity:** `O(n)` time, `O(min(n, m))` space.\n- **Watch out:** only update `left` if the previous occurrence is actually inside the current window (`lastSeen.get(c) >= left`)."
+  },
+  {
+    "id": "dsa-3sum",
+    "question": "Given an integer array `nums`, return all unique triplets `[nums[i], nums[j], nums[k]]` such that `i != j`, `i != k`, `j != k` and `nums[i] + nums[j] + nums[k] == 0`. The solution set must not contain duplicate triplets. Example: Input nums = [-1,0,1,2,-1,-4] -> Output [[-1,-1,2],[-1,0,1]].",
+    "answer": "Sort the array. For each index `i`, use two pointers `left = i+1` and `right = end` to find pairs summing to `-nums[i]`. When the sum is zero, record the triplet and advance both pointers while skipping duplicates. If the sum is too small, advance `left`; too large, retreat `right`. Skip duplicate values of `nums[i]` at the outer loop to avoid duplicate triplets.\n\n**Time O(n^2), Space O(1)** (ignoring output)",
+    "code": "function threeSum(nums) {\n  nums.sort((a, b) => a - b);\n  const result = [];\n  for (let i = 0; i < nums.length - 2; i++) {\n    if (i > 0 && nums[i] === nums[i - 1]) continue;\n    let left = i + 1, right = nums.length - 1;\n    while (left < right) {\n      const sum = nums[i] + nums[left] + nums[right];\n      if (sum === 0) {\n        result.push([nums[i], nums[left], nums[right]]);\n        while (left < right && nums[left] === nums[left + 1]) left++;\n        while (left < right && nums[right] === nums[right - 1]) right--;\n        left++; right--;\n      } else if (sum < 0) {\n        left++;\n      } else {\n        right--;\n      }\n    }\n  }\n  return result;\n}",
+    "codeLang": "js",
+    "tags": ["array", "two-pointers", "sorting"],
+    "difficulty": "medium",
+    "short": "**Sort the array, then for each element use two pointers to find pairs that make the triplet sum zero, skipping duplicates at every level.**\n\n- **Approach:** fix `nums[i]`, then use left/right pointers on the remainder to find pairs summing to `-nums[i]`.\n- **Complexity:** `O(n^2)` time (sorting + two-pointer loop), `O(1)` extra space.\n- **Watch out:** skip consecutive duplicates for `i`, `left`, and `right` independently to avoid duplicate triplets."
+  },
+  {
+    "id": "dsa-container-with-most-water",
+    "question": "Given an integer array `height` of length `n`, there are `n` vertical lines at positions `0..n-1` each with height `height[i]`. Find two lines that together with the x-axis forms a container that holds the most water. Return the maximum amount of water. Example: Input height = [1,8,6,2,5,4,8,3,7] -> Output 49.",
+    "answer": "Use two pointers starting at both ends of the array. The water held is `(right - left) * min(height[left], height[right])`. Always move the pointer with the shorter height inward: keeping the taller side maximises the chance of finding a better container. Update the global maximum at each step until the pointers meet.\n\n**Time O(n), Space O(1)**",
+    "code": "function maxArea(height) {\n  let left = 0, right = height.length - 1, best = 0;\n  while (left < right) {\n    const water = (right - left) * Math.min(height[left], height[right]);\n    best = Math.max(best, water);\n    if (height[left] < height[right]) left++;\n    else right--;\n  }\n  return best;\n}",
+    "codeLang": "js",
+    "tags": ["array", "two-pointers", "greedy"],
+    "difficulty": "medium",
+    "short": "**Two pointers from both ends: always move the shorter side inward because it is the bottleneck limiting water volume.**\n\n- **Approach:** compute area as `(right - left) * min(height[left], height[right])`; advance the pointer with the smaller height.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** moving the taller side would only decrease width without any guarantee of a taller minimum — always move the shorter one."
+  },
+  {
+    "id": "dsa-longest-palindromic-substring",
+    "question": "Given a string `s`, return the longest palindromic substring. Example: Input s = \"babad\" -> Output \"bab\" (or \"aba\", both are valid).",
+    "answer": "Expand around every possible center. A palindrome can be centered on a single character (odd length) or on the gap between two characters (even length). For each of the `2n - 1` centers, expand outward while characters match and track the longest span found. Store the start index and maximum length, then return the substring.\n\n**Time O(n^2), Space O(1)**",
+    "code": "function longestPalindrome(s) {\n  let start = 0, maxLen = 1;\n  function expand(l, r) {\n    while (l >= 0 && r < s.length && s[l] === s[r]) { l--; r++; }\n    const len = r - l - 1;\n    if (len > maxLen) { maxLen = len; start = l + 1; }\n  }\n  for (let i = 0; i < s.length; i++) {\n    expand(i, i);\n    expand(i, i + 1);\n  }\n  return s.substring(start, start + maxLen);\n}",
+    "codeLang": "js",
+    "tags": ["string", "two-pointers", "dynamic-programming"],
+    "difficulty": "medium",
+    "short": "**Expand around every center (single char for odd, gap between chars for even) and track the longest palindrome found.**\n\n- **Approach:** for each index call `expand(i, i)` and `expand(i, i+1)`; the inner loop grows as long as characters match on both sides.\n- **Complexity:** `O(n^2)` time, `O(1)` space.\n- **Watch out:** recover the substring using `start` and `maxLen` after expansion — the loop leaves `l` and `r` one step outside the palindrome."
+  },
+  {
+    "id": "dsa-search-in-rotated-sorted-array",
+    "question": "There is an integer array `nums` sorted in ascending order, which has been rotated at some pivot. Given the array and an integer `target`, return the index of `target`, or -1 if not found. Example: Input nums = [4,5,6,7,0,1,2], target = 0 -> Output 4.",
+    "answer": "Binary search adapted for rotation. At each step one of the two halves is always sorted. Check which half is sorted: if `nums[left] <= nums[mid]`, the left half is sorted; compare target against that range to decide which half to recurse into. Otherwise the right half is sorted; apply the same range check. This finds the target in logarithmic time without locating the pivot first.\n\n**Time O(log n), Space O(1)**",
+    "code": "function search(nums, target) {\n  let left = 0, right = nums.length - 1;\n  while (left <= right) {\n    const mid = (left + right) >> 1;\n    if (nums[mid] === target) return mid;\n    if (nums[left] <= nums[mid]) {\n      if (target >= nums[left] && target < nums[mid]) right = mid - 1;\n      else left = mid + 1;\n    } else {\n      if (target > nums[mid] && target <= nums[right]) left = mid + 1;\n      else right = mid - 1;\n    }\n  }\n  return -1;\n}",
+    "codeLang": "js",
+    "tags": ["array", "binary-search"],
+    "difficulty": "medium",
+    "short": "**Modified binary search: at each step determine which half is fully sorted, then check if the target falls in that range to decide which half to search.**\n\n- **Key idea:** one half is always sorted after a rotation; use `nums[left] <= nums[mid]` to identify which half.\n- **Complexity:** `O(log n)` time, `O(1)` space.\n- **Watch out:** use `<=` not `<` when comparing `nums[left]` to `nums[mid]` to handle the non-rotated case correctly."
+  },
+  {
+    "id": "dsa-find-min-in-rotated-sorted-array",
+    "question": "Given the sorted rotated integer array `nums` with no duplicates, return the minimum element. Example: Input nums = [3,4,5,1,2] -> Output 1.",
+    "answer": "Binary search for the rotation point (the minimum). If `nums[mid] > nums[right]`, the minimum is in the right half (move `left = mid + 1`); otherwise the minimum is in the left half including `mid` (move `right = mid`). When `left === right` the pointer sits on the minimum. This avoids scanning the whole array.\n\n**Time O(log n), Space O(1)**",
+    "code": "function findMin(nums) {\n  let left = 0, right = nums.length - 1;\n  while (left < right) {\n    const mid = (left + right) >> 1;\n    if (nums[mid] > nums[right]) left = mid + 1;\n    else right = mid;\n  }\n  return nums[left];\n}",
+    "codeLang": "js",
+    "tags": ["array", "binary-search"],
+    "difficulty": "medium",
+    "short": "**Binary search for the inflection point: if `nums[mid] > nums[right]` the minimum is to the right; otherwise it is at or before `mid`.**\n\n- **Approach:** compare mid to right (not left) to determine which side the rotation pivot is on.\n- **Complexity:** `O(log n)` time, `O(1)` space.\n- **Watch out:** use `right = mid` (not `mid - 1`) in the else branch to avoid skipping the minimum itself."
+  },
+  {
+    "id": "dsa-kth-largest-element",
+    "question": "Given an integer array `nums` and an integer `k`, return the `k`-th largest element in the array (not the k-th distinct element). Example: Input nums = [3,2,1,5,6,4], k = 2 -> Output 5.",
+    "answer": "Use Quickselect (partition-based selection), the in-place equivalent of Quicksort. Choose a pivot, partition the array so elements larger than the pivot are to its left, and elements smaller are to its right. If the pivot lands at index `k-1` you have the answer; otherwise recurse only into the relevant half. Average case is linear; worst case quadratic but avoidable with randomised pivots.\n\n**Time O(n) average, Space O(1)**",
+    "code": "function findKthLargest(nums, k) {\n  function partition(lo, hi) {\n    const pivot = nums[hi];\n    let store = lo;\n    for (let i = lo; i < hi; i++) {\n      if (nums[i] >= pivot) { [nums[store], nums[i]] = [nums[i], nums[store]]; store++; }\n    }\n    [nums[store], nums[hi]] = [nums[hi], nums[store]];\n    return store;\n  }\n  let lo = 0, hi = nums.length - 1;\n  while (lo <= hi) {\n    const p = partition(lo, hi);\n    if (p === k - 1) return nums[p];\n    else if (p < k - 1) lo = p + 1;\n    else hi = p - 1;\n  }\n  return -1;\n}",
+    "codeLang": "js",
+    "tags": ["array", "sorting", "quickselect"],
+    "difficulty": "medium",
+    "short": "**Quickselect: partition around a pivot (largest elements left) and recurse only into the half containing index `k-1`.**\n\n- **Approach:** partition so elements >= pivot go left; if pivot lands at `k-1` return it, else narrow to the correct side.\n- **Complexity:** `O(n)` average time, `O(1)` space — no full sort needed.\n- **Watch out:** partition for k-th LARGEST puts larger elements to the left, so index `k-1` is the target."
+  },
+  {
+    "id": "dsa-coin-change",
+    "question": "Given an array of coin denominations `coins` and an integer `amount`, return the fewest number of coins needed to make up that amount. If the amount cannot be made, return -1. Example: Input coins = [1,5,11], amount = 15 -> Output 3 (11+1+1 does not beat 5+5+5).",
+    "answer": "Bottom-up dynamic programming. Create a `dp` array of size `amount + 1` initialised to `Infinity`, with `dp[0] = 0`. For each amount from 1 to `amount`, try every coin: if `coin <= a`, `dp[a] = min(dp[a], dp[a - coin] + 1)`. The answer is `dp[amount]` if it is not `Infinity`, otherwise -1. Each subproblem builds on smaller amounts, ensuring correctness.\n\n**Time O(amount * n), Space O(amount)**",
+    "code": "function coinChange(coins, amount) {\n  const dp = new Array(amount + 1).fill(Infinity);\n  dp[0] = 0;\n  for (let a = 1; a <= amount; a++) {\n    for (const coin of coins) {\n      if (coin <= a) dp[a] = Math.min(dp[a], dp[a - coin] + 1);\n    }\n  }\n  return dp[amount] === Infinity ? -1 : dp[amount];\n}",
+    "codeLang": "js",
+    "tags": ["dynamic-programming", "array"],
+    "difficulty": "medium",
+    "short": "**Bottom-up DP: `dp[a]` is the minimum coins to make amount `a`; for each amount try every coin and take the minimum.**\n\n- **Approach:** `dp[a] = min(dp[a - coin] + 1)` for every valid coin; build from 0 up to `amount`.\n- **Complexity:** `O(amount * n)` time, `O(amount)` space.\n- **Watch out:** initialise `dp` to `Infinity` (not 0) and return -1 if `dp[amount]` is still `Infinity`."
+  },
+  {
+    "id": "dsa-longest-increasing-subsequence",
+    "question": "Given an integer array `nums`, return the length of the longest strictly increasing subsequence. Example: Input nums = [10,9,2,5,3,7,101,18] -> Output 4 (the subsequence [2,3,7,101]).",
+    "answer": "Use a patience-sorting-style approach with a `tails` array. For each number, binary search `tails` for the first value >= num and replace it (or append if all are smaller). `tails[i]` stores the smallest tail of all increasing subsequences of length `i+1`. The length of `tails` at the end is the LIS length. This reduces the naive O(n^2) DP to O(n log n).\n\n**Time O(n log n), Space O(n)**",
+    "code": "function lengthOfLIS(nums) {\n  const tails = [];\n  for (const num of nums) {\n    let lo = 0, hi = tails.length;\n    while (lo < hi) {\n      const mid = (lo + hi) >> 1;\n      if (tails[mid] < num) lo = mid + 1;\n      else hi = mid;\n    }\n    tails[lo] = num;\n  }\n  return tails.length;\n}",
+    "codeLang": "js",
+    "tags": ["array", "dynamic-programming", "binary-search"],
+    "difficulty": "medium",
+    "short": "**Patience sort: maintain a `tails` array where `tails[i]` is the smallest tail of all LIS of length `i+1`; binary-search to place each element.**\n\n- **Key idea:** replace the first tail >= current number (or append); the array length is the LIS length.\n- **Complexity:** `O(n log n)` time, `O(n)` space.\n- **Watch out:** `tails` does NOT represent an actual subsequence — it is a bookkeeping structure; only its length matters."
+  },
+  {
+    "id": "dsa-house-robber",
+    "question": "You are a robber planning to rob houses along a street. Adjacent houses have security systems connected — if two adjacent houses are robbed, the alarm triggers. Given an integer array `nums` representing the amount of money in each house, return the maximum amount you can rob without triggering an alarm. Example: Input nums = [2,7,9,3,1] -> Output 12 (rob houses 0, 2, 4 -> 2+9+1).",
+    "answer": "Dynamic programming. The maximum loot up to house `i` is either the loot skipping house `i` (`prev1`) or the loot taking house `i` plus the best up to `i-2` (`prev2 + nums[i]`). Rolling two variables instead of an array avoids extra space. Initialise `prev2 = 0`, `prev1 = nums[0]` and iterate from index 1.\n\n**Time O(n), Space O(1)**",
+    "code": "function rob(nums) {\n  if (nums.length === 1) return nums[0];\n  let prev2 = 0, prev1 = nums[0];\n  for (let i = 1; i < nums.length; i++) {\n    const cur = Math.max(prev1, prev2 + nums[i]);\n    prev2 = prev1;\n    prev1 = cur;\n  }\n  return prev1;\n}",
+    "codeLang": "js",
+    "tags": ["dynamic-programming", "array"],
+    "difficulty": "medium",
+    "short": "**Rolling DP with two variables: at each house choose the max of skipping it (`prev1`) or taking it plus the best two steps back (`prev2 + num`).**\n\n- **Approach:** `cur = max(prev1, prev2 + nums[i])`; then slide `prev2 = prev1`, `prev1 = cur`.\n- **Complexity:** `O(n)` time, `O(1)` space.\n- **Watch out:** handle the single-element edge case (`nums.length === 1`) before the loop."
+  },
+  {
+    "id": "dsa-word-break",
+    "question": "Given a string `s` and a dictionary of strings `wordDict`, return true if `s` can be segmented into a space-separated sequence of one or more dictionary words. Example: Input s = \"leetcode\", wordDict = [\"leet\",\"code\"] -> Output true.",
+    "answer": "Bottom-up DP. `dp[i]` is true when the prefix `s[0..i)` can be segmented. `dp[0]` is true (empty string). For each index `i` from 1 to `n`, check every possible last word: if `dp[j]` is true and `s[j..i)` is in the word set, set `dp[i] = true`. Using a Set for lookups makes each check O(word length). Return `dp[n]`.\n\n**Time O(n^2), Space O(n)**",
+    "code": "function wordBreak(s, wordDict) {\n  const wordSet = new Set(wordDict);\n  const dp = new Array(s.length + 1).fill(false);\n  dp[0] = true;\n  for (let i = 1; i <= s.length; i++) {\n    for (let j = 0; j < i; j++) {\n      if (dp[j] && wordSet.has(s.slice(j, i))) {\n        dp[i] = true;\n        break;\n      }\n    }\n  }\n  return dp[s.length];\n}",
+    "codeLang": "js",
+    "tags": ["dynamic-programming", "string", "hashing"],
+    "difficulty": "medium",
+    "short": "**DP where `dp[i]` means `s[0..i)` is segmentable; set it true when some `dp[j]` is true and `s[j..i)` is in the word set.**\n\n- **Approach:** for each end index `i`, try all split points `j`; if `dp[j]` and `s.slice(j,i)` is a word, mark `dp[i] = true`.\n- **Complexity:** `O(n^2)` time, `O(n)` space.\n- **Watch out:** put `wordDict` into a `Set` for O(1) lookups; slicing is O(word-length) but dominates the inner loop."
+  },
+  {
+    "id": "dsa-number-of-islands",
+    "question": "Given an `m x n` 2D binary grid where `'1'` represents land and `'0'` represents water, return the number of islands. An island is surrounded by water and is formed by connecting adjacent lands horizontally or vertically. Example: Input grid = [[\"1\",\"1\",\"0\"],[\"0\",\"1\",\"0\"],[\"0\",\"0\",\"1\"]] -> Output 2.",
+    "answer": "Iterate every cell. When a '1' is found, increment the island counter and run a DFS (or BFS) from that cell, marking all reachable '1' cells as '0' (visited) so they are not counted again. The DFS explores up, down, left, and right recursively. The number of times a fresh DFS is triggered equals the number of islands.\n\n**Time O(m * n), Space O(m * n)** (recursion stack)",
+    "code": "function numIslands(grid) {\n  const rows = grid.length, cols = grid[0].length;\n  let count = 0;\n  function dfs(r, c) {\n    if (r < 0 || r >= rows || c < 0 || c >= cols || grid[r][c] !== '1') return;\n    grid[r][c] = '0';\n    dfs(r + 1, c); dfs(r - 1, c); dfs(r, c + 1); dfs(r, c - 1);\n  }\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (grid[r][c] === '1') { count++; dfs(r, c); }\n    }\n  }\n  return count;\n}",
+    "codeLang": "js",
+    "tags": ["graph", "dfs", "matrix"],
+    "difficulty": "medium",
+    "short": "**DFS flood-fill: each time a '1' is found, increment the counter and sink the entire connected island by marking cells '0'.**\n\n- **Approach:** scan every cell; on a '1', increment count and DFS in 4 directions marking visited cells as '0'.\n- **Complexity:** `O(m * n)` time and space (each cell visited at most once).\n- **Watch out:** mutating the grid avoids a separate visited array; if the grid must be preserved, use a Set or a copy."
+  },
+  {
+    "id": "dsa-clone-graph",
+    "question": "Given a reference to a node in a connected undirected graph, return a deep copy (clone) of the graph. Each node has a `val` (integer) and a `neighbors` array. Example: Input node with val=1 connected to nodes 2,3,4 in a cycle -> Output a new graph with the same structure.",
+    "answer": "Use DFS (or BFS) with a hash map from original node to its clone. When visiting a node, if it already has a clone in the map return that clone (handles cycles). Otherwise create a new node, add it to the map, then recursively clone all neighbors and push them into the new node's `neighbors` array. The map ensures each node is cloned exactly once.\n\n**Time O(V + E), Space O(V)**",
+    "code": "function cloneGraph(node) {\n  if (!node) return null;\n  const map = new Map();\n  function dfs(n) {\n    if (map.has(n)) return map.get(n);\n    const clone = { val: n.val, neighbors: [] };\n    map.set(n, clone);\n    for (const nb of n.neighbors) clone.neighbors.push(dfs(nb));\n    return clone;\n  }\n  return dfs(node);\n}",
+    "codeLang": "js",
+    "tags": ["graph", "dfs", "hashing"],
+    "difficulty": "medium",
+    "short": "**DFS with a visited map from original to clone: create the clone first, add it to the map, then recursively clone neighbors to handle cycles.**\n\n- **Approach:** `map.has(n)` is the cycle check; always insert before recursing so revisits return the existing clone.\n- **Complexity:** `O(V + E)` time, `O(V)` space.\n- **Watch out:** add the new node to the map BEFORE recursing into neighbors to avoid infinite loops on cyclic graphs."
+  },
+  {
+    "id": "dsa-course-schedule",
+    "question": "There are `numCourses` courses labeled 0 to numCourses-1. You are given an array `prerequisites` where `prerequisites[i] = [a, b]` means you must take course `b` before course `a`. Return true if it is possible to finish all courses, i.e., there is no cycle. Example: Input numCourses = 2, prerequisites = [[1,0]] -> Output true.",
+    "answer": "Model as a directed graph and detect cycles using DFS with 3-color marking: unvisited (0), in-stack (1), done (2). For each unvisited node, run DFS; if you ever reach an in-stack node, a cycle exists — return false. Mark nodes as done after their DFS completes. If no cycle is found across all nodes, return true. Topological sort (Kahn's BFS) is an equivalent alternative.\n\n**Time O(V + E), Space O(V + E)**",
+    "code": "function canFinish(numCourses, prerequisites) {\n  const adj = Array.from({ length: numCourses }, () => []);\n  for (const [a, b] of prerequisites) adj[b].push(a);\n  const state = new Array(numCourses).fill(0);\n  function hasCycle(node) {\n    if (state[node] === 1) return true;\n    if (state[node] === 2) return false;\n    state[node] = 1;\n    for (const nb of adj[node]) if (hasCycle(nb)) return true;\n    state[node] = 2;\n    return false;\n  }\n  for (let i = 0; i < numCourses; i++) if (hasCycle(i)) return false;\n  return true;\n}",
+    "codeLang": "js",
+    "tags": ["graph", "dfs", "topological-sort"],
+    "difficulty": "medium",
+    "short": "**DFS cycle detection with 3-color marking: unvisited → in-stack → done; a back edge to an in-stack node means a cycle.**\n\n- **Approach:** build adjacency list, then DFS each unvisited node using states 0/1/2 to detect back edges.\n- **Complexity:** `O(V + E)` time and space.\n- **Watch out:** mark a node in-stack (1) before recursing and done (2) after all neighbors finish — never mark done until DFS fully returns."
+  },
+  {
+    "id": "dsa-lowest-common-ancestor-bst",
+    "question": "Given a Binary Search Tree (BST) and two nodes `p` and `q`, find the lowest common ancestor (LCA). The LCA is defined as the lowest node in the tree that has both `p` and `q` as descendants (a node can be a descendant of itself). Example: Input root = [6,2,8,0,4,7,9], p = 2, q = 8 -> Output 6.",
+    "answer": "Exploit BST ordering. Start at the root. If both `p.val` and `q.val` are less than the current node's value, move to the left child. If both are greater, move to the right child. The first node where the values split (one is less and the other is greater, or one equals the node's value) is the LCA. This runs in O(h) without extra space.\n\n**Time O(h), Space O(1)** (h = tree height)",
+    "code": "function lowestCommonAncestor(root, p, q) {\n  let node = root;\n  while (node) {\n    if (p.val < node.val && q.val < node.val) node = node.left;\n    else if (p.val > node.val && q.val > node.val) node = node.right;\n    else return node;\n  }\n  return null;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-search-tree", "dfs"],
+    "difficulty": "medium",
+    "short": "**Traverse the BST from the root: go left if both values are smaller, right if both are larger — the split point is the LCA.**\n\n- **Key idea:** in a BST, the LCA is the first node where `p` and `q` stop being on the same side.\n- **Complexity:** `O(h)` time, `O(1)` space (iterative).\n- **Watch out:** a node is its own ancestor — if `node.val` equals `p.val` or `q.val` that node IS the LCA; the else-return handles this."
+  },
+  {
+    "id": "dsa-binary-tree-level-order-traversal",
+    "question": "Given the root of a binary tree, return the level order traversal of its nodes' values as an array of arrays (each inner array is one level, left to right). Example: Input root = [3,9,20,null,null,15,7] -> Output [[3],[9,20],[15,7]].",
+    "answer": "BFS using a queue. Start with the root in the queue. On each iteration, record the current queue size (the number of nodes in this level), drain exactly that many nodes while collecting their values, and enqueue their children. This naturally separates levels because you process one full level before its children are dequeued.\n\n**Time O(n), Space O(n)**",
+    "code": "function levelOrder(root) {\n  if (!root) return [];\n  const result = [], queue = [root];\n  while (queue.length) {\n    const levelSize = queue.length, level = [];\n    for (let i = 0; i < levelSize; i++) {\n      const node = queue.shift();\n      level.push(node.val);\n      if (node.left) queue.push(node.left);\n      if (node.right) queue.push(node.right);\n    }\n    result.push(level);\n  }\n  return result;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "bfs", "graph"],
+    "difficulty": "medium",
+    "short": "**BFS with a queue: snapshot the queue size at the start of each iteration to drain exactly one level at a time.**\n\n- **Approach:** `levelSize = queue.length` before the inner loop; process that many nodes and push their children for the next level.\n- **Complexity:** `O(n)` time, `O(n)` space (queue holds at most one level at a time, up to n/2 nodes).\n- **Watch out:** capture `queue.length` into `levelSize` before the inner loop — the queue grows as children are added."
+  },
+  {
+    "id": "dsa-validate-binary-search-tree",
+    "question": "Given the root of a binary tree, determine if it is a valid binary search tree (BST). A valid BST requires every node in the left subtree to have a value strictly less than the node's value, and every node in the right subtree to have a value strictly greater. Example: Input root = [5,1,4,null,null,3,6] -> Output false (4's right child is 3 < 5).",
+    "answer": "DFS passing down a valid `[min, max]` range for each node. The root has range `(-Infinity, Infinity)`. When traversing left, the upper bound tightens to the current node's value. When traversing right, the lower bound tightens. At each node, check that its value lies strictly within the range. Return false if any node violates the constraint.\n\n**Time O(n), Space O(h)**",
+    "code": "function isValidBST(root) {\n  function validate(node, min, max) {\n    if (!node) return true;\n    if (node.val <= min || node.val >= max) return false;\n    return validate(node.left, min, node.val) && validate(node.right, node.val, max);\n  }\n  return validate(root, -Infinity, Infinity);\n}",
+    "codeLang": "js",
+    "tags": ["tree", "dfs", "binary-search-tree"],
+    "difficulty": "medium",
+    "short": "**DFS with min/max bounds: pass tighter bounds down each branch — left child gets the parent's value as the new upper bound, right child as the new lower bound.**\n\n- **Approach:** `validate(node, min, max)` returns false if `node.val` is not strictly in `(min, max)`.\n- **Complexity:** `O(n)` time, `O(h)` space (call stack).\n- **Watch out:** use strict inequalities (`<= min` or `>= max`) because equal values are NOT valid in a strict BST."
+  },
+  {
+    "id": "dsa-kth-smallest-in-bst",
+    "question": "Given the root of a binary search tree and an integer `k`, return the `k`-th smallest value (1-indexed) in the BST. Example: Input root = [3,1,4,null,2], k = 1 -> Output 1.",
+    "answer": "In-order traversal of a BST yields values in sorted ascending order. Use an iterative in-order traversal with an explicit stack. Push left nodes until none remain, pop and decrement `k`; when `k` reaches zero return the current value. Move to the right child and repeat. This stops as soon as the k-th element is found without traversing the entire tree.\n\n**Time O(h + k), Space O(h)**",
+    "code": "function kthSmallest(root, k) {\n  const stack = [];\n  let node = root;\n  while (node || stack.length) {\n    while (node) { stack.push(node); node = node.left; }\n    node = stack.pop();\n    k--;\n    if (k === 0) return node.val;\n    node = node.right;\n  }\n  return -1;\n}",
+    "codeLang": "js",
+    "tags": ["tree", "binary-search-tree", "dfs"],
+    "difficulty": "medium",
+    "short": "**Iterative in-order traversal (left → node → right) counts nodes in ascending order; return the node's value when the counter hits k.**\n\n- **Approach:** push all left nodes onto a stack; pop, decrement `k`, return if `k === 0`, else move to the right child.\n- **Complexity:** `O(h + k)` time, `O(h)` space.\n- **Watch out:** an iterative stack is preferred over recursion to enable early termination as soon as the k-th node is found."
+  },
+  {
+    "id": "dsa-implement-trie",
+    "question": "Implement a trie (prefix tree) with three methods: `insert(word)` inserts a string; `search(word)` returns true if the word is in the trie; `startsWith(prefix)` returns true if any previously inserted word starts with the prefix. Example: insert(\"apple\"); search(\"apple\") -> true; search(\"app\") -> false; startsWith(\"app\") -> true.",
+    "answer": "A trie node holds a map of children (character to child node) and an `isEnd` boolean flag. `insert` iterates the word's characters, creating missing nodes. `search` traverses and returns `node.isEnd` at the last character. `startsWith` traverses and returns true if all prefix characters are found (regardless of `isEnd`). Using a Map (or object) per node handles any character set.\n\n**Time O(m) per operation, Space O(m * n)** (m = word length, n = number of words)",
+    "code": "class TrieNode {\n  constructor() { this.children = {}; this.isEnd = false; }\n}\nclass Trie {\n  constructor() { this.root = new TrieNode(); }\n  insert(word) {\n    let node = this.root;\n    for (const c of word) {\n      if (!node.children[c]) node.children[c] = new TrieNode();\n      node = node.children[c];\n    }\n    node.isEnd = true;\n  }\n  search(word) {\n    let node = this.root;\n    for (const c of word) {\n      if (!node.children[c]) return false;\n      node = node.children[c];\n    }\n    return node.isEnd;\n  }\n  startsWith(prefix) {\n    let node = this.root;\n    for (const c of prefix) {\n      if (!node.children[c]) return false;\n      node = node.children[c];\n    }\n    return true;\n  }\n}",
+    "codeLang": "js",
+    "tags": ["trie", "design", "string"],
+    "difficulty": "medium",
+    "short": "**Each trie node holds a children map and an `isEnd` flag; insert/search/startsWith all walk character by character from the root.**\n\n- **Approach:** insert creates missing child nodes; search returns `node.isEnd` after traversal; startsWith returns true if traversal completes.\n- **Complexity:** `O(m)` per operation, `O(m * n)` total space.\n- **Watch out:** `search` must check `isEnd` at the final node; `startsWith` must NOT — that's the only difference between the two methods."
+  },
+  {
+    "id": "dsa-lru-cache",
+    "question": "Design a data structure that follows the Least Recently Used (LRU) cache eviction policy with capacity `cap`. Implement `get(key)` (return value or -1) and `put(key, value)` (insert or update; evict the LRU item when over capacity). Both operations must run in O(1) average time. Example: LRUCache(2); put(1,1); put(2,2); get(1) -> 1; put(3,3) (evicts key 2); get(2) -> -1.",
+    "answer": "Combine a doubly linked list with a hash map. The list maintains insertion/access order: most recently used at the tail, least recently used at the head. The map gives O(1) access to any node. On `get`, move the node to the tail. On `put`, update or insert at the tail; if over capacity, remove the head node and delete its key from the map. Sentinel head/tail dummy nodes simplify pointer manipulation.\n\n**Time O(1) per operation, Space O(capacity)**",
+    "code": "class LRUCache {\n  constructor(capacity) {\n    this.cap = capacity;\n    this.map = new Map();\n    this.head = { key: 0, val: 0, prev: null, next: null };\n    this.tail = { key: 0, val: 0, prev: null, next: null };\n    this.head.next = this.tail;\n    this.tail.prev = this.head;\n  }\n  _remove(node) {\n    node.prev.next = node.next;\n    node.next.prev = node.prev;\n  }\n  _insertTail(node) {\n    node.prev = this.tail.prev;\n    node.next = this.tail;\n    this.tail.prev.next = node;\n    this.tail.prev = node;\n  }\n  get(key) {\n    if (!this.map.has(key)) return -1;\n    const node = this.map.get(key);\n    this._remove(node);\n    this._insertTail(node);\n    return node.val;\n  }\n  put(key, value) {\n    if (this.map.has(key)) {\n      const node = this.map.get(key);\n      node.val = value;\n      this._remove(node);\n      this._insertTail(node);\n    } else {\n      if (this.map.size === this.cap) {\n        const lru = this.head.next;\n        this._remove(lru);\n        this.map.delete(lru.key);\n      }\n      const node = { key, val: value, prev: null, next: null };\n      this._insertTail(node);\n      this.map.set(key, node);\n    }\n  }\n}",
+    "codeLang": "js",
+    "tags": ["design", "hashing", "linked-list"],
+    "difficulty": "medium",
+    "short": "**Doubly linked list + hash map: list maintains recency order (MRU at tail, LRU at head); map gives O(1) node access for instant move-to-tail.**\n\n- **Approach:** `get` and `put` both move the accessed node to the tail; eviction removes `head.next` (the true LRU).\n- **Complexity:** `O(1)` per operation, `O(capacity)` space.\n- **Watch out:** use sentinel head/tail dummy nodes to avoid null-pointer edge cases when removing from or inserting at the boundaries."
+  },
+  {
+    "id": "dsa-rotate-image",
+    "question": "You are given an `n x n` 2D matrix representing an image. Rotate the image by 90 degrees clockwise in-place. Example: Input matrix = [[1,2,3],[4,5,6],[7,8,9]] -> Output [[7,4,1],[8,5,2],[9,6,3]].",
+    "answer": "Two-step in-place approach: first transpose the matrix (swap `matrix[i][j]` with `matrix[j][i]` for all `i < j`), then reverse each row. Transposing moves rows to columns; reversing each row converts a counter-clockwise result into a clockwise 90-degree rotation. No additional matrix is needed.\n\n**Time O(n^2), Space O(1)**",
+    "code": "function rotate(matrix) {\n  const n = matrix.length;\n  for (let i = 0; i < n; i++) {\n    for (let j = i + 1; j < n; j++) {\n      [matrix[i][j], matrix[j][i]] = [matrix[j][i], matrix[i][j]];\n    }\n  }\n  for (let i = 0; i < n; i++) matrix[i].reverse();\n}",
+    "codeLang": "js",
+    "tags": ["array", "matrix", "math"],
+    "difficulty": "medium",
+    "short": "**Transpose the matrix (swap across the main diagonal), then reverse each row — two in-place steps equal a 90-degree clockwise rotation.**\n\n- **Approach:** step 1: `swap(matrix[i][j], matrix[j][i])` for `j > i`; step 2: `matrix[i].reverse()` for each row.\n- **Complexity:** `O(n^2)` time, `O(1)` space.\n- **Watch out:** only swap elements where `j > i` during the transpose — swapping both directions would undo the change."
+  }
+]
