@@ -4,11 +4,15 @@ import { useMemo, useState } from "react";
 import SectionTabs from "./SectionTabs";
 import SearchBar from "./SearchBar";
 import QuestionCard from "./QuestionCard";
+import { getTopicMeta } from "@/lib/topicMeta";
 import type { Topic } from "@/data/types";
 
 export default function TopicPage({ topic }: { topic: Topic }) {
   const [activeId, setActiveId] = useState(topic.sections[0]?.id ?? "");
   const [query, setQuery] = useState("");
+
+  const meta = getTopicMeta(topic.slug);
+  const total = topic.sections.reduce((n, s) => n + s.questions.length, 0);
 
   const section =
     topic.sections.find((s) => s.id === activeId) ?? topic.sections[0];
@@ -25,10 +29,19 @@ export default function TopicPage({ topic }: { topic: Topic }) {
   }, [section, query]);
 
   return (
-    <div className="topic-page">
+    <div
+      className="topic-page"
+      style={{ "--tc": meta.color } as React.CSSProperties}
+    >
       <header className="topic-header">
-        <h1>{topic.name}</h1>
-        <p className="blurb">{topic.blurb}</p>
+        <span className="topic-glyph topic-glyph--lg" aria-hidden>
+          {meta.abbr}
+        </span>
+        <div className="topic-title">
+          <h1>{topic.name}</h1>
+          <p className="blurb">{topic.blurb}</p>
+          <p className="topic-total">{total} questions</p>
+        </div>
       </header>
 
       <SectionTabs
@@ -42,7 +55,7 @@ export default function TopicPage({ topic }: { topic: Topic }) {
 
       <SearchBar value={query} onChange={setQuery} />
 
-      <p className="result-count">
+      <p className="result-count" role="status">
         {filtered.length} question{filtered.length === 1 ? "" : "s"}
       </p>
 

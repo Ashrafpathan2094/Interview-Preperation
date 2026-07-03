@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import hljs from "highlight.js/lib/core";
 import type { LanguageFn } from "highlight.js";
 import javascript from "highlight.js/lib/languages/javascript";
@@ -40,6 +41,23 @@ export default function CodeBlock({
   code: string;
   lang?: string;
 }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Clear the "Copied" reset timer if the card unmounts first.
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard API unavailable (http/permissions) — silently ignore.
+    }
+  }
+
   // SAFETY: `html` is the output of highlight.js over our own authored code
   // samples (static data files) — never user input. highlight.js HTML-escapes
   // its input and emits only <span> wrappers, so this cannot inject markup.
@@ -49,11 +67,24 @@ export default function CodeBlock({
     : hljs.highlightAuto(code).value;
 
   return (
-    <pre className="code-block">
-      <code
-        className={`hljs language-${lang}`}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    </pre>
+    <figure className="code-block">
+      <figcaption className="code-head">
+        <span className="code-lang">{lang}</span>
+        <button
+          type="button"
+          className="copy-btn"
+          onClick={copy}
+          aria-live="polite"
+        >
+          {copied ? "Copied ✓" : "Copy"}
+        </button>
+      </figcaption>
+      <pre>
+        <code
+          className={`hljs language-${lang}`}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </pre>
+    </figure>
   );
 }

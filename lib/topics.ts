@@ -39,6 +39,12 @@ import webapisMixed from "@/data/web-apis/mixed.json";
 import sysdesignTheory from "@/data/system-design/theory.json";
 import sysdesignCoding from "@/data/system-design/coding.json";
 import sysdesignMixed from "@/data/system-design/mixed.json";
+import nextjsTheory from "@/data/nextjs/theory.json";
+import nextjsCoding from "@/data/nextjs/coding.json";
+import nextjsMixed from "@/data/nextjs/mixed.json";
+import nestjsTheory from "@/data/nestjs/theory.json";
+import nestjsCoding from "@/data/nestjs/coding.json";
+import nestjsMixed from "@/data/nestjs/mixed.json";
 import dsaEasy from "@/data/dsa/easy.json";
 import dsaMedium from "@/data/dsa/medium.json";
 import dsaHard from "@/data/dsa/hard.json";
@@ -125,6 +131,14 @@ export const topics: Topic[] = [
     reactMixed
   ),
   topic3(
+    "nextjs",
+    "Next.js",
+    "App Router, server components, rendering & caching.",
+    nextjsTheory,
+    nextjsCoding,
+    nextjsMixed
+  ),
+  topic3(
     "angular",
     "Angular",
     "Components, DI, RxJS & change detection.",
@@ -147,6 +161,14 @@ export const topics: Topic[] = [
     expressTheory,
     expressCoding,
     expressMixed
+  ),
+  topic3(
+    "nestjs",
+    "NestJS",
+    "Modules, DI, guards, pipes & interceptors.",
+    nestjsTheory,
+    nestjsCoding,
+    nestjsMixed
   ),
   topic3(
     "mongodb",

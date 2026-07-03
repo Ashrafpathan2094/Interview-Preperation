@@ -18,22 +18,41 @@ export default function QuestionCard({
   const hasShort = Boolean(q.short && q.short.trim());
 
   return (
-    <article className="question-card">
-      <header className="question-head">
-        <span className="q-number">{index + 1}</span>
-        <h3 className="q-text">{q.question}</h3>
-        {q.difficulty && (
-          <span className={`badge badge-${q.difficulty}`}>{q.difficulty}</span>
-        )}
-      </header>
-
-      <button
-        className="reveal-btn"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? "Hide answer ▴" : "Show answer ▸"}
-      </button>
+    <article
+      className={`question-card rise${open ? " is-open" : ""}`}
+      style={{ animationDelay: `${Math.min(index, 10) * 35}ms` }}
+    >
+      {/* h3 > button is the WAI-ARIA accordion pattern: the whole header is
+          the click target, and the heading keeps document outline semantics. */}
+      <h3 className="question-head">
+        <button
+          className="question-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="q-number">
+            {String(index + 1).padStart(2, "0")}
+          </span>
+          <span className="q-text">{q.question}</span>
+          {q.difficulty && (
+            <span className={`badge badge-${q.difficulty}`}>
+              {q.difficulty}
+            </span>
+          )}
+          <span className="chevron" aria-hidden>
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path
+                d="M6 9l6 6 6-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+        </button>
+      </h3>
 
       {open && (
         <div className="answer">
@@ -51,9 +70,7 @@ export default function QuestionCard({
                 aria-expanded={full}
                 onClick={() => setFull((v) => !v)}
               >
-                {full
-                  ? "Hide full explanation ▴"
-                  : "Show full explanation ▸"}
+                {full ? "Hide full explanation ▴" : "Show full explanation ▸"}
               </button>
 
               {full && (
