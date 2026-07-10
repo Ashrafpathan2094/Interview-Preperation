@@ -36,3 +36,32 @@ const FALLBACK: TopicMeta = { color: "#6ea8fe", abbr: "?" };
 export function getTopicMeta(slug: string): TopicMeta {
   return TOPIC_META[slug] ?? FALLBACK;
 }
+
+/** Course-catalog grouping used by the home page (learning-platform style). */
+export const TOPIC_GROUPS: { id: string; label: string; slugs: string[] }[] = [
+  {
+    id: "languages",
+    label: "Languages",
+    slugs: ["javascript", "typescript"],
+  },
+  {
+    id: "frontend",
+    label: "Frontend",
+    slugs: ["html", "css", "react", "nextjs", "angular"],
+  },
+  {
+    id: "backend",
+    label: "Backend & APIs",
+    slugs: ["nodejs", "express", "nestjs", "web-apis"],
+  },
+  {
+    id: "data",
+    label: "Databases",
+    slugs: ["mongodb", "sql"],
+  },
+  {
+    id: "foundations",
+    label: "Foundations",
+    slugs: ["git", "system-design", "dsa"],
+  },
+];
